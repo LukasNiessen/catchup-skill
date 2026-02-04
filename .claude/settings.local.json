@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tree:*)",
+      "Bash(python3 -m py_compile:*)",
+      "Bash(python -m pytest:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(python scripts/catchup.py:*)",
+      "Bash(python:*)"
+    ]
+  }
+}
