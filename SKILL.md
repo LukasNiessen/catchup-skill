@@ -96,7 +96,7 @@ echo "Edit to add your API keys for enhanced research."
 **Step 1: Run the research script**
 
 ```bash
-python3 ~/.claude/skills/catchup/scripts/catchup.py "$ARGUMENTS" --emit=compact 2>&1
+PY=$(python3 -c "" 2>/dev/null && echo python3 || echo python) && $PY ~/.claude/skills/briefbot/scripts/catchup.py "$ARGUMENTS" --emit=compact 2>&1
 ```
 
 The script will automatically:

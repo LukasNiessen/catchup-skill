@@ -4,7 +4,7 @@
 # Retrieves and consolidates recent discussions from Reddit, X, YouTube, and LinkedIn
 #
 # Invocation pattern:
-#     python3 catchup.py <subject_matter> [flags]
+#     python catchup.py <subject_matter> [flags]
 #
 # Supported flags:
 #     --mock              Substitute fixture data for live API responses

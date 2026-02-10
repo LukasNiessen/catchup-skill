@@ -6,7 +6,8 @@
       "Bash(python -m pytest:*)",
       "WebFetch(domain:github.com)",
       "Bash(python scripts/catchup.py:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(where:*)"
     ]
   }
 }

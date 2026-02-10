@@ -71,7 +71,8 @@ User: /catchup [topic] for [tool]
     SKILL.md parsed by Claude Code
           ↓
     Explore agent dispatches via Bash:
-    python3 ~/.claude/skills/catchup/scripts/catchup.py "$ARGUMENTS" --emit=compact
+    PY=$(python3 -c "" 2>/dev/null && echo python3 || echo python)
+    $PY ~/.claude/skills/briefbot/scripts/catchup.py "$ARGUMENTS" --emit=compact
           ↓
     Script runs parallel searches → processes → outputs results
           ↓
