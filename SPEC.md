@@ -6,6 +6,8 @@
 
 The skill operates in three modes depending on available API keys: **reddit-only** (OpenAI key), **x-only** (xAI key), or **both** (full cross-validation). It uses automatic model selection to stay current with the latest models from both providers, with optional pinning for stability.
 
+Note: this file is just documentation and does not impact runtime.
+
 ## Architecture
 
 The orchestrator (`catchup.py`) coordinates discovery, enrichment, normalization, scoring, deduplication, and rendering. Each concern is isolated in `scripts/lib/`:
@@ -29,24 +31,30 @@ The orchestrator (`catchup.py`) coordinates discovery, enrichment, normalization
 Other skills can import the research context in several ways:
 
 ### Inline Context Injection
+
 ```markdown
 ## Recent Research Context
+
 !python3 ~/.claude/skills/catchup/scripts/catchup.py "your topic" --emit=context
 ```
 
 ### Read from File
+
 ```markdown
 ## Research Context
+
 !cat ~/.local/share/catchup/out/catchup.context.md
 ```
 
 ### Get Path for Dynamic Loading
+
 ```bash
 CONTEXT_PATH=$(python3 ~/.claude/skills/catchup/scripts/catchup.py "topic" --emit=path)
 cat "$CONTEXT_PATH"
 ```
 
 ### JSON for Programmatic Use
+
 ```bash
 python3 ~/.claude/skills/catchup/scripts/catchup.py "topic" --emit=json > research.json
 ```
