@@ -1,5 +1,5 @@
 #
-# Network Layer: HTTP client implementation for the catchup skill
+# Network Layer: HTTP client implementation for the BriefBot skill
 # Uses only standard library modules for maximum compatibility
 #
 

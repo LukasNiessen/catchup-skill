@@ -111,7 +111,7 @@ class ContextPathRetrievalVerification(unittest.TestCase):
     def test_returns_path_string(self):
         computed_result = render.get_context_path()
         self.assertIsInstance(computed_result, str)
-        self.assertIn("catchup.context.md", computed_result)
+        self.assertIn("briefbot.context.md", computed_result)
 
 
 if __name__ == "__main__":

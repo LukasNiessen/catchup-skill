@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="assets/swimmom-mockup.jpeg" width="200" alt="catchup skill"/>
+  <img src="assets/swimmom-mockup.jpeg" width="200" alt="BriefBot skill"/>
 </p>
 
-<h1 align="center">/catchup</h1>
+<h1 align="center">/briefbot</h1>
 
 <p align="center">
   <strong>Research any topic from the last N days across Reddit, X, YouTube, LinkedIn & the web</strong>
@@ -18,7 +18,7 @@
 
 ---
 
-The AI world reinvents itself every month. This Claude Code skill keeps you current. `/catchup` researches your topic across Reddit, X, and the web, finds what the community is actually upvoting and sharing, and writes you a prompt that works today—not six months ago.
+The AI world reinvents itself every month. This Claude Code skill keeps you current. `/briefbot` researches your topic across Reddit, X, and the web, finds what the community is actually upvoting and sharing, and writes you a prompt that works today—not six months ago.
 
 **Best for prompt research**: discover what prompting techniques actually work for any tool (ChatGPT, Midjourney, Claude, Figma AI, etc.) by learning from real community discussions.
 
@@ -31,18 +31,18 @@ The AI world reinvents itself every month. This Claude Code skill keeps you curr
 ### 1. Clone the repo
 
 ```bash
-git clone https://github.com/mvanhorn/catchup-skill.git ~/.claude/skills/catchup
+git clone https://github.com/mvanhorn/briefbot-skill.git ~/.claude/skills/briefbot
 ```
 
 ### 2. Add your API keys (optional)
 
 ```bash
-mkdir -p ~/.config/catchup
-cat > ~/.config/catchup/.env << 'EOF'
+mkdir -p ~/.config/briefbot
+cat > ~/.config/briefbot/.env << 'EOF'
 OPENAI_API_KEY=sk-...
 XAI_API_KEY=xai-...
 EOF
-chmod 600 ~/.config/catchup/.env
+chmod 600 ~/.config/briefbot/.env
 ```
 
 > **Note:** API keys are optional. The skill works with WebSearch fallback if no keys are configured.
@@ -50,9 +50,9 @@ chmod 600 ~/.config/catchup/.env
 ### 3. Use the skill
 
 ```
-/catchup [topic]
-/catchup [topic] for [tool]
-/catchup [topic] --days=7
+/briefbot [topic]
+/briefbot [topic] for [tool]
+/briefbot [topic] --days=7
 ```
 
 ---
@@ -61,12 +61,12 @@ chmod 600 ~/.config/catchup/.env
 
 | Use Case | Example Query | What You Get |
 |----------|---------------|--------------|
-| **Prompt Research** | `/catchup prompting techniques for ChatGPT` | Techniques + copy-paste prompts |
-| **Tool Best Practices** | `/catchup how to use Remotion with Claude Code` | Real workflows from developers |
-| **Trend Discovery** | `/catchup best rap songs lately` | Curated lists with engagement data |
-| **Product Research** | `/catchup what do people think of M4 MacBook` | Community sentiment analysis |
-| **Viral Content** | `/catchup dog as human ChatGPT trend` | Trending prompts and examples |
-| **News & Updates** | `/catchup what's happening with DeepSeek R1` | Current discussions and opinions |
+| **Prompt Research** | `/briefbot prompting techniques for ChatGPT` | Techniques + copy-paste prompts |
+| **Tool Best Practices** | `/briefbot how to use Remotion with Claude Code` | Real workflows from developers |
+| **Trend Discovery** | `/briefbot best rap songs lately` | Curated lists with engagement data |
+| **Product Research** | `/briefbot what do people think of M4 MacBook` | Community sentiment analysis |
+| **Viral Content** | `/briefbot dog as human ChatGPT trend` | Trending prompts and examples |
+| **News & Updates** | `/briefbot what's happening with DeepSeek R1` | Current discussions and opinions |
 
 ---
 
@@ -98,11 +98,11 @@ Results are ranked by **what the community actually cares about**, not just keyw
 Search any time window with the `--days` flag:
 
 ```bash
-/catchup AI news --days=1      # Today only
-/catchup AI news --days=7      # Last week
-/catchup AI news --days=30     # Last month (default)
-/catchup AI news --days=90     # Last 3 months
-/catchup AI news --days=365    # Last year
+/briefbot AI news --days=1      # Today only
+/briefbot AI news --days=7      # Last week
+/briefbot AI news --days=30     # Last month (default)
+/briefbot AI news --days=90     # Last 3 months
+/briefbot AI news --days=365    # Last year
 ```
 
 ### Smart Deduplication
@@ -132,7 +132,7 @@ Automatically removes duplicate content across platforms and identifies cross-po
 <details>
 <summary><strong>Legal Prompting (Hallucination Prevention)</strong></summary>
 
-**Query:** `/catchup prompting techniques for chatgpt for legal questions`
+**Query:** `/briefbot prompting techniques for chatgpt for legal questions`
 
 **Research Output:**
 > The dominant theme is hallucination prevention - multiple sources discuss lawyers being fined for submitting fake case citations. Key strategies: (1) Deep Research mode with uploaded primary sources, (2) "Hallucination Prevention Systems" that force epistemic honesty, (3) prompting for procedural questions rather than case law.
@@ -156,7 +156,7 @@ Important constraints:
 <details>
 <summary><strong>iOS App Mockup (Nano Banana Pro)</strong></summary>
 
-**Query:** `/catchup prompting tips for nano banana pro for ios designs`
+**Query:** `/briefbot prompting tips for nano banana pro for ios designs`
 
 **Research Output:**
 > JSON-structured prompts dominate for UI work. Key workflow: define window frame first, then UI layout, then text labels. Use an 8pt grid and limit to 6-8 elements per screen.
@@ -191,7 +191,7 @@ Important constraints:
 <details>
 <summary><strong>Viral Trend Discovery (Dog as Human)</strong></summary>
 
-**Query:** `/catchup using ChatGPT to make images of dogs`
+**Query:** `/briefbot using ChatGPT to make images of dogs`
 
 **Research Output:**
 > The Reddit community is obsessed with the "dog as human" trend - uploading photos of their dogs and asking ChatGPT to show what they'd look like as a person (threads with 600-900+ upvotes).
@@ -215,7 +215,7 @@ human face. Make it a realistic portrait photo, not a cartoon.
 <details>
 <summary><strong>Photorealistic Portraits (Aging Grid)</strong></summary>
 
-**Query:** `/catchup photorealistic people in nano banana pro`
+**Query:** `/briefbot photorealistic people in nano banana pro`
 
 **Research Output:**
 > JSON prompts with specific fields for demographics, skin texture, lighting, and camera settings. Use "preserve_original": true for reference photos.
@@ -262,7 +262,7 @@ At least one key is recommended for best results, but the skill works without an
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        /catchup [topic]                         │
+│                        /briefbot [topic]                         │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼

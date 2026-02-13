@@ -1,5 +1,5 @@
 ---
-name: catchup
+name: briefbot
 description: Research a topic from the last 30 days on Reddit + X + YouTube + LinkedIn + Web, become an expert, and write copy-paste-ready prompts for the user's target tool.
 argument-hint: "[topic] for [tool]" or "[topic]"
 context: fork
@@ -8,7 +8,7 @@ disable-model-invocation: true
 allowed-tools: Bash, Read, Write, AskUserQuestion, WebSearch
 ---
 
-# catchup: Research Any Topic from the Last 30 Days
+# BriefBot: Research Any Topic from the Last 30 Days
 
 Research ANY topic across Reddit, X, YouTube, LinkedIn, and the web. Surface what people are actually discussing, recommending, and debating right now.
 
@@ -68,9 +68,9 @@ The skill works in multiple modes based on available API keys:
 If the user wants to add API keys for better results:
 
 ```bash
-mkdir -p ~/.config/catchup
-cat > ~/.config/catchup/.env << 'ENVEOF'
-# catchup API Configuration
+mkdir -p ~/.config/briefbot
+cat > ~/.config/briefbot/.env << 'ENVEOF'
+# BriefBot API Configuration
 # Both keys are optional - skill works with WebSearch fallback
 
 # For Reddit, YouTube, LinkedIn research (uses OpenAI's web_search tool)
@@ -78,10 +78,13 @@ OPENAI_API_KEY=
 
 # For X/Twitter research (uses xAI's x_search tool)
 XAI_API_KEY=
+
+# For premium TTS audio output (optional, --audio flag)
+ELEVENLABS_API_KEY=
 ENVEOF
 
-chmod 600 ~/.config/catchup/.env
-echo "Config created at ~/.config/catchup/.env"
+chmod 600 ~/.config/briefbot/.env
+echo "Config created at ~/.config/briefbot/.env"
 echo "Edit to add your API keys for enhanced research."
 ```
 
@@ -96,7 +99,7 @@ echo "Edit to add your API keys for enhanced research."
 **Step 1: Run the research script**
 
 ```bash
-PY=$(python3 -c "" 2>/dev/null && echo python3 || echo python) && $PY ~/.claude/skills/briefbot/scripts/catchup.py "$ARGUMENTS" --emit=compact 2>&1
+PY=$(python3 -c "" 2>/dev/null && echo python3 || echo python) && $PY ~/.claude/skills/briefbot/scripts/briefbot.py "$ARGUMENTS" --emit=compact 2>&1
 ```
 
 The script will automatically:
@@ -171,6 +174,38 @@ Use TaskOutput to get the script results before proceeding to synthesis.
   - `--days=1` → Today only
   - `--days=90` → Last 3 months
   - `--days=365` → Last year
+
+**Audio output:**
+
+- `--audio` → Generate an MP3 audio briefing of the research output
+  - Saves to `~/.claude/skills/briefbot/output/briefbot.mp3`
+  - Uses ElevenLabs if `ELEVENLABS_API_KEY` is set in `~/.config/briefbot/.env`
+  - Otherwise uses `edge-tts` (install with `pip install edge-tts`)
+
+**Scheduled jobs:**
+
+- `--schedule "0 6 * * *" --email user@example.com` → Create a scheduled job that runs research and emails results
+  - Cron expression format: `minute hour day-of-month month day-of-week`
+  - Examples: `"0 6 * * *"` (daily 6am), `"0 8 * * 1-5"` (weekdays 8am), `"0 9 1 * *"` (1st of month)
+  - Captures current `--quick`/`--deep`/`--audio`/`--days`/`--sources` flags into the job
+  - Requires SMTP configuration in `~/.config/briefbot/.env` (see below)
+- `--list-jobs` → Display all registered scheduled jobs with status
+- `--delete-job cu_XXXXXX` → Remove a job from the OS scheduler and registry
+
+**SMTP setup for scheduled jobs:**
+
+Add these to `~/.config/briefbot/.env`:
+
+```
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=you@gmail.com
+SMTP_PASSWORD=your-app-password
+SMTP_FROM=you@gmail.com
+SMTP_USE_TLS=true
+```
+
+For Gmail: use an [App Password](https://support.google.com/accounts/answer/185833), not your regular password.
 
 ---
 
@@ -291,7 +326,7 @@ For **web-only mode** (no API keys):
 ├─ 🌐 Web: {n} pages │ {domains}
 └─ Top sources: {author1} on {site1}, {author2} on {site2}
 
-💡 Want engagement metrics? Add API keys to ~/.config/catchup/.env
+💡 Want engagement metrics? Add API keys to ~/.config/briefbot/.env
    - OPENAI_API_KEY → Reddit, YouTube, LinkedIn (real engagement)
    - XAI_API_KEY → X/Twitter (real likes & reposts)
 ```
@@ -429,5 +464,5 @@ For **web-only mode**:
 
 Want another prompt? Just tell me what you're creating next.
 
-💡 Unlock all sources: Add API keys to ~/.config/catchup/.env
+💡 Unlock all sources: Add API keys to ~/.config/briefbot/.env
 ```

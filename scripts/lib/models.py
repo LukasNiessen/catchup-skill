@@ -1,5 +1,5 @@
 #
-# Model Selection: Automatic API model discovery and selection for the catchup skill
+# Model Selection: Automatic API model discovery and selection for the BriefBot skill
 # Handles model availability checks and version-based prioritization
 #
 

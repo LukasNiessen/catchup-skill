@@ -32,7 +32,7 @@ Colors = TerminalStyles
 
 HEADER_ART = """{}{}\n   \u2588\u2588\u2588\u2588\u2588\u2588\u2557 \u2588\u2588\u2588\u2588\u2588\u2557 \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2557 \u2588\u2588\u2588\u2588\u2588\u2588\u2557\u2588\u2588\u2557  \u2588\u2588\u2557\u2588\u2588\u2557   \u2588\u2588\u2557\u2588\u2588\u2588\u2588\u2588\u2588\u2557\n  \u2588\u2588\u2554\u2550\u2550\u2550\u2550\u255d\u2588\u2588\u2554\u2550\u2550\u2588\u2588\u2557\u255a\u2550\u2550\u2588\u2588\u2554\u2550\u2550\u255d\u2588\u2588\u2554\u2550\u2550\u2550\u2550\u255d\u2588\u2588\u2551  \u2588\u2588\u2551\u2588\u2588\u2551   \u2588\u2588\u2551\u2588\u2588\u2554\u2550\u2550\u2588\u2588\u2557\n  \u2588\u2588\u2551     \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2551   \u2588\u2588\u2551   \u2588\u2588\u2551     \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2551\u2588\u2588\u2551   \u2588\u2588\u2551\u2588\u2588\u2588\u2588\u2588\u2588\u2554\u255d\n  \u2588\u2588\u2551     \u2588\u2588\u2554\u2550\u2550\u2588\u2588\u2551   \u2588\u2588\u2551   \u2588\u2588\u2551     \u2588\u2588\u2554\u2550\u2550\u2588\u2588\u2551\u2588\u2588\u2551   \u2588\u2588\u2551\u2588\u2588\u2554\u2550\u2550\u2550\u255d\n  \u255a\u2588\u2588\u2588\u2588\u2588\u2588\u2557\u2588\u2588\u2551  \u2588\u2588\u2551   \u2588\u2588\u2551   \u255a\u2588\u2588\u2588\u2588\u2588\u2588\u2557\u2588\u2588\u2551  \u2588\u2588\u2551\u255a\u2588\u2588\u2588\u2588\u2588\u2588\u2554\u255d\u2588\u2588\u2551\n   \u255a\u2550\u2550\u2550\u2550\u2550\u255d\u255a\u2550\u255d  \u255a\u2550\u255d   \u255a\u2550\u255d    \u255a\u2550\u2550\u2550\u2550\u2550\u255d\u255a\u2550\u255d  \u255a\u2550\u255d \u255a\u2550\u2550\u2550\u2550\u2550\u255d \u255a\u2550\u255d\n{}{}  30 days of research. 30 seconds of work.{}\n""".format(TerminalStyles.MAGENTA, TerminalStyles.EMPHASIZED, TerminalStyles.NORMAL, TerminalStyles.SUBDUED, TerminalStyles.NORMAL)
 
-COMPACT_HEADER = "{}{}/catchup{} {}\xb7 researching...{}".format(TerminalStyles.MAGENTA, TerminalStyles.EMPHASIZED, TerminalStyles.NORMAL, TerminalStyles.SUBDUED, TerminalStyles.NORMAL)
+COMPACT_HEADER = "{}{}/briefbot{} {}\xb7 researching...{}".format(TerminalStyles.MAGENTA, TerminalStyles.EMPHASIZED, TerminalStyles.NORMAL, TerminalStyles.SUBDUED, TerminalStyles.NORMAL)
 
 # Preserve the original variable names for API compatibility
 BANNER = HEADER_ART
@@ -86,6 +86,14 @@ WEB_STATUS_VARIANTS = [
     "Discovering tutorials...",
 ]
 
+# Status messages for TTS phase
+TTS_STATUS_VARIANTS = [
+    "Generating audio...",
+    "Converting to speech...",
+    "Recording the briefing...",
+    "Synthesizing audio...",
+]
+
 # Preserve the original variable names for API compatibility
 REDDIT_MESSAGES = REDDIT_STATUS_VARIANTS
 X_MESSAGES = X_STATUS_VARIANTS
@@ -96,7 +104,7 @@ WEB_ONLY_MESSAGES = WEB_STATUS_VARIANTS
 # Promotional content for users without API keys
 UPGRADE_NOTICE = """
 {}{}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501{}
-{}\u26a1 UNLOCK THE FULL POWER OF /catchup{}
+{}\u26a1 UNLOCK THE FULL POWER OF /briefbot{}
 
 {}Right now you're using web search only. Add API keys to unlock:{}
 
@@ -108,13 +116,13 @@ UPGRADE_NOTICE = """
   {}\U0001f535 X (Twitter){} - Real-time posts, likes, reposts from creators
      \u2514\u2500 Add XAI_API_KEY (uses xAI's live X search)
 
-{}Setup:{} Edit {}~/.config/catchup/.env{}
+{}Setup:{} Edit {}~/.config/briefbot/.env{}
 {}{}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501{}
 """.format(TerminalStyles.AMBER, TerminalStyles.EMPHASIZED, TerminalStyles.NORMAL, TerminalStyles.AMBER, TerminalStyles.NORMAL, TerminalStyles.SUBDUED, TerminalStyles.NORMAL, TerminalStyles.AMBER, TerminalStyles.NORMAL, TerminalStyles.CRIMSON, TerminalStyles.NORMAL, TerminalStyles.AZURE, TerminalStyles.NORMAL, TerminalStyles.TEAL, TerminalStyles.NORMAL, TerminalStyles.SUBDUED, TerminalStyles.NORMAL, TerminalStyles.EMPHASIZED, TerminalStyles.NORMAL, TerminalStyles.AMBER, TerminalStyles.EMPHASIZED, TerminalStyles.NORMAL)
 
 UPGRADE_NOTICE_PLAIN = """
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\u26a1 UNLOCK THE FULL POWER OF /catchup
+\u26a1 UNLOCK THE FULL POWER OF /briefbot
 
 Right now you're using web search only. Add API keys to unlock:
 
@@ -126,7 +134,7 @@ Right now you're using web search only. Add API keys to unlock:
   \U0001f535 X (Twitter) - Real-time posts, likes, reposts from creators
      \u2514\u2500 Add XAI_API_KEY (uses xAI's live X search)
 
-Setup: Edit ~/.config/catchup/.env
+Setup: Edit ~/.config/briefbot/.env
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 """
 
@@ -136,13 +144,13 @@ PROMO_MESSAGE_PLAIN = UPGRADE_NOTICE_PLAIN
 
 # Shorter hints for single missing key
 SINGLE_KEY_HINTS = {
-    "reddit": "\n{}\U0001f4a1 Tip: Add {}{}{}{} to ~/.config/catchup/.env for Reddit, YouTube & LinkedIn data!{}\n".format(TerminalStyles.SUBDUED, TerminalStyles.AMBER, "OPENAI_API_KEY", TerminalStyles.NORMAL, TerminalStyles.SUBDUED, TerminalStyles.NORMAL),
-    "x": "\n{}\U0001f4a1 Tip: Add {}{}{}{} to ~/.config/catchup/.env for X/Twitter data with real likes & reposts!{}\n".format(TerminalStyles.SUBDUED, TerminalStyles.TEAL, "XAI_API_KEY", TerminalStyles.NORMAL, TerminalStyles.SUBDUED, TerminalStyles.NORMAL),
+    "reddit": "\n{}\U0001f4a1 Tip: Add {}{}{}{} to ~/.config/briefbot/.env for Reddit, YouTube & LinkedIn data!{}\n".format(TerminalStyles.SUBDUED, TerminalStyles.AMBER, "OPENAI_API_KEY", TerminalStyles.NORMAL, TerminalStyles.SUBDUED, TerminalStyles.NORMAL),
+    "x": "\n{}\U0001f4a1 Tip: Add {}{}{}{} to ~/.config/briefbot/.env for X/Twitter data with real likes & reposts!{}\n".format(TerminalStyles.SUBDUED, TerminalStyles.TEAL, "XAI_API_KEY", TerminalStyles.NORMAL, TerminalStyles.SUBDUED, TerminalStyles.NORMAL),
 }
 
 SINGLE_KEY_HINTS_PLAIN = {
-    "reddit": "\n\U0001f4a1 Tip: Add OPENAI_API_KEY to ~/.config/catchup/.env for Reddit, YouTube & LinkedIn data!\n",
-    "x": "\n\U0001f4a1 Tip: Add XAI_API_KEY to ~/.config/catchup/.env for X/Twitter data with real likes & reposts!\n",
+    "reddit": "\n\U0001f4a1 Tip: Add OPENAI_API_KEY to ~/.config/briefbot/.env for Reddit, YouTube & LinkedIn data!\n",
+    "x": "\n\U0001f4a1 Tip: Add XAI_API_KEY to ~/.config/briefbot/.env for X/Twitter data with real likes & reposts!\n",
 }
 
 # Preserve the original variable names for API compatibility
@@ -230,7 +238,7 @@ class ResearchProgressTracker:
             sys.stderr.write(COMPACT_HEADER + "\n")
             sys.stderr.write("{}Topic: {}{}{}{}\n\n".format(TerminalStyles.SUBDUED, TerminalStyles.NORMAL, TerminalStyles.EMPHASIZED, self.subject_matter, TerminalStyles.NORMAL))
         else:
-            sys.stderr.write("/catchup \xb7 researching: {}\n".format(self.subject_matter))
+            sys.stderr.write("/briefbot \xb7 researching: {}\n".format(self.subject_matter))
         sys.stderr.flush()
 
     def start_reddit(self):
@@ -330,6 +338,17 @@ class ResearchProgressTracker:
         else:
             sys.stderr.write("\u2713 Ready for web search ({:.1f}s)\n".format(elapsed_seconds))
         sys.stderr.flush()
+
+    def start_tts(self):
+        """Initiates TTS generation indicator."""
+        status_variant = random.choice(TTS_STATUS_VARIANTS)
+        self.indicator = AnimatedIndicator("{}Audio{} {}".format(TerminalStyles.MAGENTA, TerminalStyles.NORMAL, status_variant), TerminalStyles.MAGENTA)
+        self.indicator.start()
+
+    def end_tts(self, output_file: str):
+        """Terminates TTS indicator with file path."""
+        if self.indicator:
+            self.indicator.stop("{}Audio{} Saved to {}".format(TerminalStyles.MAGENTA, TerminalStyles.NORMAL, output_file))
 
     def show_promo(self, missing_keys: str = "both"):
         """

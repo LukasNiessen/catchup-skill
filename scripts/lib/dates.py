@@ -1,5 +1,5 @@
 #
-# Temporal Utilities: Date manipulation and validation for the catchup skill
+# Temporal Utilities: Date manipulation and validation for the BriefBot skill
 # Provides date parsing, range calculation, and recency scoring
 #
 

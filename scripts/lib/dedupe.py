@@ -1,5 +1,5 @@
 #
-# Similarity Detection: Near-duplicate identification for the catchup skill
+# Similarity Detection: Near-duplicate identification for the BriefBot skill
 # Uses n-gram analysis and Jaccard similarity to find redundant content
 #
 

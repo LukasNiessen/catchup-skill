@@ -1,5 +1,5 @@
 #
-# Configuration Management: Environment and credential handling for the catchup skill
+# Configuration Management: Environment and credential handling for the BriefBot skill
 # Manages API key loading and source availability determination
 #
 
@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 
 # Configuration file locations
-SETTINGS_DIRECTORY = Path.home() / ".config" / "catchup"
+SETTINGS_DIRECTORY = Path.home() / ".config" / "briefbot"
 SETTINGS_FILEPATH = SETTINGS_DIRECTORY / ".env"
 
 
@@ -78,6 +78,14 @@ def assemble_configuration() -> Dict[str, Any]:
         'OPENAI_MODEL_PIN': os.environ.get('OPENAI_MODEL_PIN') or file_settings.get('OPENAI_MODEL_PIN'),
         'XAI_MODEL_POLICY': os.environ.get('XAI_MODEL_POLICY') or file_settings.get('XAI_MODEL_POLICY', 'latest'),
         'XAI_MODEL_PIN': os.environ.get('XAI_MODEL_PIN') or file_settings.get('XAI_MODEL_PIN'),
+        'ELEVENLABS_API_KEY': os.environ.get('ELEVENLABS_API_KEY') or file_settings.get('ELEVENLABS_API_KEY'),
+        'ELEVENLABS_VOICE_ID': os.environ.get('ELEVENLABS_VOICE_ID') or file_settings.get('ELEVENLABS_VOICE_ID'),
+        'SMTP_HOST': os.environ.get('SMTP_HOST') or file_settings.get('SMTP_HOST'),
+        'SMTP_PORT': os.environ.get('SMTP_PORT') or file_settings.get('SMTP_PORT', '587'),
+        'SMTP_USER': os.environ.get('SMTP_USER') or file_settings.get('SMTP_USER'),
+        'SMTP_PASSWORD': os.environ.get('SMTP_PASSWORD') or file_settings.get('SMTP_PASSWORD'),
+        'SMTP_FROM': os.environ.get('SMTP_FROM') or file_settings.get('SMTP_FROM'),
+        'SMTP_USE_TLS': os.environ.get('SMTP_USE_TLS') or file_settings.get('SMTP_USE_TLS', 'true'),
     }
 
     return configuration
@@ -175,7 +183,7 @@ def validate_sources(
         elif requested_sources == 'web':
             return 'web', None
         else:
-            return 'web', "No API keys configured. Using WebSearch fallback. Add keys to ~/.config/catchup/.env for Reddit/X/YouTube/LinkedIn."
+            return 'web', "No API keys configured. Using WebSearch fallback. Add keys to ~/.config/briefbot/.env for Reddit/X/YouTube/LinkedIn."
 
     # Auto mode: use whatever is available
     if requested_sources == 'auto':

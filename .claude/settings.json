@@ -1,0 +1,3 @@
+{
+  "allowedTools": ["Edit", "Read", "Bash(git log *)"]
+}

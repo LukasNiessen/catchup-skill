@@ -1,5 +1,5 @@
 #
-# Persistence Layer: Caching subsystem for the catchup skill
+# Persistence Layer: Caching subsystem for the BriefBot skill
 # Manages disk-based storage of API responses and model selections
 #
 

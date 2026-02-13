@@ -5,9 +5,13 @@
       "Bash(python3 -m py_compile:*)",
       "Bash(python -m pytest:*)",
       "WebFetch(domain:github.com)",
-      "Bash(python scripts/catchup.py:*)",
+      "Bash(python scripts/briefbot.py:*)",
       "Bash(python:*)",
-      "Bash(where:*)"
+      "Bash(where:*)",
+      "Bash(^d \")",
+      "Bash(pip install:*)",
+      "Bash(PYTHONIOENCODING=utf-8 python:*)",
+      "Bash(echo:*)"
     ]
   }
 }

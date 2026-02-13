@@ -1,23 +1,23 @@
-# Catchup Skill Architecture
+# BriefBot Skill Architecture
 
-This document explains how the `/catchup` skill works internally, for developers who want to understand, modify, or extend it.
+This document explains how the `/briefbot` skill works internally, for developers who want to understand, modify, or extend it.
 
 ## Overview
 
-The `/catchup` skill is a research automation tool that discovers trending topics across multiple platforms (Reddit, X/Twitter, YouTube, LinkedIn, and the web) from the past 30 days. It synthesizes findings into actionable insights and prompts.
+The `/briefbot` skill is a research automation tool that discovers trending topics across multiple platforms (Reddit, X/Twitter, YouTube, LinkedIn, and the web) from the past 30 days. It synthesizes findings into actionable insights and prompts.
 
 **Key differentiator**: Popularity-weighted ranking that combines engagement metrics (upvotes, likes, views) with relevance and recency scoring.
 
 ## Directory Structure
 
 ```
-catchup-skill/
+briefbot-skill/
 ├── SKILL.md                    # Skill definition (YAML frontmatter + instructions)
 ├── ARCHITECTURE.md             # This file
 ├── README.md                   # Installation & usage examples
 ├── SPEC.md                     # Technical specification
 ├── scripts/
-│   ├── catchup.py              # Main orchestrator
+│   ├── briefbot.py              # Main orchestrator
 │   └── lib/                    # Modular utilities
 │       ├── __init__.py
 │       ├── cache.py            # 24-hour TTL caching
@@ -47,7 +47,7 @@ catchup-skill/
 
 ```yaml
 ---
-name: catchup
+name: briefbot
 description: Research a topic from the last 30 days on Reddit + X + YouTube + LinkedIn + Web
 argument-hint: "[topic] for [tool]" or "[topic]"
 context: fork
@@ -66,13 +66,13 @@ allowed-tools: Bash, Read, Write, AskUserQuestion, WebSearch
 ### Invocation Flow
 
 ```
-User: /catchup [topic] for [tool]
+User: /briefbot [topic] for [tool]
           ↓
     SKILL.md parsed by Claude Code
           ↓
     Explore agent dispatches via Bash:
     PY=$(python3 -c "" 2>/dev/null && echo python3 || echo python)
-    $PY ~/.claude/skills/briefbot/scripts/catchup.py "$ARGUMENTS" --emit=compact
+    $PY ~/.claude/skills/briefbot/scripts/briefbot.py "$ARGUMENTS" --emit=compact
           ↓
     Script runs parallel searches → processes → outputs results
           ↓
@@ -323,7 +323,7 @@ render.render_compact()          # Output for Claude
 
 ## Configuration (`env.py`)
 
-**Config file location**: `~/.config/catchup/.env`
+**Config file location**: `~/.config/briefbot/.env`
 
 **Supported variables**:
 ```env
@@ -373,7 +373,7 @@ url = f"https://www.reddit.com{path}.json?raw_json=1"
 **stdlib-only** - No external dependencies (no `requests`).
 
 **Features**:
-- User-Agent: `catchup-skill/1.0 (Claude Code Skill)`
+- User-Agent: `briefbot-skill/1.0 (Claude Code Skill)`
 - Retry logic: 3 attempts with exponential backoff (1s, 2s, 3s)
 - 4xx errors: No retry (except 429 rate limits)
 - 5xx errors: Retry with backoff
@@ -382,14 +382,14 @@ url = f"https://www.reddit.com{path}.json?raw_json=1"
 
 - **TTL**: 24 hours
 - **Key**: Topic + date range hash
-- **Location**: `~/.cache/catchup/`
+- **Location**: `~/.cache/briefbot/`
 
 ## Output Location
 
-Generated files go to: `~/.local/share/catchup/out/`
+Generated files go to: `~/.local/share/briefbot/out/`
 - `report.json` - Full normalized data
 - `report.md` - Human-readable report
-- `catchup.context.md` - Snippet for other tools
+- `briefbot.context.md` - Snippet for other tools
 - `raw_*.json` - Raw API responses (debugging)
 
 ## Extension Points
@@ -411,7 +411,7 @@ Generated files go to: `~/.local/share/catchup/out/`
 4. Update `normalize.py`:
    - Add `normalize_newplatform_items()`
 
-5. Update `catchup.py`:
+5. Update `briefbot.py`:
    - Import new module
    - Add to parallel execution
    - Add to processing pipeline

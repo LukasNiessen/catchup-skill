@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 #
-# Catchup Module: Multi-platform content aggregation engine
+# BriefBot Module: Multi-platform content aggregation engine
 # Retrieves and consolidates recent discussions from Reddit, X, YouTube, and LinkedIn
 #
 # Invocation pattern:
-#     python catchup.py <subject_matter> [flags]
+#     python briefbot.py <subject_matter> [flags]
 #
 # Supported flags:
 #     --mock              Substitute fixture data for live API responses
@@ -13,6 +13,7 @@
 #     --quick             Streamlined mode - reduced result set (8-12 per platform)
 #     --deep              Exhaustive mode - expanded result set (50-70 Reddit, 40-60 X)
 #     --debug             Activate detailed diagnostic output
+#     --audio             Generate MP3 audio of the research output
 #
 
 import argparse
@@ -23,15 +24,23 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 
+# Fix Windows console encoding (cp1252 cannot handle emoji/box-drawing chars)
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 # Ensure library modules are discoverable
 MODULE_ROOT = Path(__file__).parent.resolve()
 sys.path.insert(0, str(MODULE_ROOT))
 
 from lib import (
+    cron_parse,
     dates,
     dedupe,
+    email_sender,
     env,
     http,
+    jobs,
     models,
     normalize,
     openai_linkedin,
@@ -39,8 +48,10 @@ from lib import (
     openai_youtube,
     reddit_enrich,
     render,
+    scheduler,
     schema,
     score,
+    tts,
     ui,
     websearch,
     xai_x,
@@ -562,8 +573,49 @@ def bootstrap():
         action="store_true",
         help="Include general web search alongside Reddit/X (lower weighted)",
     )
+    argument_parser.add_argument(
+        "--audio",
+        action="store_true",
+        help="Generate MP3 audio of the research output (uses edge-tts or ElevenLabs)",
+    )
+    argument_parser.add_argument(
+        "--schedule",
+        type=str,
+        metavar="CRON",
+        help='Create a scheduled job with a cron expression (e.g., "0 6 * * *" for daily at 6am)',
+    )
+    argument_parser.add_argument(
+        "--email",
+        type=str,
+        metavar="ADDRESS",
+        help="Email the report to this address (works standalone or with --schedule)",
+    )
+    argument_parser.add_argument(
+        "--list-jobs",
+        action="store_true",
+        help="List all registered scheduled jobs",
+    )
+    argument_parser.add_argument(
+        "--delete-job",
+        type=str,
+        metavar="JOB_ID",
+        help="Delete a scheduled job by ID (e.g., cu_ABC123)",
+    )
 
     cli_args = argument_parser.parse_args()
+
+    # Handle scheduling commands (exit early, no research)
+    if cli_args.list_jobs:
+        _handle_list_jobs()
+        return
+
+    if cli_args.delete_job:
+        _handle_delete_job(cli_args.delete_job)
+        return
+
+    if cli_args.schedule:
+        _handle_create_schedule(cli_args)
+        return
 
     # Activate diagnostic output when requested
     if cli_args.debug:
@@ -620,7 +672,7 @@ def bootstrap():
     absent_credentials = env.get_missing_keys(configuration)
 
     # Initialize the progress display subsystem
-    status_tracker = ui.ProgressDisplay(cli_args.topic, show_banner=True)
+    status_tracker = ui.ProgressDisplay(cli_args.topic, display_header=True)
 
     # Display promotional content for missing credentials before research begins
     if absent_credentials != "none":
@@ -752,6 +804,181 @@ def bootstrap():
         cli_args.topic, start_date, end_date, absent_credentials, day_count
     )
 
+    # Generate audio output if requested
+    audio_output_path = None
+    if cli_args.audio:
+        status_tracker.start_tts()
+        try:
+            compact_text = render.render_compact(report, absent_credentials=absent_credentials)
+            audio_output_dir = MODULE_ROOT.parent / "output"
+            audio_output_path = audio_output_dir / "briefbot.mp3"
+            tts.generate_audio(
+                compact_text,
+                audio_output_path,
+                elevenlabs_api_key=configuration.get("ELEVENLABS_API_KEY"),
+                elevenlabs_voice_id=configuration.get("ELEVENLABS_VOICE_ID"),
+            )
+            status_tracker.end_tts(str(audio_output_path))
+        except RuntimeError as tts_err:
+            status_tracker.show_error("TTS: {}".format(tts_err))
+            audio_output_path = None
+        except Exception as tts_err:
+            status_tracker.show_error("TTS failed: {}".format(tts_err))
+            audio_output_path = None
+
+    # Send email if --email was provided (non-scheduled, one-shot)
+    if cli_args.email and not cli_args.schedule:
+        smtp_error = email_sender.validate_smtp_config(configuration)
+        if smtp_error:
+            status_tracker.show_error(smtp_error)
+        else:
+            try:
+                report_text = render.render_compact(report, absent_credentials=absent_credentials)
+                now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                subject = "BriefBot: {} ({})".format(cli_args.topic, now_str)
+                email_sender.send_report_email(
+                    recipient=cli_args.email,
+                    subject=subject,
+                    markdown_body=report_text,
+                    config=configuration,
+                    audio_path=audio_output_path,
+                )
+                sys.stderr.write("Email sent to {}\n".format(cli_args.email))
+                sys.stderr.flush()
+            except Exception as mail_err:
+                status_tracker.show_error("Email failed: {}".format(mail_err))
+
+
+def _handle_list_jobs():
+    """Displays all registered scheduled jobs."""
+    all_jobs = jobs.list_jobs()
+
+    if not all_jobs:
+        print("No scheduled jobs registered.")
+        print("Create one with: python briefbot.py \"topic\" --schedule \"0 6 * * *\" --email you@example.com")
+        return
+
+    print("Scheduled jobs ({}):\n".format(len(all_jobs)))
+
+    for job in all_jobs:
+        try:
+            parsed = cron_parse.parse_cron_expression(job["schedule"])
+            schedule_desc = cron_parse.describe_schedule(parsed)
+        except ValueError:
+            schedule_desc = job["schedule"]
+
+        status_indicator = "OK" if job.get("last_status") == "success" else (
+            "ERR" if job.get("last_status") == "error" else "NEW"
+        )
+
+        print("  {} [{}]".format(job["id"], status_indicator))
+        print("    Topic:    {}".format(job["topic"]))
+        print("    Schedule: {} ({})".format(job["schedule"], schedule_desc))
+        if job.get("email"):
+            print("    Email:    {}".format(job["email"]))
+        if job.get("args", {}).get("audio"):
+            print("    Audio:    enabled")
+        print("    Runs:     {}".format(job.get("run_count", 0)))
+        if job.get("last_run"):
+            print("    Last run: {} ({})".format(job["last_run"], job.get("last_status", "unknown")))
+        if job.get("last_error"):
+            print("    Error:    {}".format(job["last_error"]))
+        print()
+
+
+def _handle_delete_job(job_id: str):
+    """Removes a scheduled job from both the OS scheduler and the registry."""
+    job = jobs.get_job(job_id)
+
+    if job is None:
+        print("Error: Job {} not found.".format(job_id), file=sys.stderr)
+        sys.exit(1)
+
+    # Remove from OS scheduler
+    try:
+        scheduler_msg = scheduler.unregister_job(job)
+        print(scheduler_msg)
+    except RuntimeError as err:
+        print("Warning: Could not remove from OS scheduler: {}".format(err), file=sys.stderr)
+
+    # Remove from registry
+    deleted = jobs.delete_job(job_id)
+    if deleted:
+        print("Job {} deleted from registry.".format(job_id))
+    else:
+        print("Warning: Job {} was not in registry.".format(job_id), file=sys.stderr)
+
+
+def _handle_create_schedule(cli_args):
+    """Creates a new scheduled job from CLI arguments."""
+    # Validate required arguments
+    if not cli_args.topic:
+        print("Error: Topic is required when creating a schedule.", file=sys.stderr)
+        print("Usage: python briefbot.py \"topic\" --schedule \"0 6 * * *\" --email you@example.com", file=sys.stderr)
+        sys.exit(1)
+
+    # Validate cron expression
+    try:
+        parsed = cron_parse.parse_cron_expression(cli_args.schedule)
+        schedule_desc = cron_parse.describe_schedule(parsed)
+    except ValueError as err:
+        print("Error: Invalid schedule: {}".format(err), file=sys.stderr)
+        sys.exit(1)
+
+    # Validate SMTP configuration only when email is requested
+    if cli_args.email:
+        configuration = env.get_config()
+        smtp_error = email_sender.validate_smtp_config(configuration)
+        if smtp_error:
+            print("Error: {}".format(smtp_error), file=sys.stderr)
+            sys.exit(1)
+
+    if not cli_args.email and not cli_args.audio:
+        print("Warning: No --email or --audio specified. The job will run research but produce no output.", file=sys.stderr)
+        print("Consider adding --audio and/or --email.", file=sys.stderr)
+
+    # Capture current CLI arguments into the job record
+    args_dict = {
+        "quick": cli_args.quick,
+        "deep": cli_args.deep,
+        "audio": cli_args.audio,
+        "days": cli_args.days,
+        "sources": cli_args.sources,
+        "include_web": cli_args.include_web,
+    }
+
+    # Create the job
+    job = jobs.create_job(
+        topic=cli_args.topic,
+        schedule=cli_args.schedule,
+        email=cli_args.email or "",
+        args_dict=args_dict,
+    )
+
+    print("Created scheduled job: {}".format(job["id"]))
+    print("  Topic:    {}".format(job["topic"]))
+    print("  Schedule: {} ({})".format(job["schedule"], schedule_desc))
+    if job["email"]:
+        print("  Email:    {}".format(job["email"]))
+    if cli_args.audio:
+        print("  Audio:    enabled")
+
+    # Register with OS scheduler
+    runner_path = MODULE_ROOT / "run_job.py"
+    try:
+        scheduler_msg = scheduler.register_job(job, runner_path)
+        print("  {}".format(scheduler_msg))
+    except RuntimeError as err:
+        print("\nWarning: Could not register with OS scheduler: {}".format(err), file=sys.stderr)
+        print("You can manually run: python {} {}".format(runner_path, job["id"]), file=sys.stderr)
+
+    # Show next occurrence
+    try:
+        next_fire = cron_parse.next_occurrence(parsed)
+        print("\n  Next run: {}".format(next_fire.strftime("%Y-%m-%d %H:%M")))
+    except ValueError:
+        pass
+
 
 def emit_research_output(
     report: schema.Report,
@@ -770,7 +997,7 @@ def emit_research_output(
     perform supplemental WebSearch queries.
     """
     format_handlers = {
-        "compact": lambda: print(render.render_compact(report, missing_keys=absent_credentials)),
+        "compact": lambda: print(render.render_compact(report, absent_credentials=absent_credentials)),
         "json": lambda: print(json.dumps(report.to_dict(), indent=2)),
         "md": lambda: print(render.render_full_report(report)),
         "context": lambda: print(report.context_snippet_md),

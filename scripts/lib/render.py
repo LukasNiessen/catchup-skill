@@ -9,7 +9,7 @@ from typing import List, Optional
 
 from . import schema
 
-ARTIFACT_DIRECTORY = Path.home() / ".local" / "share" / "catchup" / "out"
+ARTIFACT_DIRECTORY = Path.home() / ".local" / "share" / "briefbot" / "out"
 
 
 def initialize_output_directory():
@@ -594,7 +594,7 @@ def persist_all_artifacts(
     file_handle.close()
 
     # Write context fragment
-    file_handle = open(ARTIFACT_DIRECTORY / "catchup.context.md", 'w')
+    file_handle = open(ARTIFACT_DIRECTORY / "briefbot.context.md", 'w')
     file_handle.write(generate_context_fragment(research_report))
     file_handle.close()
 
@@ -631,7 +631,7 @@ write_outputs = persist_all_artifacts
 
 def retrieve_context_filepath() -> str:
     """Returns the filesystem path to the context fragment file."""
-    return str(ARTIFACT_DIRECTORY / "catchup.context.md")
+    return str(ARTIFACT_DIRECTORY / "briefbot.context.md")
 
 
 # Preserve the original function name for API compatibility
