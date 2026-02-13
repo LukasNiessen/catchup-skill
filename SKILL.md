@@ -109,6 +109,8 @@ The script will automatically:
 - Run Reddit/X searches if keys exist
 - Signal if WebSearch is needed
 
+**Schedule-only mode:** If `$ARGUMENTS` contains both `--schedule` and `--skip-immediate-run`, the script will create the scheduled job and exit. In this case, **STOP HERE** — do not proceed with WebSearch, synthesis, or delivery. Just report the scheduling result from the script output to the user and you're done.
+
 **Step 2: Check the output mode**
 
 The script output will indicate the mode:
@@ -192,7 +194,7 @@ Use TaskOutput to get the script results before proceeding to synthesis.
 - `--list-jobs` → Display all registered scheduled jobs with status
 - `--delete-job cu_XXXXXX` → Remove a job from the OS scheduler and registry
 
-**SMTP setup for scheduled jobs:**
+**SMTP setup for email delivery:**
 
 Add these to `~/.config/briefbot/.env`:
 
@@ -201,11 +203,14 @@ SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=you@gmail.com
 SMTP_PASSWORD=your-app-password
-SMTP_FROM=you@gmail.com
 SMTP_USE_TLS=true
 ```
 
+`SMTP_FROM` is optional — defaults to `SMTP_USER` (only needed if the "From:" address differs from login).
+
 For Gmail: use an [App Password](https://support.google.com/accounts/answer/185833), not your regular password.
+
+Multiple recipients: `--email alice@example.com,bob@example.com`
 
 ---
 
@@ -355,6 +360,31 @@ Options:
 ```
 
 **IMPORTANT**: After displaying this, WAIT for the user to respond. Don't dump generic prompts.
+
+---
+
+## Delivery (Email & Audio)
+
+**After showing the summary above**, check if `$ARGUMENTS` contained `--email` or `--audio`. If neither flag is present, skip this section entirely.
+
+If delivery is requested:
+
+1. **Write the full synthesis** (everything you displayed above — "What I learned", patterns, stats) to a file using the Write tool:
+
+   Path: `~/.claude/skills/briefbot/output/briefing.md`
+
+2. **Run the delivery script:**
+
+```bash
+PY=$(python3 -c "" 2>/dev/null && echo python3 || echo python) && $PY ~/.claude/skills/briefbot/scripts/deliver.py --content ~/.claude/skills/briefbot/output/briefing.md [FLAGS]
+```
+
+Build the `[FLAGS]` from `$ARGUMENTS`:
+- If `--audio` was in `$ARGUMENTS` → add `--audio`
+- If `--email ADDRESS` was in `$ARGUMENTS` → add `--email ADDRESS`
+- Always add `--subject "BriefBot: TOPIC (YYYY-MM-DD)"` using the actual topic and today's date
+
+3. **Report delivery status** to the user based on the script output (e.g., "Email sent to ...", "Audio saved to ...").
 
 ---
 

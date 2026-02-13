@@ -21,7 +21,6 @@ import json
 import os
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timezone
 from pathlib import Path
 
 # Fix Windows console encoding (cp1252 cannot handle emoji/box-drawing chars)
@@ -51,7 +50,6 @@ from lib import (
     scheduler,
     schema,
     score,
-    tts,
     ui,
     websearch,
     xai_x,
@@ -588,7 +586,7 @@ def bootstrap():
         "--email",
         type=str,
         metavar="ADDRESS",
-        help="Email the report to this address (works standalone or with --schedule)",
+        help="Email the report to this address (comma-separated for multiple recipients)",
     )
     argument_parser.add_argument(
         "--list-jobs",
@@ -600,6 +598,11 @@ def bootstrap():
         type=str,
         metavar="JOB_ID",
         help="Delete a scheduled job by ID (e.g., cu_ABC123)",
+    )
+    argument_parser.add_argument(
+        "--skip-immediate-run",
+        action="store_true",
+        help="With --schedule: only create the job, don't run research now",
     )
 
     cli_args = argument_parser.parse_args()
@@ -803,50 +806,6 @@ def bootstrap():
         report, cli_args.emit, requires_web_search,
         cli_args.topic, start_date, end_date, absent_credentials, day_count
     )
-
-    # Generate audio output if requested
-    audio_output_path = None
-    if cli_args.audio:
-        status_tracker.start_tts()
-        try:
-            compact_text = render.render_compact(report, absent_credentials=absent_credentials)
-            audio_output_dir = MODULE_ROOT.parent / "output"
-            audio_output_path = audio_output_dir / "briefbot.mp3"
-            tts.generate_audio(
-                compact_text,
-                audio_output_path,
-                elevenlabs_api_key=configuration.get("ELEVENLABS_API_KEY"),
-                elevenlabs_voice_id=configuration.get("ELEVENLABS_VOICE_ID"),
-            )
-            status_tracker.end_tts(str(audio_output_path))
-        except RuntimeError as tts_err:
-            status_tracker.show_error("TTS: {}".format(tts_err))
-            audio_output_path = None
-        except Exception as tts_err:
-            status_tracker.show_error("TTS failed: {}".format(tts_err))
-            audio_output_path = None
-
-    # Send email if --email was provided (non-scheduled, one-shot)
-    if cli_args.email and not cli_args.schedule:
-        smtp_error = email_sender.validate_smtp_config(configuration)
-        if smtp_error:
-            status_tracker.show_error(smtp_error)
-        else:
-            try:
-                report_text = render.render_compact(report, absent_credentials=absent_credentials)
-                now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-                subject = "BriefBot: {} ({})".format(cli_args.topic, now_str)
-                email_sender.send_report_email(
-                    recipient=cli_args.email,
-                    subject=subject,
-                    markdown_body=report_text,
-                    config=configuration,
-                    audio_path=audio_output_path,
-                )
-                sys.stderr.write("Email sent to {}\n".format(cli_args.email))
-                sys.stderr.flush()
-            except Exception as mail_err:
-                status_tracker.show_error("Email failed: {}".format(mail_err))
 
 
 def _handle_list_jobs():

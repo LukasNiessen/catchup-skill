@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 from lib.email_sender import (
     _build_email_message,
     _markdown_to_basic_html,
+    parse_recipients,
     validate_smtp_config,
 )
 
@@ -23,7 +24,15 @@ class TestValidateSmtpConfig:
             "SMTP_HOST": "smtp.gmail.com",
             "SMTP_USER": "user@gmail.com",
             "SMTP_PASSWORD": "app-password",
-            "SMTP_FROM": "user@gmail.com",
+        }
+        assert validate_smtp_config(config) is None
+
+    def test_valid_config_with_optional_from(self):
+        config = {
+            "SMTP_HOST": "smtp.gmail.com",
+            "SMTP_USER": "user@gmail.com",
+            "SMTP_PASSWORD": "app-password",
+            "SMTP_FROM": "alias@gmail.com",
         }
         assert validate_smtp_config(config) is None
 
@@ -31,7 +40,6 @@ class TestValidateSmtpConfig:
         config = {
             "SMTP_USER": "user@gmail.com",
             "SMTP_PASSWORD": "pass",
-            "SMTP_FROM": "user@gmail.com",
         }
         error = validate_smtp_config(config)
         assert error is not None
@@ -43,12 +51,20 @@ class TestValidateSmtpConfig:
         assert "SMTP_HOST" in error
         assert "SMTP_USER" in error
 
+    def test_smtp_from_not_required(self):
+        """SMTP_FROM is optional — should not appear in missing keys."""
+        config = {
+            "SMTP_HOST": "smtp.gmail.com",
+            "SMTP_USER": "user@gmail.com",
+            "SMTP_PASSWORD": "pass",
+        }
+        assert validate_smtp_config(config) is None
+
     def test_empty_values_treated_as_missing(self):
         config = {
             "SMTP_HOST": "",
             "SMTP_USER": "user@gmail.com",
             "SMTP_PASSWORD": "pass",
-            "SMTP_FROM": "user@gmail.com",
         }
         error = validate_smtp_config(config)
         assert error is not None
@@ -93,12 +109,34 @@ class TestMarkdownToBasicHtml:
         assert "pip install" in html
 
 
+class TestParseRecipients:
+    """Tests for parse_recipients()."""
+
+    def test_single_address(self):
+        assert parse_recipients("alice@example.com") == ["alice@example.com"]
+
+    def test_multiple_comma_separated(self):
+        result = parse_recipients("alice@example.com,bob@example.com")
+        assert result == ["alice@example.com", "bob@example.com"]
+
+    def test_whitespace_around_addresses(self):
+        result = parse_recipients("alice@example.com , bob@example.com")
+        assert result == ["alice@example.com", "bob@example.com"]
+
+    def test_trailing_comma_ignored(self):
+        result = parse_recipients("alice@example.com,")
+        assert result == ["alice@example.com"]
+
+    def test_empty_string(self):
+        assert parse_recipients("") == []
+
+
 class TestBuildEmailMessage:
     """Tests for _build_email_message()."""
 
     def test_basic_message(self):
         msg = _build_email_message(
-            recipient="user@example.com",
+            recipients=["user@example.com"],
             subject="Test Report",
             markdown_body="# Hello\n\nThis is a test.",
             sender="bot@example.com",
@@ -107,9 +145,18 @@ class TestBuildEmailMessage:
         assert msg["To"] == "user@example.com"
         assert msg["Subject"] == "Test Report"
 
+    def test_multiple_recipients_in_to_header(self):
+        msg = _build_email_message(
+            recipients=["alice@example.com", "bob@example.com"],
+            subject="Test",
+            markdown_body="Hello",
+            sender="bot@example.com",
+        )
+        assert msg["To"] == "alice@example.com, bob@example.com"
+
     def test_message_has_text_and_html(self):
         msg = _build_email_message(
-            recipient="user@example.com",
+            recipients=["user@example.com"],
             subject="Test",
             markdown_body="Hello world",
             sender="bot@example.com",
@@ -126,7 +173,7 @@ class TestBuildEmailMessage:
 
     def test_job_id_in_footer(self):
         msg = _build_email_message(
-            recipient="user@example.com",
+            recipients=["user@example.com"],
             subject="Test",
             markdown_body="Hello",
             sender="bot@example.com",
@@ -145,7 +192,7 @@ class TestBuildEmailMessage:
         audio_file.write_bytes(b"\xff\xfb\x90\x00" + b"\x00" * 100)
 
         msg = _build_email_message(
-            recipient="user@example.com",
+            recipients=["user@example.com"],
             subject="Test",
             markdown_body="Hello",
             sender="bot@example.com",
@@ -159,7 +206,7 @@ class TestBuildEmailMessage:
 
     def test_no_attachment_when_file_missing(self):
         msg = _build_email_message(
-            recipient="user@example.com",
+            recipients=["user@example.com"],
             subject="Test",
             markdown_body="Hello",
             sender="bot@example.com",

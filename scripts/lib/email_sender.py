@@ -10,16 +10,18 @@ from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 
 def validate_smtp_config(config: Dict[str, Any]) -> Optional[str]:
     """
     Validates that all required SMTP configuration keys are present.
 
+    SMTP_FROM is optional — defaults to SMTP_USER when not set.
+
     Returns None if valid, or an error message describing what's missing.
     """
-    required_keys = ["SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD", "SMTP_FROM"]
+    required_keys = ["SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD"]
     missing = [k for k in required_keys if not config.get(k)]
 
     if missing:
@@ -88,7 +90,7 @@ def _markdown_to_basic_html(markdown_text: str) -> str:
 
 
 def _build_email_message(
-    recipient: str,
+    recipients: List[str],
     subject: str,
     markdown_body: str,
     sender: str,
@@ -101,7 +103,7 @@ def _build_email_message(
     """
     msg = MIMEMultipart("mixed")
     msg["From"] = sender
-    msg["To"] = recipient
+    msg["To"] = ", ".join(recipients)
     msg["Subject"] = subject
 
     # Add footer with job info
@@ -152,6 +154,15 @@ def _build_email_message(
     return msg
 
 
+def parse_recipients(recipient_str: str) -> List[str]:
+    """
+    Parses a comma-separated recipient string into a list of addresses.
+
+    Strips whitespace around each address and discards empty entries.
+    """
+    return [addr.strip() for addr in recipient_str.split(",") if addr.strip()]
+
+
 def send_report_email(
     recipient: str,
     subject: str,
@@ -164,7 +175,7 @@ def send_report_email(
     Sends a research report email via SMTP.
 
     Args:
-        recipient: Email address to send to.
+        recipient: One or more email addresses, comma-separated.
         subject: Email subject line.
         markdown_body: The report content in markdown format.
         config: Configuration dict containing SMTP_* keys.
@@ -183,11 +194,13 @@ def send_report_email(
     port = int(config.get("SMTP_PORT", 587))
     user = config["SMTP_USER"]
     password = config["SMTP_PASSWORD"]
-    sender = config["SMTP_FROM"]
+    sender = config.get("SMTP_FROM") or user
     use_tls = str(config.get("SMTP_USE_TLS", "true")).lower() in ("true", "1", "yes")
 
+    recipients = parse_recipients(recipient)
+
     msg = _build_email_message(
-        recipient, subject, markdown_body, sender, job_id, audio_path
+        recipients, subject, markdown_body, sender, job_id, audio_path
     )
 
     if use_tls:
@@ -198,6 +211,6 @@ def send_report_email(
 
     try:
         server.login(user, password)
-        server.sendmail(sender, [recipient], msg.as_string())
+        server.sendmail(sender, recipients, msg.as_string())
     finally:
         server.quit()
