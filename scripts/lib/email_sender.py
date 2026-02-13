@@ -63,25 +63,25 @@ def _markdown_to_news_html(markdown_text: str) -> str:
         html,
     )
 
-    # Headers — news-style with accent bar
+    # Headers — white text on dark background for dark-mode resilience
     html = re.sub(
         r"^### (.+)$",
-        r'<h3 style="font-size:16px;font-weight:700;color:#1a1a2e;margin:24px 0 8px 0;'
-        r'padding:0;line-height:1.3;">\1</h3>',
+        r'<h3 style="font-size:16px;font-weight:700;color:#ffffff;margin:24px 0 8px 0;'
+        r'padding:8px 12px;background:#1a1a2e;border-radius:4px;line-height:1.3;">\1</h3>',
         html,
         flags=re.MULTILINE,
     )
     html = re.sub(
         r"^## (.+)$",
-        r'<h2 style="font-size:20px;font-weight:700;color:#1a1a2e;margin:32px 0 12px 0;'
-        r'padding-bottom:8px;border-bottom:2px solid #4361ee;line-height:1.3;">\1</h2>',
+        r'<h2 style="font-size:20px;font-weight:700;color:#ffffff;margin:32px 0 12px 0;'
+        r'padding:10px 14px;background:linear-gradient(135deg,#1a1a2e,#0f3460);border-radius:6px;line-height:1.3;">\1</h2>',
         html,
         flags=re.MULTILINE,
     )
     html = re.sub(
         r"^# (.+)$",
-        r'<h1 style="font-size:26px;font-weight:800;color:#1a1a2e;margin:0 0 16px 0;'
-        r'padding:0;line-height:1.2;">\1</h1>',
+        r'<h1 style="font-size:26px;font-weight:800;color:#ffffff;margin:0 0 16px 0;'
+        r'padding:12px 16px;background:linear-gradient(135deg,#1a1a2e,#0f3460);border-radius:8px;line-height:1.2;">\1</h1>',
         html,
         flags=re.MULTILINE,
     )
