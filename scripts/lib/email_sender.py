@@ -31,15 +31,16 @@ def validate_smtp_config(config: Dict[str, Any]) -> Optional[str]:
     return None
 
 
-def _markdown_to_basic_html(markdown_text: str) -> str:
+def _markdown_to_news_html(markdown_text: str) -> str:
     """
-    Converts markdown to basic HTML using regex.
-    Handles headers, bold, italic, links, lists, and code blocks.
+    Converts markdown to polished news-site-style HTML for email.
+    Handles headers, bold, italic, links (styled as inline citations),
+    lists, code blocks, and horizontal rules.
     No external dependencies required.
     """
     html = markdown_text
 
-    # Escape HTML entities first
+    # Escape HTML entities first (but preserve markdown syntax chars)
     html = html.replace("&", "&amp;")
     html = html.replace("<", "&lt;")
     html = html.replace(">", "&gt;")
@@ -47,35 +48,88 @@ def _markdown_to_basic_html(markdown_text: str) -> str:
     # Code blocks (``` ... ```)
     html = re.sub(
         r"```[\w]*\n(.*?)```",
-        r"<pre style='background:#f4f4f4;padding:12px;border-radius:4px;overflow-x:auto;'>\1</pre>",
+        r'<pre style="background:#f8f9fa;padding:14px 16px;border-radius:6px;'
+        r'overflow-x:auto;font-size:13px;line-height:1.5;border:1px solid #e9ecef;'
+        r'font-family:Consolas,Monaco,monospace;">\1</pre>',
         html,
         flags=re.DOTALL,
     )
 
     # Inline code
-    html = re.sub(r"`([^`]+)`", r"<code style='background:#f4f4f4;padding:2px 4px;border-radius:2px;'>\1</code>", html)
+    html = re.sub(
+        r"`([^`]+)`",
+        r'<code style="background:#f0f1f3;padding:2px 6px;border-radius:3px;'
+        r'font-size:0.9em;font-family:Consolas,Monaco,monospace;">\1</code>',
+        html,
+    )
 
-    # Headers
-    html = re.sub(r"^### (.+)$", r"<h3>\1</h3>", html, flags=re.MULTILINE)
-    html = re.sub(r"^## (.+)$", r"<h2>\1</h2>", html, flags=re.MULTILINE)
-    html = re.sub(r"^# (.+)$", r"<h1>\1</h1>", html, flags=re.MULTILINE)
+    # Headers — news-style with accent bar
+    html = re.sub(
+        r"^### (.+)$",
+        r'<h3 style="font-size:16px;font-weight:700;color:#1a1a2e;margin:24px 0 8px 0;'
+        r'padding:0;line-height:1.3;">\1</h3>',
+        html,
+        flags=re.MULTILINE,
+    )
+    html = re.sub(
+        r"^## (.+)$",
+        r'<h2 style="font-size:20px;font-weight:700;color:#1a1a2e;margin:32px 0 12px 0;'
+        r'padding-bottom:8px;border-bottom:2px solid #4361ee;line-height:1.3;">\1</h2>',
+        html,
+        flags=re.MULTILINE,
+    )
+    html = re.sub(
+        r"^# (.+)$",
+        r'<h1 style="font-size:26px;font-weight:800;color:#1a1a2e;margin:0 0 16px 0;'
+        r'padding:0;line-height:1.2;">\1</h1>',
+        html,
+        flags=re.MULTILINE,
+    )
 
     # Bold and italic
     html = re.sub(r"\*\*\*(.+?)\*\*\*", r"<strong><em>\1</em></strong>", html)
     html = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", html)
     html = re.sub(r"\*(.+?)\*", r"<em>\1</em>", html)
 
-    # Links [text](url)
-    html = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r'<a href="\2">\1</a>', html)
+    # Links [text](url) — styled as inline citations / source links
+    html = re.sub(
+        r"\[([^\]]+)\]\(([^)]+)\)",
+        r'<a href="\2" style="color:#4361ee;text-decoration:none;'
+        r'border-bottom:1px solid #4361ee40;">\1</a>',
+        html,
+    )
 
-    # Unordered lists
-    html = re.sub(r"^[*\-] (.+)$", r"<li>\1</li>", html, flags=re.MULTILINE)
+    # Unordered list items
+    html = re.sub(
+        r"^[*\-] (.+)$",
+        r'<li style="margin-bottom:6px;line-height:1.6;">\1</li>',
+        html,
+        flags=re.MULTILINE,
+    )
 
-    # Horizontal rules
-    html = re.sub(r"^---+$", "<hr>", html, flags=re.MULTILINE)
-    html = re.sub(r"^===+$", "<hr>", html, flags=re.MULTILINE)
+    # Wrap consecutive <li> in <ul>
+    html = re.sub(
+        r"((?:<li[^>]*>.*?</li>\s*)+)",
+        r'<ul style="padding-left:20px;margin:12px 0;">\1</ul>',
+        html,
+        flags=re.DOTALL,
+    )
 
-    # Paragraphs: convert double newlines to paragraph breaks
+    # Horizontal rules — styled divider
+    html = re.sub(
+        r"^---+$",
+        '<hr style="border:none;border-top:1px solid #e0e0e0;margin:28px 0;">',
+        html,
+        flags=re.MULTILINE,
+    )
+    html = re.sub(
+        r"^===+$",
+        '<hr style="border:none;border-top:1px solid #e0e0e0;margin:28px 0;">',
+        html,
+        flags=re.MULTILINE,
+    )
+
+    # Paragraphs: double newlines become paragraph breaks
     html = re.sub(r"\n\n+", "</p><p>", html)
     # Single newlines to line breaks
     html = html.replace("\n", "<br>\n")
@@ -85,6 +139,9 @@ def _markdown_to_basic_html(markdown_text: str) -> str:
 
     # Clean up empty paragraphs
     html = re.sub(r"<p>\s*</p>", "", html)
+
+    # Style all paragraphs
+    html = html.replace("<p>", '<p style="margin:0 0 14px 0;line-height:1.7;color:#2d2d2d;">')
 
     return html
 
@@ -99,7 +156,7 @@ def _build_email_message(
 ) -> MIMEMultipart:
     """
     Builds a MIME multipart email with text/plain + text/html parts
-    and an optional MP3 attachment.
+    and an optional MP3 attachment.  HTML uses a news-site-inspired layout.
     """
     msg = MIMEMultipart("mixed")
     msg["From"] = sender
@@ -124,15 +181,84 @@ def _build_email_message(
     text_part = MIMEText(full_text, "plain", "utf-8")
     alt_part.attach(text_part)
 
-    # HTML version
-    html_body = _markdown_to_basic_html(full_text)
-    html_content = """<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 700px; margin: 0 auto; padding: 20px; color: #333;">
-{}
+    # HTML version — news-site layout
+    html_body = _markdown_to_news_html(full_text)
+
+    import datetime
+    date_str = datetime.date.today().strftime("%B %d, %Y")
+
+    html_content = """\
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{subject}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+
+<!-- Outer wrapper for background color -->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f5f7;">
+<tr><td align="center" style="padding:24px 16px;">
+
+<!-- Main card -->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:640px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+
+<!-- Header banner -->
+<tr>
+<td style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);padding:28px 32px 24px 32px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+  <tr>
+    <td>
+      <span style="font-size:12px;font-weight:600;letter-spacing:2px;color:#4cc9f0;text-transform:uppercase;">BriefBot</span>
+    </td>
+    <td align="right">
+      <span style="font-size:12px;color:#8d99ae;">{date}</span>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2" style="padding-top:12px;">
+      <span style="font-size:22px;font-weight:800;color:#ffffff;line-height:1.3;">{subject}</span>
+    </td>
+  </tr>
+  </table>
+</td>
+</tr>
+
+<!-- Body content -->
+<tr>
+<td style="padding:28px 32px 12px 32px;font-size:15px;color:#2d2d2d;line-height:1.7;">
+{body}
+</td>
+</tr>
+
+<!-- Footer -->
+<tr>
+<td style="padding:16px 32px 24px 32px;border-top:1px solid #e9ecef;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+  <tr>
+    <td style="font-size:12px;color:#8d99ae;line-height:1.5;">
+      Compiled by <strong style="color:#4361ee;">BriefBot</strong><br>
+      Sources are linked inline throughout this briefing.
+    </td>
+  </tr>
+  </table>
+</td>
+</tr>
+
+</table>
+<!-- End main card -->
+
+</td></tr>
+</table>
+<!-- End outer wrapper -->
+
 </body>
-</html>""".format(html_body)
+</html>""".format(
+        subject=subject.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"),
+        date=date_str,
+        body=html_body,
+    )
 
     html_part = MIMEText(html_content, "html", "utf-8")
     alt_part.attach(html_part)

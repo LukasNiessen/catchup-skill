@@ -373,6 +373,16 @@ If delivery is requested:
 
    Path: `~/.claude/skills/briefbot/output/briefing.md`
 
+   **CRITICAL — Inline source links for email:**
+   The email is rendered as a news-site-style HTML newsletter. To make sources discoverable and trustworthy, you MUST embed markdown links **inline, close to the statements they support**. Do NOT dump all sources in a single block at the bottom.
+
+   Rules for writing `briefing.md`:
+   - After a claim or fact, add a markdown link to its source right there — e.g. `KI wird als "entscheidender Treiber" bezeichnet ([Wahlprogramm Grüne BW](https://gruene-bw.de/...)).`
+   - For quotes, link the quote attribution: `"Co-Pilot, nicht Autopilot" — [hessenschau.de](https://hessenschau.de/...)`
+   - Group a short "Further reading" list (3-6 links max) at the very bottom for sources that support the overall topic but don't map to a single paragraph.
+   - Every section (h2/h3) should have at least one inline source link.
+   - Prefer descriptive link text (site name, article title, or org name) over raw URLs.
+
 2. **Run the delivery script:**
 
 ```bash
