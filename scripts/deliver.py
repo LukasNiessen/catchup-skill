@@ -20,7 +20,7 @@ if sys.platform == "win32":
 MODULE_ROOT = Path(__file__).parent.resolve()
 sys.path.insert(0, str(MODULE_ROOT))
 
-from lib import email_sender, env, tts
+from lib import email_sender, env, pdf, tts
 
 
 def main():
@@ -82,12 +82,27 @@ def main():
             print("Audio generation failed: {}".format(err), file=sys.stderr)
             audio_path = None
 
-    # Send email
+    # Send email (with auto-generated PDF attachment)
     if args.email:
         smtp_error = email_sender.validate_smtp_config(config)
         if smtp_error:
             print("Error: {}".format(smtp_error), file=sys.stderr)
             sys.exit(1)
+
+        # Build the newsletter HTML and render a PDF from it
+        output_dir = MODULE_ROOT.parent / "output"
+        pdf_path = None
+        try:
+            newsletter_html = email_sender.build_newsletter_html(
+                args.subject, briefing_text
+            )
+            pdf_path = pdf.generate_pdf(
+                newsletter_html, output_dir / "briefing.pdf"
+            )
+            if pdf_path:
+                print("PDF saved to {}".format(pdf_path))
+        except Exception as err:
+            print("PDF generation failed: {}".format(err), file=sys.stderr)
 
         try:
             email_sender.send_report_email(
@@ -96,6 +111,7 @@ def main():
                 markdown_body=briefing_text,
                 config=config,
                 audio_path=audio_path,
+                pdf_path=pdf_path,
             )
             recipients = email_sender.parse_recipients(args.email)
             print("Email sent to {}".format(", ".join(recipients)))

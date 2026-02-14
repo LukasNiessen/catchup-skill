@@ -146,48 +146,19 @@ def _markdown_to_news_html(markdown_text: str) -> str:
     return html
 
 
-def _build_email_message(
-    recipients: List[str],
-    subject: str,
-    markdown_body: str,
-    sender: str,
-    job_id: Optional[str] = None,
-    audio_path: Optional[Path] = None,
-) -> MIMEMultipart:
+def build_newsletter_html(subject: str, markdown_body: str) -> str:
     """
-    Builds a MIME multipart email with text/plain + text/html parts
-    and an optional MP3 attachment.  HTML uses a news-site-inspired layout.
+    Builds the full HTML newsletter document from markdown content.
+
+    Returns the complete HTML string — used for both email delivery and PDF
+    generation so the PDF mirrors the email layout exactly.
     """
-    msg = MIMEMultipart("mixed")
-    msg["From"] = sender
-    msg["To"] = ", ".join(recipients)
-    msg["Subject"] = subject
-
-    # Add footer with job info
-    footer = "\n\n---\n"
-    if job_id:
-        footer += "Sent by BriefBot scheduled job {}\n".format(job_id)
-        footer += "To stop receiving these emails, run:\n"
-        footer += "  python briefbot.py --delete-job {}\n".format(job_id)
-    else:
-        footer += "Sent by BriefBot\n"
-
-    full_text = markdown_body + footer
-
-    # Create alternative part for text and HTML
-    alt_part = MIMEMultipart("alternative")
-
-    # Plain text version
-    text_part = MIMEText(full_text, "plain", "utf-8")
-    alt_part.attach(text_part)
-
-    # HTML version — news-site layout
-    html_body = _markdown_to_news_html(full_text)
-
     import datetime
-    date_str = datetime.date.today().strftime("%B %d, %Y")
 
-    html_content = """\
+    date_str = datetime.date.today().strftime("%B %d, %Y")
+    html_body = _markdown_to_news_html(markdown_body)
+
+    return """\
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -260,10 +231,60 @@ def _build_email_message(
         body=html_body,
     )
 
+
+def _build_email_message(
+    recipients: List[str],
+    subject: str,
+    markdown_body: str,
+    sender: str,
+    job_id: Optional[str] = None,
+    audio_path: Optional[Path] = None,
+    pdf_path: Optional[Path] = None,
+) -> MIMEMultipart:
+    """
+    Builds a MIME multipart email with text/plain + text/html parts
+    and optional MP3 / PDF attachments.  HTML uses a news-site-inspired layout.
+    """
+    msg = MIMEMultipart("mixed")
+    msg["From"] = sender
+    msg["To"] = ", ".join(recipients)
+    msg["Subject"] = subject
+
+    # Add footer with job info
+    footer = "\n\n---\n"
+    if job_id:
+        footer += "Sent by BriefBot scheduled job {}\n".format(job_id)
+        footer += "To stop receiving these emails, run:\n"
+        footer += "  python briefbot.py --delete-job {}\n".format(job_id)
+    else:
+        footer += "Sent by BriefBot\n"
+
+    full_text = markdown_body + footer
+
+    # Create alternative part for text and HTML
+    alt_part = MIMEMultipart("alternative")
+
+    # Plain text version
+    text_part = MIMEText(full_text, "plain", "utf-8")
+    alt_part.attach(text_part)
+
+    # HTML version — news-site layout
+    html_content = build_newsletter_html(subject, full_text)
+
     html_part = MIMEText(html_content, "html", "utf-8")
     alt_part.attach(html_part)
 
     msg.attach(alt_part)
+
+    # Attach PDF if provided
+    if pdf_path and pdf_path.exists():
+        with open(pdf_path, "rb") as f:
+            pdf_data = f.read()
+        pdf_attachment = MIMEApplication(pdf_data, _subtype="pdf")
+        pdf_attachment.add_header(
+            "Content-Disposition", "attachment", filename=pdf_path.name
+        )
+        msg.attach(pdf_attachment)
 
     # Attach audio file if provided
     if audio_path and audio_path.exists():
@@ -296,6 +317,7 @@ def send_report_email(
     config: Dict[str, Any],
     job_id: Optional[str] = None,
     audio_path: Optional[Path] = None,
+    pdf_path: Optional[Path] = None,
 ) -> None:
     """
     Sends a research report email via SMTP.
@@ -307,6 +329,7 @@ def send_report_email(
         config: Configuration dict containing SMTP_* keys.
         job_id: Optional job ID for the unsubscribe footer.
         audio_path: Optional path to an MP3 file to attach.
+        pdf_path: Optional path to a PDF file to attach.
 
     Raises:
         ValueError: If SMTP config is incomplete.
@@ -326,7 +349,7 @@ def send_report_email(
     recipients = parse_recipients(recipient)
 
     msg = _build_email_message(
-        recipients, subject, markdown_body, sender, job_id, audio_path
+        recipients, subject, markdown_body, sender, job_id, audio_path, pdf_path
     )
 
     if use_tls:

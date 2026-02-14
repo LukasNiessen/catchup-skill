@@ -292,6 +292,7 @@ Read the research output carefully. Pay attention to:
 - **Exact product/tool names** mentioned (e.g., if research mentions "ClawdBot" or "@clawdbot", that's a DIFFERENT product than "Claude Code" - don't conflate them)
 - **Specific quotes and insights** from the sources - use THESE, not generic knowledge
 - **What the sources actually say**, not what you assume the topic is about
+- **Actionable techniques** — extract specific, named techniques people recommend (e.g., "use ALL CAPS for constraints", "JSON character descriptions", "negative prompting to remove watermarks"). These are the gold — generic descriptions of what the tool IS are not valuable.
 
 **ANTI-PATTERN TO AVOID**: If user asks about "clawdbot skills" and research returns ClawdBot content (self-hosted AI agent), do NOT synthesize this as "Claude Code skills" just because both involve "skills". Read what the research actually says.
 
@@ -325,6 +326,43 @@ Identify from the ACTUAL RESEARCH OUTPUT:
 
 **If research says "use JSON prompts" or "structured prompts", you MUST deliver prompts in that format later.**
 
+### CRITICAL: Build a Mental Model, Then Distill Techniques
+
+Your job is to be a **consultant who did research and is ready to work**, NOT a search results page. The output has two distinct layers — keep them separate:
+
+**Layer 1 — The mental model (WHY):** One orienting insight that reframes how the user should think about the entire topic. This goes in "What I learned." It should change their approach, not just inform them.
+
+**Layer 2 — The techniques (WHAT TO DO):** 5 tightly explained techniques with clear mechanisms. These go in "Key techniques." Each one must explain WHY it works, not just WHAT to do.
+
+**BAD** (list of tricks — doesn't scale to novel situations):
+> 1. **Use ALL CAPS** — Write important words in uppercase
+> 2. **Add camera specs** — Include f-stop and lens info
+> 3. **Keep prompts short** — Under 25 words works best (30% higher accuracy)
+> 4. **Strategic imperfections** — Add flaws for realism
+> 5. **Negative prompting** — Say what you don't want
+> 6. **Use JSON** — Structure your prompt as JSON
+> 7. **Rule of thirds** — Mention composition rules
+
+*Problems: 7 loose tips with no mechanisms. "30% higher accuracy" sounds invented. "Strategic imperfections" is filler. No insight into WHY any of this works.*
+
+**GOOD** (framework for thinking — scales to novel situations):
+> **What I learned:** Nano Banana Pro is a reasoning-first model — it has a "deep think" step that plans composition before generating pixels. This means it responds to structured, explained intent far better than keyword lists. Think of your prompt as a design document, not a request.
+>
+> **Key techniques:**
+> 1. **Design-document prompting** — Describe scenes as narratives ("a bartender polishing glasses in a speakeasy at golden hour") not keyword lists. The reasoning engine parses context, so a sentence massively outperforms comma-separated tags ([Leonardo.ai](https://leonardo.ai/...))
+> 2. **Camera-gear anchoring** — Referencing specific camera models and lens specs (f/1.8, 85mm) overrides generic style words and forces physical realism. The model uses gear references to infer depth-of-field, grain, and color science ([minimaxir.com](https://minimaxir.com/...))
+> 3. **Micro-constraints with MUST** — ALL CAPS "MUST" statements activate the reasoning step's constraint-checking. "All objects MUST follow rule of thirds" is enforced systematically, unlike lowercase suggestions ([minimaxir.com](https://minimaxir.com/...))
+> 4. **Structured data as prompts** — JSON character descriptions (~2,600 tokens), HTML/CSS layouts, even Flexbox ratios are valid inputs. The model parses structured formats and renders them faithfully ([minimaxir.com](https://minimaxir.com/...))
+> 5. **Negative prompting for cleanup** — "Do not include any logos, text, or watermarks" removes artifacts while preserving the compositional benefits of your positive prompt ([minimaxir.com](https://minimaxir.com/...))
+
+*Why this is better: The mental model ("reasoning-first, treat it like a design document") gives a framework that scales. Each technique explains its mechanism (WHY it works). 5 tight entries beat 7 loose ones.*
+
+**Quality rules:**
+- **5 techniques max.** Tight and explained > loose and many. If you found 8 things, pick the 5 with the clearest mechanisms.
+- Each technique must include a **mechanism** — WHY it works, not just WHAT to do
+- **Never invent statistics.** "~70% fewer retries" is OK if a source said it. "30% higher accuracy" with no methodology is not. If unsure, describe the effect qualitatively.
+- Cite the source inline (author or domain with URL)
+
 ---
 
 ## THEN: Present the Summary and Invite Direction
@@ -349,18 +387,38 @@ Identify from the ACTUAL RESEARCH OUTPUT:
 **Notable mentions:** [other specific things with 1-2 mentions]
 ```
 
-**If PROMPTING/NEWS/GENERAL** - Show synthesis and patterns:
+**If PROMPTING/NEWS/GENERAL** - Show mental model + techniques (TWO distinct sections):
 
 ```
-Key findings:
+### What I learned
 
-[2-4 sentences synthesizing key insights FROM THE ACTUAL RESEARCH OUTPUT.]
+[THE ORIENTING INSIGHT — 1-2 sentences that reframe how the user should THINK about this topic. This is the single most important thing the research revealed. It should change the user's mental model, not just inform them.]
 
-**Patterns identified:**
-1. [Pattern from research]
-2. [Pattern from research]
-3. [Pattern from research]
+[SUPPORTING CONTEXT — 1-2 more sentences that deepen the insight with specifics from the research. Together with the orienting insight, these form a framework that helps the user approach novel situations, not just follow recipes.]
 ```
+
+**Then, separated clearly:**
+
+```
+### Key techniques
+
+1. **[Technique name]** — [What to do + WHY it works — the mechanism] ([source](URL))
+2. **[Technique name]** — [What to do + WHY it works — the mechanism] ([source](URL))
+3. **[Technique name]** — [What to do + WHY it works — the mechanism] ([source](URL))
+4. **[Technique name]** — [What to do + WHY it works — the mechanism] ([source](URL))
+5. **[Technique name]** — [What to do + WHY it works — the mechanism] ([source](URL))
+```
+
+**The two sections serve different purposes — keep them separate:**
+- **"What I learned"** = the WHY. A mental model / framework that scales to novel situations. This is understanding.
+- **"Key techniques"** = the WHAT TO DO. Specific, actionable techniques with mechanisms. This is application.
+
+**ANTI-PATTERNS for this section:**
+- Do NOT spend sentences explaining what the tool/topic IS ("X is Google's image model released in November..."). The user already knows. Jump straight to the orienting insight.
+- Do NOT use generic patterns like "use good prompts" or "be specific". Every technique must be concrete and named.
+- Do NOT list more than 5 techniques. 5 tight entries with mechanisms > 7 loose tips. Pick the ones with the clearest WHY.
+- Do NOT invent statistics. "~70% fewer retries" is fine if a source said it. "30% higher accuracy" with no methodology is not. Describe effects qualitatively if unsure.
+- Do NOT mix understanding and application. If a sentence explains WHY something works, it belongs in "What I learned." If it tells you WHAT TO DO, it belongs in "Key techniques."
 
 **THEN - Stats (right before invitation):**
 
@@ -399,28 +457,32 @@ For **web-only mode** (no API keys):
 *OPENAI_API_KEY → Reddit, YouTube, LinkedIn | XAI_API_KEY → X/Twitter*
 ```
 
-**LAST - Invitation:**
+**LAST - Invitation (research-driven examples):**
+
+**Do NOT use a generic numbered menu.** Instead, offer 2-3 **specific, vivid example prompts** that showcase the techniques you just presented. These examples must be grounded in the research findings — they should demonstrate the key techniques in action.
 
 ```
 ---
-Describe what you want to build and I'll write a prompt you can copy-paste directly into {TARGET_TOOL}.
+What do you want to make? For example:
+
+- [Specific vivid example applying technique 1 from your findings — e.g., "A photorealistic product shot with studio lighting and specific camera specs (the most reliable technique right now)"]
+- [Specific vivid example applying technique 2 — e.g., "A miniature/diorama scene exploiting {tool}'s scale logic strength"]
+- [Specific vivid example applying a unique finding — e.g., "A complex scene with embedded text using structured prompts"]
+
+Just describe your vision and I'll write a prompt you can paste straight into {TARGET_TOOL or best-guess tool from research}.
 ```
+
+**Rules for the invitation examples:**
+- Each example must reference a specific technique or finding from your research
+- Use concrete, visual language — the user should be able to picture the output
+- If TARGET_TOOL is unknown, infer the most likely tool from the research context and use that
+- These examples replace any generic "1. Gemini 2. Midjourney 3. Other" menu — NEVER show a generic tool-choice list
 
 **Use real numbers from the research output.** The patterns should be actual insights from the research, not generic advice.
 
 **SELF-CHECK before displaying**: Re-read your key findings section. Does it match what the research ACTUALLY says? If the research was about ClawdBot (a self-hosted AI agent), your summary should be about ClawdBot, not Claude Code. If you catch yourself projecting your own knowledge instead of the research, rewrite it.
 
-**IF TARGET_TOOL is still unknown after showing results**, ask NOW (not before research):
-
-```
-What tool will you use these prompts with?
-
-Options:
-1. [Most relevant tool based on research - e.g., if research mentioned Figma/Framer, offer those]
-2. Midjourney / Flux (image generation)
-3. ChatGPT / Claude (text/code)
-4. Other (tell me)
-```
+**IF TARGET_TOOL is still unknown**, infer from context. If research is clearly about an image generation tool, default to that tool. If genuinely ambiguous, ask briefly at the end: "What tool will you paste this into?" — but NEVER as a numbered multiple-choice menu.
 
 **IMPORTANT**: After displaying this, WAIT for the user to respond. Don't dump generic prompts.
 
@@ -458,7 +520,9 @@ Build the `[FLAGS]` from `$ARGUMENTS`:
 - If `--email ADDRESS` was in `$ARGUMENTS` → add `--email ADDRESS`
 - Always add `--subject "BriefBot: TOPIC (YYYY-MM-DD)"` using the actual topic and today's date
 
-3. **Report delivery status** to the user based on the script output (e.g., "Email sent to ...", "Audio saved to ...").
+3. **Report delivery status** to the user based on the script output (e.g., "Email sent to ...", "PDF saved to ...", "Audio saved to ...").
+
+**PDF generation:** When `--email` is used, a PDF copy of the HTML newsletter is automatically generated and attached to the email. The PDF is also saved to `~/.claude/skills/briefbot/output/briefing.pdf`. This requires `xhtml2pdf` (recommended: `pip install xhtml2pdf` — pure Python, works everywhere) or alternatively `weasyprint` / `pdfkit`. If no backend is installed, the email is still sent — just without the PDF attachment.
 
 ---
 
