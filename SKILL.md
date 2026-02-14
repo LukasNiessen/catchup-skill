@@ -8,24 +8,24 @@ disable-model-invocation: true
 allowed-tools: Bash, Read, Write, AskUserQuestion, WebSearch
 ---
 
-# BriefBot: Investigate Any Subject Over the Past 30 Days
+# 🔎 BriefBot: Investigate Any Subject Over the Past 30 Days
 
 Investigate ANY subject across Reddit, X, YouTube, LinkedIn, and the web. Surface what people are actually discussing, recommending, and debating right now — or answer knowledge questions directly from expertise.
 
 Supported scenarios:
 
-- **Prompting**: "photorealistic people in Nano Banana Pro", "Midjourney prompts", "ChatGPT image generation" → learn techniques, get copy-paste prompts
-- **Recommendations**: "best Claude Code skills", "top AI tools" → get a LIST of specific things people mention
-- **News**: "what's happening with OpenAI", "latest AI announcements" → current events and updates
-- **General**: any topic you're curious about → understand what the community is saying
-- **Knowledge**: "explain how attention works", "what is RAG", "transformers vs RNNs" → get a thorough expert answer without live research
+- **Prompting**: "Flux portrait workflows", "Stable Diffusion prompts", "ChatGPT image generation tips" → learn techniques, get copy-paste prompts
+- **Recommendations**: "best VS Code AI extensions", "top coding fonts", "recommended Figma plugins" → get a LIST of specific things people mention
+- **News**: "what's happening with OpenAI", "latest AI announcements", "new React features" → current events and updates
+- **General**: any subject you're curious about → understand what the community is saying
+- **Knowledge**: "explain how attention works", "what is RAG", "CNNs vs transformers" → get a thorough expert answer without live research
 
 ## ESSENTIAL: Determine User Intent
 
 Before doing anything, determine the user's intent from their input:
 
-1. **TOPIC**: What they want to learn about (e.g., "web app mockups", "Claude Code skills", "image generation")
-2. **TARGET TOOL** (if specified): Where they'll use the prompts (e.g., "Nano Banana Pro", "ChatGPT", "Midjourney")
+1. **TOPIC**: What they want to learn about (e.g., "dashboard wireframes", "open-source LLMs", "image generation")
+2. **TARGET TOOL** (if specified): Where they'll use the prompts (e.g., "Midjourney", "ChatGPT", "Figma AI")
 3. **QUERY TYPE**: What kind of information they need:
    - **PROMPTING** - "X prompts", "prompting for X", "X best practices" → User wants to learn techniques and get copy-paste prompts
    - **RECOMMENDATIONS** - "best X", "top X", "what X should I use", "recommended X" → User wants a LIST of specific things
@@ -35,9 +35,9 @@ Before doing anything, determine the user's intent from their input:
 
 Common patterns:
 
-- `[topic] for [tool]` → "web mockups for Nano Banana Pro" → TOOL IS SPECIFIED
-- `[topic] prompts for [tool]` → "UI design prompts for Midjourney" → TOOL IS SPECIFIED
-- Just `[topic]` → "iOS design mockups" → TOOL NOT SPECIFIED, that's OK
+- `[topic] for [tool]` → "portrait lighting for Midjourney" → TOOL IS SPECIFIED
+- `[topic] prompts for [tool]` → "UI layout prompts for Figma AI" → TOOL IS SPECIFIED
+- Just `[topic]` → "iOS onboarding flows" → TOOL NOT SPECIFIED, that's OK
 - "best [topic]" or "top [topic]" → QUERY_TYPE = RECOMMENDATIONS
 - "what are the best [topic]" → QUERY_TYPE = RECOMMENDATIONS
 - "explain [topic]" or "how does [topic] work" → QUERY_TYPE = KNOWLEDGE
@@ -109,14 +109,14 @@ echo "Edit to add your API keys for enhanced research."
 
 ---
 
-## If QUERY_TYPE = KNOWLEDGE: Direct Answer Path
+## If QUERY_TYPE = KNOWLEDGE: 🧠 Direct Answer Path
 
 **If the user's query is a knowledge question, skip the entire research pipeline and answer directly.**
 
 **Step 1: Decide whether supplemental search helps**
 
 - If the topic concerns events, releases, or developments after 2025 → do a brief WebSearch to ground your answer in current facts
-- If the topic is a stable concept (e.g., "how attention works", "what is gradient descent", "explain TCP/IP") → answer directly from expertise, no search needed
+- If the topic is a stable concept (e.g., "how backpropagation works", "what is gradient descent", "explain TCP/IP") → answer directly from expertise, no search needed
 
 **Step 2: Write a thorough, structured expert answer**
 
@@ -206,8 +206,8 @@ Choose search queries based on QUERY_TYPE:
 For ALL query types:
 
 - **USE THE USER'S EXACT TERMINOLOGY** - don't substitute or add tech names based on your knowledge
-  - If user says "ChatGPT image prompting", search for "ChatGPT image prompting"
-  - Do NOT add "DALL-E", "GPT-4o", or other terms you think are related
+  - If user says "Flux LoRA training", search for "Flux LoRA training"
+  - Do NOT add "Stable Diffusion", "ComfyUI", or other terms you think are related
   - Your knowledge may be outdated - trust the user's terminology
 - EXCLUDE reddit.com, x.com, twitter.com (covered by script)
 - INCLUDE: blogs, tutorials, docs, news, GitHub repos
@@ -306,13 +306,13 @@ When user asks "best X" or "top X", they want a LIST of specific things:
 - Note which sources recommend each (Reddit thread, X post, blog)
 - List them by popularity/mention count
 
-**BAD synthesis for "best Claude Code skills":**
+**BAD synthesis for "best VS Code AI extensions":**
 
-> "Skills are powerful. Keep them under 500 lines. Use progressive disclosure."
+> "AI extensions boost productivity. Try extensions that integrate well. Look for good reviews."
 
-**GOOD synthesis for "best Claude Code skills":**
+**GOOD synthesis for "best VS Code AI extensions":**
 
-> "Most mentioned skills: /commit (5 mentions), remotion skill (4x), git-worktree (3x), /pr (3x). The Remotion announcement got 16K likes on X."
+> "Most mentioned: Continue (7 mentions), Cline (5x), Copilot (4x), Cursor Tab (3x). The Continue launch post hit 2K upvotes on r/programming."
 
 ### For all QUERY_TYPEs
 
@@ -369,7 +369,7 @@ For **full/partial mode** (has API keys):
 ```
 ---
 
-### Sources collected
+### ✅ Sources collected
 
 | Platform  | Items         | Engagement                      |
 |-----------|---------------|---------------------------------|
@@ -387,7 +387,7 @@ For **web-only mode** (no API keys):
 ```
 ---
 
-### Sources collected
+### ✅ Sources collected
 
 | Platform | Items      | Engagement |
 |----------|------------|------------|
@@ -395,7 +395,7 @@ For **web-only mode** (no API keys):
 
 **Top sources:** {author1} on {site1}, {author2} on {site2}
 
-*For richer results with engagement metrics, add API keys to ~/.config/briefbot/.env*
+💡 *For richer results with engagement metrics, add API keys to ~/.config/briefbot/.env*
 *OPENAI_API_KEY → Reddit, YouTube, LinkedIn | XAI_API_KEY → X/Twitter*
 ```
 
@@ -416,8 +416,8 @@ Describe what you want to build and I'll write a prompt you can copy-paste direc
 What tool will you use these prompts with?
 
 Options:
-1. [Most relevant tool based on research - e.g., if research mentioned Figma/Sketch, offer those]
-2. Nano Banana Pro (image generation)
+1. [Most relevant tool based on research - e.g., if research mentioned Figma/Framer, offer those]
+2. Midjourney / Flux (image generation)
 3. ChatGPT / Claude (text/code)
 4. Other (tell me)
 ```
@@ -466,7 +466,7 @@ Build the `[FLAGS]` from `$ARGUMENTS`:
 
 After showing the stats summary with your invitation, **STOP and wait** for the user to tell you what they want to create.
 
-When they respond with their direction (e.g., "I want a landing page mockup for my SaaS app"), THEN write a single, thoughtful, tailored prompt.
+When they respond with their direction (e.g., "I need an onboarding email sequence for my dev tool"), THEN write a single, thoughtful, tailored prompt.
 
 ---
 
@@ -568,5 +568,5 @@ For **web-only mode**:
 
 Ready for another prompt -- just describe what you want to build.
 
-*For richer results with engagement metrics, add API keys to ~/.config/briefbot/.env*
+💡 *For richer results with engagement metrics, add API keys to ~/.config/briefbot/.env*
 ```

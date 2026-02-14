@@ -1,26 +1,13 @@
 # BriefBot - ClaudeCode Skill
 
 <div align="center" name="top">
-  <img align="center" src="assets/logo.png" width="250" height="250" alt="BriefBot Logo">
-
-<!-- spacer -->
-<p></p>
+  <img align="center" src="assets/logo.png" width="400" height="400" alt="BriefBot Logo">
 
 <i>Stay up to date in a world that's never moved faster!</i>
 
-BRIEF BOT
+BRIEF BOT: <strong>Research any topic from the last N days across Reddit, X, YouTube, LinkedIn & the web</strong>
 
 </div>
-
-<p align="center">
-  <img src="assets/swimmom-mockup.jpeg" width="200" alt="BriefBot skill"/>
-</p>
-
-<h1 align="center">/briefbot</h1>
-
-<p align="center">
-  <strong>Research any topic from the last N days across Reddit, X, YouTube, LinkedIn & the web</strong>
-</p>
 
 <p align="center">
   <a href="#-quickstart">Quickstart</a> •
