@@ -50,6 +50,18 @@ Common patterns:
 - `TARGET_TOOL = [extracted tool, or "unknown" if not specified]`
 - `QUERY_TYPE = [RECOMMENDATIONS | NEWS | HOW-TO | GENERAL]`
 
+**DISPLAY your parsing to the user.** Before running any tools, output:
+
+````
+I'll research {TOPIC} across Reddit, X, and the web to find what's been discussed in the last 30 days.
+
+Parsed intent:
+- TOPIC = {TOPIC}
+- TARGET_TOOL = {TARGET_TOOL or "unknown"}
+- QUERY_TYPE = {QUERY_TYPE}
+
+Research typically takes 2-8 minutes (niche topics take longer). Starting now.
+
 ---
 
 ## Setup Check
@@ -86,7 +98,7 @@ ENVEOF
 chmod 600 ~/.config/briefbot/.env
 echo "Config created at ~/.config/briefbot/.env"
 echo "Edit to add your API keys for enhanced research."
-```
+````
 
 **DO NOT stop if no keys are configured.** Proceed with web-only mode.
 
@@ -105,7 +117,6 @@ PY=$(python3 -c "" 2>/dev/null && echo python3 || echo python) && $PY ~/.claude/
 The script will automatically:
 
 - Detect available API keys
-- Show a promo banner if keys are missing (this is intentional marketing)
 - Run Reddit/X searches if keys exist
 - Signal if WebSearch is needed
 
@@ -390,6 +401,7 @@ PY=$(python3 -c "" 2>/dev/null && echo python3 || echo python) && $PY ~/.claude/
 ```
 
 Build the `[FLAGS]` from `$ARGUMENTS`:
+
 - If `--audio` was in `$ARGUMENTS` → add `--audio`
 - If `--email ADDRESS` was in `$ARGUMENTS` → add `--email ADDRESS`
 - Always add `--subject "BriefBot: TOPIC (YYYY-MM-DD)"` using the actual topic and today's date
