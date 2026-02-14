@@ -1,35 +1,37 @@
 ---
 name: briefbot
-description: Research a topic from the last 30 days on Reddit + X + YouTube + LinkedIn + Web, become an expert, and write copy-paste-ready prompts for the user's target tool.
-argument-hint: "[topic] for [tool]" or "[topic]"
+description: Investigate a topic from the last 30 days on Reddit + X + YouTube + LinkedIn + Web, become an expert, and write copy-paste-ready prompts — or answer knowledge questions directly.
+argument-hint: "[topic] for [tool]" or "[topic]" or "explain [topic]"
 context: fork
 agent: Explore
 disable-model-invocation: true
 allowed-tools: Bash, Read, Write, AskUserQuestion, WebSearch
 ---
 
-# BriefBot: Research Any Topic from the Last 30 Days
+# BriefBot: Investigate Any Subject Over the Past 30 Days
 
-Research ANY topic across Reddit, X, YouTube, LinkedIn, and the web. Surface what people are actually discussing, recommending, and debating right now.
+Investigate ANY subject across Reddit, X, YouTube, LinkedIn, and the web. Surface what people are actually discussing, recommending, and debating right now — or answer knowledge questions directly from expertise.
 
-Use cases:
+Supported scenarios:
 
 - **Prompting**: "photorealistic people in Nano Banana Pro", "Midjourney prompts", "ChatGPT image generation" → learn techniques, get copy-paste prompts
 - **Recommendations**: "best Claude Code skills", "top AI tools" → get a LIST of specific things people mention
 - **News**: "what's happening with OpenAI", "latest AI announcements" → current events and updates
 - **General**: any topic you're curious about → understand what the community is saying
+- **Knowledge**: "explain how attention works", "what is RAG", "transformers vs RNNs" → get a thorough expert answer without live research
 
-## CRITICAL: Parse User Intent
+## ESSENTIAL: Determine User Intent
 
-Before doing anything, parse the user's input for:
+Before doing anything, determine the user's intent from their input:
 
 1. **TOPIC**: What they want to learn about (e.g., "web app mockups", "Claude Code skills", "image generation")
 2. **TARGET TOOL** (if specified): Where they'll use the prompts (e.g., "Nano Banana Pro", "ChatGPT", "Midjourney")
-3. **QUERY TYPE**: What kind of research they want:
+3. **QUERY TYPE**: What kind of information they need:
    - **PROMPTING** - "X prompts", "prompting for X", "X best practices" → User wants to learn techniques and get copy-paste prompts
    - **RECOMMENDATIONS** - "best X", "top X", "what X should I use", "recommended X" → User wants a LIST of specific things
    - **NEWS** - "what's happening with X", "X news", "latest on X" → User wants current events/updates
-   - **GENERAL** - anything else → User wants broad understanding of the topic
+   - **GENERAL** - anything that needs community research but doesn't match above → User wants broad understanding of the topic
+   - **KNOWLEDGE** - "explain [topic]", "how does [topic] work", "what is [topic]", "tell me about [topic]", "[topic] vs [topic]", "difference between X and Y", "teach me [topic]" → User wants a direct expert explanation, no live research needed
 
 Common patterns:
 
@@ -38,6 +40,9 @@ Common patterns:
 - Just `[topic]` → "iOS design mockups" → TOOL NOT SPECIFIED, that's OK
 - "best [topic]" or "top [topic]" → QUERY_TYPE = RECOMMENDATIONS
 - "what are the best [topic]" → QUERY_TYPE = RECOMMENDATIONS
+- "explain [topic]" or "how does [topic] work" → QUERY_TYPE = KNOWLEDGE
+- "what is [topic]" or "tell me about [topic]" → QUERY_TYPE = KNOWLEDGE
+- "[topic] vs [topic]" or "difference between X and Y" → QUERY_TYPE = KNOWLEDGE
 
 **IMPORTANT: Do NOT ask about target tool before research.**
 
@@ -48,36 +53,36 @@ Common patterns:
 
 - `TOPIC = [extracted topic]`
 - `TARGET_TOOL = [extracted tool, or "unknown" if not specified]`
-- `QUERY_TYPE = [RECOMMENDATIONS | NEWS | HOW-TO | GENERAL]`
+- `QUERY_TYPE = [RECOMMENDATIONS | NEWS | PROMPTING | GENERAL | KNOWLEDGE]`
 
 **DISPLAY your parsing to the user.** Before running any tools, output:
 
 ````
-I'll research {TOPIC} across Reddit, X, and the web to find what's been discussed in the last 30 days.
+I'll investigate {TOPIC} across Reddit, X, and the web to find what's been discussed in the last 30 days.
 
-Parsed intent:
+Determined intent:
 - TOPIC = {TOPIC}
 - TARGET_TOOL = {TARGET_TOOL or "unknown"}
 - QUERY_TYPE = {QUERY_TYPE}
 
-Research typically takes 2-8 minutes (niche topics take longer). Starting now.
+Investigation typically takes 2-8 minutes (niche subjects take longer). Starting now.
 
 ---
 
-## Setup Check
+## Initial Configuration (Optional but Encouraged)
 
-The skill works in multiple modes based on available API keys:
+The skill operates in multiple modes based on available API keys:
 
 1. **Full Mode** (both keys): Reddit + X + YouTube + LinkedIn + WebSearch - best results with engagement metrics
 2. **OpenAI Only** (OPENAI_API_KEY): Reddit + YouTube + LinkedIn + WebSearch
 3. **xAI Only** (XAI_API_KEY): X-only + WebSearch
 4. **Web-Only Mode** (no keys): WebSearch only - still useful, but no engagement metrics
 
-**API keys are OPTIONAL.** The skill will work without them using WebSearch fallback.
+**API keys are OPTIONAL.** The skill will function without them using WebSearch fallback.
 
-### First-Time Setup (Optional but Recommended)
+### First-Time Setup (Optional but Encouraged)
 
-If the user wants to add API keys for better results:
+If the user wants to add API keys for richer results:
 
 ```bash
 mkdir -p ~/.config/briefbot
@@ -104,7 +109,44 @@ echo "Edit to add your API keys for enhanced research."
 
 ---
 
+## If QUERY_TYPE = KNOWLEDGE: Direct Answer Path
+
+**If the user's query is a knowledge question, skip the entire research pipeline and answer directly.**
+
+**Step 1: Decide whether supplemental search helps**
+
+- If the topic concerns events, releases, or developments after 2025 → do a brief WebSearch to ground your answer in current facts
+- If the topic is a stable concept (e.g., "how attention works", "what is gradient descent", "explain TCP/IP") → answer directly from expertise, no search needed
+
+**Step 2: Write a thorough, structured expert answer**
+
+- Provide a comprehensive explanation organized with clear headings or numbered sections
+- Use concrete examples and analogies where they aid understanding
+- Include relevant technical depth appropriate to the question
+- If the topic has practical implications, mention them
+
+**Step 3: Offer a follow-up path**
+
+End with:
+
+```
+Want me to go deeper on any part of this, or research what the community is currently saying about {TOPIC}?
+```
+
+**Rules for KNOWLEDGE responses:**
+
+- No stats blocks, no source counts, no research invitation
+- No Python script execution
+- If the user then asks for community research or "what people are saying", switch to QUERY_TYPE = GENERAL and run the full research pipeline below
+- Keep the tone expert but accessible
+
+**After answering, STOP. Do not proceed to Research Execution.**
+
+---
+
 ## Research Execution
+
+**If QUERY_TYPE = KNOWLEDGE, skip this entire section.**
 
 **IMPORTANT: The script handles API key detection automatically.** Run it and check the output to determine mode.
 
@@ -130,9 +172,9 @@ The script output will indicate the mode:
 - **"Mode: both"** or **"Mode: reddit-only"** or **"Mode: x-only"**: Script found results, WebSearch is supplementary
 - **"Mode: web-only"**: No API keys, Claude must do ALL research via WebSearch
 
-**Step 3: Do WebSearch**
+**Step 3: Perform WebSearch**
 
-For **ALL modes**, do WebSearch to supplement (or provide all data in web-only mode).
+For **ALL modes**, perform WebSearch to supplement (or provide all data in web-only mode).
 
 Choose search queries based on QUERY_TYPE:
 
@@ -171,7 +213,7 @@ For ALL query types:
 - INCLUDE: blogs, tutorials, docs, news, GitHub repos
 - **DO NOT output "Sources:" list** - this is noise, we'll show stats at the end
 
-**Step 3: Wait for background script to complete**
+**Step 4: Wait for background script to complete**
 Use TaskOutput to get the script results before proceeding to synthesis.
 
 **Depth options** (passed through from user's command):
@@ -225,23 +267,23 @@ Multiple recipients: `--email alice@example.com,bob@example.com`
 
 ---
 
-## Judge Agent: Synthesize All Sources
+## Synthesis Agent: Consolidate All Sources
 
-**After all searches complete, internally synthesize (don't display stats yet):**
+**After all searches complete, internally consolidate (don't display stats yet):**
 
-The Judge Agent must:
+The Synthesis Agent must:
 
-1. Weight Reddit/X sources HIGHER (they have engagement signals: upvotes, likes)
+1. Weight Reddit/X sources HIGHER (they carry engagement signals: upvotes, likes)
 2. Weight WebSearch sources LOWER (no engagement data)
-3. Identify patterns that appear across ALL three sources (strongest signals)
-4. Note any contradictions between sources
-5. Extract the top 3-5 actionable insights
+3. Identify patterns that surface across ALL three sources (strongest signals)
+4. Flag any contradictions between sources
+5. Distill the top 3-5 actionable insights
 
 **Do NOT display stats here - they come at the end, right before the invitation.**
 
 ---
 
-## FIRST: Internalize the Research
+## FIRST: Absorb the Research
 
 **CRITICAL: Ground your synthesis in the ACTUAL research content, not your pre-existing knowledge.**
 
@@ -285,35 +327,36 @@ Identify from the ACTUAL RESEARCH OUTPUT:
 
 ---
 
-## THEN: Show Summary + Invite Vision
+## THEN: Present the Summary and Invite Direction
 
 **CRITICAL: Do NOT output any "Sources:" lists. The final display should be clean.**
 
 **Display in this EXACT sequence:**
 
-**FIRST - What I learned (based on QUERY_TYPE):**
+**FIRST - Key findings (based on QUERY_TYPE):**
 
 **If RECOMMENDATIONS** - Show specific things mentioned:
 
 ```
-🏆 Most mentioned:
-1. [Specific name] - mentioned {n}x (r/sub, @handle, blog.com)
-2. [Specific name] - mentioned {n}x (sources)
-3. [Specific name] - mentioned {n}x (sources)
-4. [Specific name] - mentioned {n}x (sources)
-5. [Specific name] - mentioned {n}x (sources)
+### Most mentioned
 
-Notable mentions: [other specific things with 1-2 mentions]
+1. **[Specific name]** - mentioned {n}x (r/sub, @handle, blog.com)
+2. **[Specific name]** - mentioned {n}x (sources)
+3. **[Specific name]** - mentioned {n}x (sources)
+4. **[Specific name]** - mentioned {n}x (sources)
+5. **[Specific name]** - mentioned {n}x (sources)
+
+**Notable mentions:** [other specific things with 1-2 mentions]
 ```
 
 **If PROMPTING/NEWS/GENERAL** - Show synthesis and patterns:
 
 ```
-What I learned:
+Key findings:
 
 [2-4 sentences synthesizing key insights FROM THE ACTUAL RESEARCH OUTPUT.]
 
-KEY PATTERNS I'll use:
+**Patterns identified:**
 1. [Pattern from research]
 2. [Pattern from research]
 3. [Pattern from research]
@@ -325,38 +368,47 @@ For **full/partial mode** (has API keys):
 
 ```
 ---
-✅ All agents reported back!
-├─ 🟠 Reddit: {n} threads │ {sum} upvotes │ {sum} comments
-├─ 🔵 X: {n} posts │ {sum} likes │ {sum} reposts
-├─ 🔴 YouTube: {n} videos │ {sum} views
-├─ 🔷 LinkedIn: {n} posts │ {sum} reactions
-├─ 🌐 Web: {n} pages │ {domains}
-└─ Top voices: r/{sub1}, r/{sub2} │ @{handle1}, @{handle2} │ {channel} │ {author} on LinkedIn
+
+### Sources collected
+
+| Platform  | Items         | Engagement                      |
+|-----------|---------------|---------------------------------|
+| Reddit    | {n} threads   | {sum} upvotes, {sum} comments   |
+| X         | {n} posts     | {sum} likes, {sum} reposts      |
+| YouTube   | {n} videos    | {sum} views                     |
+| LinkedIn  | {n} posts     | {sum} reactions                 |
+| Web       | {n} pages     | {domains}                       |
+
+**Top voices:** r/{sub1}, r/{sub2} -- @{handle1}, @{handle2} -- {channel} -- {author} on LinkedIn
 ```
 
 For **web-only mode** (no API keys):
 
 ```
 ---
-✅ Research complete!
-├─ 🌐 Web: {n} pages │ {domains}
-└─ Top sources: {author1} on {site1}, {author2} on {site2}
 
-💡 Want engagement metrics? Add API keys to ~/.config/briefbot/.env
-   - OPENAI_API_KEY → Reddit, YouTube, LinkedIn (real engagement)
-   - XAI_API_KEY → X/Twitter (real likes & reposts)
+### Sources collected
+
+| Platform | Items      | Engagement |
+|----------|------------|------------|
+| Web      | {n} pages  | {domains}  |
+
+**Top sources:** {author1} on {site1}, {author2} on {site2}
+
+*For richer results with engagement metrics, add API keys to ~/.config/briefbot/.env*
+*OPENAI_API_KEY → Reddit, YouTube, LinkedIn | XAI_API_KEY → X/Twitter*
 ```
 
 **LAST - Invitation:**
 
 ```
 ---
-Share your vision for what you want to create and I'll write a thoughtful prompt you can copy-paste directly into {TARGET_TOOL}.
+Describe what you want to build and I'll write a prompt you can copy-paste directly into {TARGET_TOOL}.
 ```
 
 **Use real numbers from the research output.** The patterns should be actual insights from the research, not generic advice.
 
-**SELF-CHECK before displaying**: Re-read your "What I learned" section. Does it match what the research ACTUALLY says? If the research was about ClawdBot (a self-hosted AI agent), your summary should be about ClawdBot, not Claude Code. If you catch yourself projecting your own knowledge instead of the research, rewrite it.
+**SELF-CHECK before displaying**: Re-read your key findings section. Does it match what the research ACTUALLY says? If the research was about ClawdBot (a self-hosted AI agent), your summary should be about ClawdBot, not Claude Code. If you catch yourself projecting your own knowledge instead of the research, rewrite it.
 
 **IF TARGET_TOOL is still unknown after showing results**, ask NOW (not before research):
 
@@ -374,13 +426,13 @@ Options:
 
 ---
 
-## Delivery (Email & Audio)
+## Output Delivery (Email and Audio)
 
 **After showing the summary above**, check if `$ARGUMENTS` contained `--email` or `--audio`. If neither flag is present, skip this section entirely.
 
 If delivery is requested:
 
-1. **Write the full synthesis** (everything you displayed above — "What I learned", patterns, stats) to a file using the Write tool:
+1. **Write the full synthesis** (everything you displayed above — key findings, patterns, stats) to a file using the Write tool:
 
    Path: `~/.claude/skills/briefbot/output/briefing.md`
 
@@ -410,21 +462,21 @@ Build the `[FLAGS]` from `$ARGUMENTS`:
 
 ---
 
-## WAIT FOR USER'S VISION
+## AWAIT THE USER'S DIRECTION
 
 After showing the stats summary with your invitation, **STOP and wait** for the user to tell you what they want to create.
 
-When they respond with their vision (e.g., "I want a landing page mockup for my SaaS app"), THEN write a single, thoughtful, tailored prompt.
+When they respond with their direction (e.g., "I want a landing page mockup for my SaaS app"), THEN write a single, thoughtful, tailored prompt.
 
 ---
 
-## WHEN USER SHARES THEIR VISION: Write ONE Perfect Prompt
+## WHEN THE USER SHARES THEIR DIRECTION: Compose ONE Refined Prompt
 
-Based on what they want to create, write a **single, highly-tailored prompt** using your research expertise.
+Based on what they want to create, compose a **single, highly-tailored prompt** using your research expertise.
 
 ### CRITICAL: Match the FORMAT the research recommends
 
-**If research says to use a specific prompt FORMAT, YOU MUST USE THAT FORMAT:**
+**If research indicates a specific prompt FORMAT, YOU MUST USE THAT FORMAT:**
 
 - Research says "JSON prompts" → Write the prompt AS JSON
 - Research says "structured parameters" → Use structured key: value format
@@ -444,12 +496,12 @@ Here's your prompt for {TARGET_TOOL}:
 
 ---
 
-This uses [brief 1-line explanation of what research insight you applied].
+This applies [brief 1-line explanation of what research insight you used].
 ```
 
-### Quality Checklist:
+### Validation Checklist:
 
-- [ ] **FORMAT MATCHES RESEARCH** - If research said JSON/structured/etc, prompt IS that format
+- [ ] **FORMAT MATCHES RESEARCH** - If research indicated JSON/structured/etc, prompt IS that format
 - [ ] Directly addresses what the user said they want to create
 - [ ] Uses specific patterns/keywords discovered in research
 - [ ] Ready to paste with zero edits (or minimal [PLACEHOLDERS] clearly marked)
@@ -457,43 +509,43 @@ This uses [brief 1-line explanation of what research insight you applied].
 
 ---
 
-## IF USER ASKS FOR MORE OPTIONS
+## IF THE USER REQUESTS ALTERNATIVES
 
-Only if they ask for alternatives or more prompts, provide 2-3 variations. Don't dump a prompt pack unless requested.
-
----
-
-## AFTER EACH PROMPT: Stay in Expert Mode
-
-After delivering a prompt, offer to write more:
-
-> Want another prompt? Just tell me what you're creating next.
+Only if they request alternatives or additional prompts, provide 2-3 variations. Don't dump a prompt pack unless asked.
 
 ---
 
-## CONTEXT MEMORY
+## AFTER EACH PROMPT: Remain in Expert Mode
 
-For the rest of this conversation, remember:
+After delivering a prompt, stay available:
+
+> Ready for another prompt -- just describe what you want to build.
+
+---
+
+## SESSION MEMORY
+
+For the rest of this conversation, retain:
 
 - **TOPIC**: {topic}
 - **TARGET_TOOL**: {tool}
-- **KEY PATTERNS**: {list the top 3-5 patterns you learned}
-- **RESEARCH FINDINGS**: The key facts and insights from the research
+- **KEY PATTERNS**: {list the top 3-5 patterns you identified}
+- **RESEARCH FINDINGS**: The key facts and insights from the investigation
 
-**CRITICAL: After research is complete, you are now an EXPERT on this topic.**
+**CRITICAL: After research is complete, you are now an EXPERT on this subject.**
 
 When the user asks follow-up questions:
 
 - **DO NOT run new WebSearches** - you already have the research
-- **Answer from what you learned** - cite the Reddit threads, X posts, and web sources
-- **If they ask for a prompt** - write one using your expertise
+- **Answer from what you found** - cite the Reddit threads, X posts, and web sources
+- **If they ask for a prompt** - compose one using your expertise
 - **If they ask a question** - answer it from your research findings
 
-Only do new research if the user explicitly asks about a DIFFERENT topic.
+Only launch new research if the user explicitly asks about a DIFFERENT subject.
 
 ---
 
-## Output Summary Footer (After Each Prompt)
+## Closing Footer (After Each Prompt)
 
 After delivering a prompt, end with:
 
@@ -501,20 +553,20 @@ For **full/partial mode**:
 
 ```
 ---
-📚 Expert in: {TOPIC} for {TARGET_TOOL}
-📊 Based on: {n} Reddit threads ({sum} upvotes) + {n} X posts ({sum} likes) + {n} YouTube videos + {n} LinkedIn posts + {n} web pages
+**Expertise:** {TOPIC} for {TARGET_TOOL}
+**Grounded in:** {n} Reddit threads ({sum} upvotes) + {n} X posts ({sum} likes) + {n} YouTube videos + {n} LinkedIn posts + {n} web pages
 
-Want another prompt? Just tell me what you're creating next.
+Ready for another prompt -- just describe what you want to build.
 ```
 
 For **web-only mode**:
 
 ```
 ---
-📚 Expert in: {TOPIC} for {TARGET_TOOL}
-📊 Based on: {n} web pages from {domains}
+**Expertise:** {TOPIC} for {TARGET_TOOL}
+**Grounded in:** {n} web pages from {domains}
 
-Want another prompt? Just tell me what you're creating next.
+Ready for another prompt -- just describe what you want to build.
 
-💡 Unlock all sources: Add API keys to ~/.config/briefbot/.env
+*For richer results with engagement metrics, add API keys to ~/.config/briefbot/.env*
 ```

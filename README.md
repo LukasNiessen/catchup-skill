@@ -1,3 +1,17 @@
+# BriefBot - ClaudeCode Skill
+
+<div align="center" name="top">
+  <img align="center" src="assets/logo.png" width="250" height="250" alt="BriefBot Logo">
+
+<!-- spacer -->
+<p></p>
+
+<i>Stay up to date in a world that's never moved faster!</i>
+
+BRIEF BOT
+
+</div>
+
 <p align="center">
   <img src="assets/swimmom-mockup.jpeg" width="200" alt="BriefBot skill"/>
 </p>
@@ -59,14 +73,14 @@ chmod 600 ~/.config/briefbot/.env
 
 ## 🎯 Use Cases
 
-| Use Case | Example Query | What You Get |
-|----------|---------------|--------------|
-| **Prompt Research** | `/briefbot prompting techniques for ChatGPT` | Techniques + copy-paste prompts |
-| **Tool Best Practices** | `/briefbot how to use Remotion with Claude Code` | Real workflows from developers |
-| **Trend Discovery** | `/briefbot best rap songs lately` | Curated lists with engagement data |
-| **Product Research** | `/briefbot what do people think of M4 MacBook` | Community sentiment analysis |
-| **Viral Content** | `/briefbot dog as human ChatGPT trend` | Trending prompts and examples |
-| **News & Updates** | `/briefbot what's happening with DeepSeek R1` | Current discussions and opinions |
+| Use Case                | Example Query                                    | What You Get                       |
+| ----------------------- | ------------------------------------------------ | ---------------------------------- |
+| **Prompt Research**     | `/briefbot prompting techniques for ChatGPT`     | Techniques + copy-paste prompts    |
+| **Tool Best Practices** | `/briefbot how to use Remotion with Claude Code` | Real workflows from developers     |
+| **Trend Discovery**     | `/briefbot best rap songs lately`                | Curated lists with engagement data |
+| **Product Research**    | `/briefbot what do people think of M4 MacBook`   | Community sentiment analysis       |
+| **Viral Content**       | `/briefbot dog as human ChatGPT trend`           | Trending prompts and examples      |
+| **News & Updates**      | `/briefbot what's happening with DeepSeek R1`    | Current discussions and opinions   |
 
 ---
 
@@ -76,13 +90,13 @@ chmod 600 ~/.config/briefbot/.env
 
 Searches across 5 sources simultaneously:
 
-| Platform | What It Finds | Metrics |
-|----------|---------------|---------|
-| Reddit | Discussions, threads, community wisdom | Upvotes, comments |
-| X/Twitter | Real-time posts, announcements | Likes, reposts |
-| YouTube | Tutorials, reviews, demonstrations | Views, likes |
-| LinkedIn | Professional insights, industry takes | Reactions |
-| Web | Blogs, docs, tutorials, news | — |
+| Platform  | What It Finds                          | Metrics           |
+| --------- | -------------------------------------- | ----------------- |
+| Reddit    | Discussions, threads, community wisdom | Upvotes, comments |
+| X/Twitter | Real-time posts, announcements         | Likes, reposts    |
+| YouTube   | Tutorials, reviews, demonstrations     | Views, likes      |
+| LinkedIn  | Professional insights, industry takes  | Reactions         |
+| Web       | Blogs, docs, tutorials, news           | —                 |
 
 ### Engagement-Weighted Scoring
 
@@ -113,17 +127,17 @@ Automatically removes duplicate content across platforms and identifies cross-po
 
 ## ⚙️ Options
 
-| Flag | Description |
-|------|-------------|
-| `--days=N` | Search the last N days (default: 30) |
-| `--quick` | Faster research, fewer sources (8-12 each) |
-| `--deep` | Comprehensive research (50-70 Reddit, 40-60 X) |
-| `--sources=reddit` | Reddit only |
-| `--sources=x` | X only |
-| `--sources=youtube` | YouTube only |
-| `--sources=linkedin` | LinkedIn only |
-| `--sources=all` | All platforms |
-| `--debug` | Verbose logging for troubleshooting |
+| Flag                 | Description                                    |
+| -------------------- | ---------------------------------------------- |
+| `--days=N`           | Search the last N days (default: 30)           |
+| `--quick`            | Faster research, fewer sources (8-12 each)     |
+| `--deep`             | Comprehensive research (50-70 Reddit, 40-60 X) |
+| `--sources=reddit`   | Reddit only                                    |
+| `--sources=x`        | X only                                         |
+| `--sources=youtube`  | YouTube only                                   |
+| `--sources=linkedin` | LinkedIn only                                  |
+| `--sources=all`      | All platforms                                  |
+| `--debug`            | Verbose logging for troubleshooting            |
 
 ---
 
@@ -135,9 +149,11 @@ Automatically removes duplicate content across platforms and identifies cross-po
 **Query:** `/briefbot prompting techniques for chatgpt for legal questions`
 
 **Research Output:**
+
 > The dominant theme is hallucination prevention - multiple sources discuss lawyers being fined for submitting fake case citations. Key strategies: (1) Deep Research mode with uploaded primary sources, (2) "Hallucination Prevention Systems" that force epistemic honesty, (3) prompting for procedural questions rather than case law.
 
 **Generated Prompt:**
+
 ```
 Role: You are a legal research assistant helping a property owner understand
 their options. You are NOT providing legal advice.
@@ -159,9 +175,11 @@ Important constraints:
 **Query:** `/briefbot prompting tips for nano banana pro for ios designs`
 
 **Research Output:**
+
 > JSON-structured prompts dominate for UI work. Key workflow: define window frame first, then UI layout, then text labels. Use an 8pt grid and limit to 6-8 elements per screen.
 
 **Generated Prompt:**
+
 ```json
 {
   "image_type": "UI mockup",
@@ -194,9 +212,11 @@ Important constraints:
 **Query:** `/briefbot using ChatGPT to make images of dogs`
 
 **Research Output:**
+
 > The Reddit community is obsessed with the "dog as human" trend - uploading photos of their dogs and asking ChatGPT to show what they'd look like as a person (threads with 600-900+ upvotes).
 
 **Generated Prompt:**
+
 ```
 Look at this photo of my dog. Create an image showing what they would look like
 as a human person. Keep their exact personality, energy, and distinctive
@@ -218,9 +238,11 @@ human face. Make it a realistic portrait photo, not a cartoon.
 **Query:** `/briefbot photorealistic people in nano banana pro`
 
 **Research Output:**
+
 > JSON prompts with specific fields for demographics, skin texture, lighting, and camera settings. Use "preserve_original": true for reference photos.
 
 **Generated Prompt:**
+
 ```json
 {
   "prompt_type": "Ultra-Photorealistic Multi-Panel Portrait",
@@ -230,10 +252,10 @@ human face. Make it a realistic portrait photo, not a cartoon.
     "preserve_features": ["bone structure", "freckle pattern", "heterochromia"]
   },
   "panels": [
-    {"position": "top-left", "age": 10},
-    {"position": "top-right", "age": 20},
-    {"position": "bottom-left", "age": 40},
-    {"position": "bottom-right", "age": 80}
+    { "position": "top-left", "age": 10 },
+    { "position": "top-right", "age": 20 },
+    { "position": "bottom-left", "age": 40 },
+    { "position": "bottom-right", "age": 80 }
   ],
   "texture_quality": "8K, natural skin texture"
 }
@@ -249,10 +271,10 @@ human face. Make it a realistic portrait photo, not a cartoon.
 
 ## 🔧 Requirements
 
-| Requirement | Purpose | Required? |
-|-------------|---------|-----------|
-| **OpenAI API key** | Reddit, YouTube, LinkedIn research | Optional |
-| **xAI API key** | X/Twitter research | Optional |
+| Requirement        | Purpose                            | Required? |
+| ------------------ | ---------------------------------- | --------- |
+| **OpenAI API key** | Reddit, YouTube, LinkedIn research | Optional  |
+| **xAI API key**    | X/Twitter research                 | Optional  |
 
 At least one key is recommended for best results, but the skill works without any keys using WebSearch fallback.
 
