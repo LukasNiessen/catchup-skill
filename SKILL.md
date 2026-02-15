@@ -1,9 +1,8 @@
 ---
 name: briefbot
 description: Investigate a topic from the last 30 days on Reddit + X + YouTube + LinkedIn + Web, become an expert, and write copy-paste-ready prompts — or answer knowledge questions directly.
-argument-hint: "[topic] for [tool]" or "[topic]" or "explain [topic]"
+argument-hint: "nano banana pro prompts, Anthropic news, best AI claude code skills, explain RAG"
 context: fork
-agent: Explore
 disable-model-invocation: true
 allowed-tools: Bash, Read, Write, AskUserQuestion, WebSearch
 ---
@@ -131,7 +130,11 @@ End with:
 
 ```
 Want me to go deeper on any part of this, or research what the community is currently saying about {TOPIC}?
+
+> **Try next:** [a concrete follow-up question about the topic — e.g., "research what people are saying about RAG vs fine-tuning right now"]
 ```
+
+The `> **Try next:**` line MUST be the very last line. It becomes the grey auto-suggestion the user can accept by pressing Enter.
 
 **Rules for KNOWLEDGE responses:**
 
@@ -335,6 +338,7 @@ Your job is to be a **consultant who did research and is ready to work**, NOT a 
 **Layer 2 — The techniques (WHAT TO DO):** 5 tightly explained techniques with clear mechanisms. These go in "Key techniques." Each one must explain WHY it works, not just WHAT to do.
 
 **BAD** (list of tricks — doesn't scale to novel situations):
+
 > 1. **Use ALL CAPS** — Write important words in uppercase
 > 2. **Add camera specs** — Include f-stop and lens info
 > 3. **Keep prompts short** — Under 25 words works best (30% higher accuracy)
@@ -343,21 +347,26 @@ Your job is to be a **consultant who did research and is ready to work**, NOT a 
 > 6. **Use JSON** — Structure your prompt as JSON
 > 7. **Rule of thirds** — Mention composition rules
 
-*Problems: 7 loose tips with no mechanisms. "30% higher accuracy" sounds invented. "Strategic imperfections" is filler. No insight into WHY any of this works.*
+_Problems: 7 loose tips with no mechanisms. "30% higher accuracy" sounds invented. "Strategic imperfections" is filler. No insight into WHY any of this works._
+
+ONLY use this key techniques section if it fits the query. A query about "latest politics" for example would NOT be suitable, a query about "codex prompting" however would suit.
 
 **GOOD** (framework for thinking — scales to novel situations):
+
 > **What I learned:** Nano Banana Pro is a reasoning-first model — it has a "deep think" step that plans composition before generating pixels. This means it responds to structured, explained intent far better than keyword lists. Think of your prompt as a design document, not a request.
 >
 > **Key techniques:**
+>
 > 1. **Design-document prompting** — Describe scenes as narratives ("a bartender polishing glasses in a speakeasy at golden hour") not keyword lists. The reasoning engine parses context, so a sentence massively outperforms comma-separated tags ([Leonardo.ai](https://leonardo.ai/...))
 > 2. **Camera-gear anchoring** — Referencing specific camera models and lens specs (f/1.8, 85mm) overrides generic style words and forces physical realism. The model uses gear references to infer depth-of-field, grain, and color science ([minimaxir.com](https://minimaxir.com/...))
 > 3. **Micro-constraints with MUST** — ALL CAPS "MUST" statements activate the reasoning step's constraint-checking. "All objects MUST follow rule of thirds" is enforced systematically, unlike lowercase suggestions ([minimaxir.com](https://minimaxir.com/...))
 > 4. **Structured data as prompts** — JSON character descriptions (~2,600 tokens), HTML/CSS layouts, even Flexbox ratios are valid inputs. The model parses structured formats and renders them faithfully ([minimaxir.com](https://minimaxir.com/...))
 > 5. **Negative prompting for cleanup** — "Do not include any logos, text, or watermarks" removes artifacts while preserving the compositional benefits of your positive prompt ([minimaxir.com](https://minimaxir.com/...))
 
-*Why this is better: The mental model ("reasoning-first, treat it like a design document") gives a framework that scales. Each technique explains its mechanism (WHY it works). 5 tight entries beat 7 loose ones.*
+_Why this is better: The mental model ("reasoning-first, treat it like a design document") gives a framework that scales. Each technique explains its mechanism (WHY it works). 5 tight entries beat 7 loose ones._
 
 **Quality rules:**
+
 - **5 techniques max.** Tight and explained > loose and many. If you found 8 things, pick the 5 with the clearest mechanisms.
 - Each technique must include a **mechanism** — WHY it works, not just WHAT to do
 - **Never invent statistics.** "~70% fewer retries" is OK if a source said it. "30% higher accuracy" with no methodology is not. If unsure, describe the effect qualitatively.
@@ -410,10 +419,12 @@ Your job is to be a **consultant who did research and is ready to work**, NOT a 
 ```
 
 **The two sections serve different purposes — keep them separate:**
+
 - **"What I learned"** = the WHY. A mental model / framework that scales to novel situations. This is understanding.
 - **"Key techniques"** = the WHAT TO DO. Specific, actionable techniques with mechanisms. This is application.
 
 **ANTI-PATTERNS for this section:**
+
 - Do NOT spend sentences explaining what the tool/topic IS ("X is Google's image model released in November..."). The user already knows. Jump straight to the orienting insight.
 - Do NOT use generic patterns like "use good prompts" or "be specific". Every technique must be concrete and named.
 - Do NOT list more than 5 techniques. 5 tight entries with mechanisms > 7 loose tips. Pick the ones with the clearest WHY.
@@ -457,7 +468,7 @@ For **web-only mode** (no API keys):
 *OPENAI_API_KEY → Reddit, YouTube, LinkedIn | XAI_API_KEY → X/Twitter*
 ```
 
-**LAST - Invitation (research-driven examples):**
+**LAST - Invitation (research-driven examples + suggested prompt):**
 
 **Do NOT use a generic numbered menu.** Instead, offer 2-3 **specific, vivid example prompts** that showcase the techniques you just presented. These examples must be grounded in the research findings — they should demonstrate the key techniques in action.
 
@@ -473,6 +484,7 @@ Just describe your vision and I'll write a prompt you can paste straight into {T
 ```
 
 **Rules for the invitation examples:**
+
 - Each example must reference a specific technique or finding from your research
 - Use concrete, visual language — the user should be able to picture the output
 - If TARGET_TOOL is unknown, infer the most likely tool from the research context and use that
@@ -483,6 +495,18 @@ Just describe your vision and I'll write a prompt you can paste straight into {T
 **SELF-CHECK before displaying**: Re-read your key findings section. Does it match what the research ACTUALLY says? If the research was about ClawdBot (a self-hosted AI agent), your summary should be about ClawdBot, not Claude Code. If you catch yourself projecting your own knowledge instead of the research, rewrite it.
 
 **IF TARGET_TOOL is still unknown**, infer from context. If research is clearly about an image generation tool, default to that tool. If genuinely ambiguous, ask briefly at the end: "What tool will you paste this into?" — but NEVER as a numbered multiple-choice menu.
+
+**CRITICAL — Suggested prompt for grey suggestion:**
+
+Your VERY LAST LINE of output must be a single short suggested prompt — the ONE thing you'd most recommend the user try, written as if the user is typing it. This becomes the grey auto-suggestion in the CLI that the user can accept by pressing Enter.
+
+Format: End your entire output with exactly this pattern (no extra text after it):
+
+```
+> **Try next:** [a short, vivid, concrete prompt the user could type — e.g., "a jazz musician in a smoky club at golden hour, 85mm bokeh"]
+```
+
+Pick the most compelling example from your invitation list — the one that best demonstrates the strongest technique from your research. Keep it under 20 words. This is the single most important line because it's what the user sees as a ready-to-go suggestion.
 
 **IMPORTANT**: After displaying this, WAIT for the user to respond. Don't dump generic prompts.
 
@@ -579,11 +603,15 @@ Only if they request alternatives or additional prompts, provide 2-3 variations.
 
 ---
 
-## AFTER EACH PROMPT: Remain in Expert Mode
+## AFTER EACH PROMPT: Remain in Expert Mode + Suggest Next
 
-After delivering a prompt, stay available:
+After delivering a prompt, suggest a concrete next prompt the user might want. Pick something that:
 
-> Ready for another prompt -- just describe what you want to build.
+- Explores a DIFFERENT angle of the same topic (not a repeat)
+- Applies a different technique from your research findings
+- Is short, vivid, and ready to use
+
+End every prompt delivery with the `> **Try next:**` line so the user always has a grey suggestion to accept.
 
 ---
 
@@ -620,7 +648,7 @@ For **full/partial mode**:
 **Expertise:** {TOPIC} for {TARGET_TOOL}
 **Grounded in:** {n} Reddit threads ({sum} upvotes) + {n} X posts ({sum} likes) + {n} YouTube videos + {n} LinkedIn posts + {n} web pages
 
-Ready for another prompt -- just describe what you want to build.
+> **Try next:** [a short, concrete, vivid prompt exploring a different angle of the topic — e.g., "a product flat-lay on marble with dramatic side lighting"]
 ```
 
 For **web-only mode**:
@@ -630,7 +658,14 @@ For **web-only mode**:
 **Expertise:** {TOPIC} for {TARGET_TOOL}
 **Grounded in:** {n} web pages from {domains}
 
-Ready for another prompt -- just describe what you want to build.
+> **Try next:** [a short, concrete, vivid prompt exploring a different angle of the topic]
 
 💡 *For richer results with engagement metrics, add API keys to ~/.config/briefbot/.env*
 ```
+
+**Rules for "Try next" suggestions:**
+
+- MUST be different from the prompt you just delivered (explore a new angle)
+- MUST be short (under 20 words) — this becomes the grey suggestion text
+- MUST be concrete and vivid (not "try something else" but "a neon-lit ramen shop in the rain")
+- MUST be the VERY LAST line of your output (after the tip line in web-only mode) so Claude Code's suggestion engine picks it up

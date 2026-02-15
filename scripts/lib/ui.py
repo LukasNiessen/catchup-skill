@@ -10,7 +10,29 @@ import threading
 import random
 from typing import Optional
 
-# Detect whether output is a real terminal vs captured by Claude Code
+# Enable ANSI color support on Windows 10+ terminals
+def _enable_windows_vt_processing():
+    """Activate virtual terminal processing for ANSI escape codes on Windows."""
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        for handle_id in (-11, -12):  # STD_OUTPUT_HANDLE, STD_ERROR_HANDLE
+            handle = kernel32.GetStdHandle(handle_id)
+            if handle == -1:
+                continue
+            mode = ctypes.c_ulong()
+            if kernel32.GetConsoleMode(handle, ctypes.byref(mode)):
+                kernel32.SetConsoleMode(handle, mode.value | 0x0004)
+    except Exception:
+        pass  # Non-fatal: Claude Code renders ANSI regardless
+
+_enable_windows_vt_processing()
+
+# Interactive TTY detection: gates animation (\r line overwrites), NOT colors.
+# Colors are always on — Claude Code, macOS Terminal, Windows Terminal, and Linux
+# terminals all render ANSI. Only disabled via NO_COLOR env var convention.
 TERMINAL_AVAILABLE = sys.stderr.isatty()
 
 # ANSI escape sequences for styling
@@ -28,6 +50,12 @@ class TerminalStyles:
 
 # Preserve the original class name for API compatibility
 Colors = TerminalStyles
+
+# Respect NO_COLOR convention (https://no-color.org/)
+if "NO_COLOR" in os.environ:
+    for _attr in ("MAGENTA", "AZURE", "TEAL", "LIME", "AMBER", "CRIMSON",
+                   "EMPHASIZED", "SUBDUED", "NORMAL"):
+        setattr(TerminalStyles, _attr, "")
 
 
 HEADER_ART = """{}{}\n   \u2588\u2588\u2588\u2588\u2588\u2588\u2557 \u2588\u2588\u2588\u2588\u2588\u2557 \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2557 \u2588\u2588\u2588\u2588\u2588\u2588\u2557\u2588\u2588\u2557  \u2588\u2588\u2557\u2588\u2588\u2557   \u2588\u2588\u2557\u2588\u2588\u2588\u2588\u2588\u2588\u2557\n  \u2588\u2588\u2554\u2550\u2550\u2550\u2550\u255d\u2588\u2588\u2554\u2550\u2550\u2588\u2588\u2557\u255a\u2550\u2550\u2588\u2588\u2554\u2550\u2550\u255d\u2588\u2588\u2554\u2550\u2550\u2550\u2550\u255d\u2588\u2588\u2551  \u2588\u2588\u2551\u2588\u2588\u2551   \u2588\u2588\u2551\u2588\u2588\u2554\u2550\u2550\u2588\u2588\u2557\n  \u2588\u2588\u2551     \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2551   \u2588\u2588\u2551   \u2588\u2588\u2551     \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2551\u2588\u2588\u2551   \u2588\u2588\u2551\u2588\u2588\u2588\u2588\u2588\u2588\u2554\u255d\n  \u2588\u2588\u2551     \u2588\u2588\u2554\u2550\u2550\u2588\u2588\u2551   \u2588\u2588\u2551   \u2588\u2588\u2551     \u2588\u2588\u2554\u2550\u2550\u2588\u2588\u2551\u2588\u2588\u2551   \u2588\u2588\u2551\u2588\u2588\u2554\u2550\u2550\u2550\u255d\n  \u255a\u2588\u2588\u2588\u2588\u2588\u2588\u2557\u2588\u2588\u2551  \u2588\u2588\u2551   \u2588\u2588\u2551   \u255a\u2588\u2588\u2588\u2588\u2588\u2588\u2557\u2588\u2588\u2551  \u2588\u2588\u2551\u255a\u2588\u2588\u2588\u2588\u2588\u2588\u2554\u255d\u2588\u2588\u2551\n   \u255a\u2550\u2550\u2550\u2550\u2550\u255d\u255a\u2550\u255d  \u255a\u2550\u255d   \u255a\u2550\u255d    \u255a\u2550\u2550\u2550\u2550\u2550\u255d\u255a\u2550\u255d  \u255a\u2550\u255d \u255a\u2550\u2550\u2550\u2550\u2550\u255d \u255a\u2550\u255d\n{}{}  30 days of research. 30 seconds of work.{}\n""".format(TerminalStyles.MAGENTA, TerminalStyles.EMPHASIZED, TerminalStyles.NORMAL, TerminalStyles.SUBDUED, TerminalStyles.NORMAL)
@@ -195,16 +223,16 @@ class AnimatedIndicator:
             self.animation_thread = threading.Thread(target=self._animate, daemon=True)
             self.animation_thread.start()
         else:
-            # Not a TTY (Claude Code) - print once
+            # Not a TTY (Claude Code) - print once with color
             if not self.static_displayed:
-                sys.stderr.write("\u23f3 {}\n".format(self.status_text))
+                sys.stderr.write("{}\u23f3{} {}\n".format(self.style_code, TerminalStyles.NORMAL, self.status_text))
                 sys.stderr.flush()
                 self.static_displayed = True
 
     def update(self, new_status: str):
         self.status_text = new_status
         if not TERMINAL_AVAILABLE and not self.static_displayed:
-            sys.stderr.write("\u23f3 {}\n".format(new_status))
+            sys.stderr.write("{}\u23f3{} {}\n".format(self.style_code, TerminalStyles.NORMAL, new_status))
             sys.stderr.flush()
 
     def stop(self, completion_message: str = ""):
@@ -214,7 +242,7 @@ class AnimatedIndicator:
         if TERMINAL_AVAILABLE:
             sys.stderr.write("\r" + " " * 80 + "\r")
         if completion_message:
-            sys.stderr.write("\u2713 {}\n".format(completion_message))
+            sys.stderr.write("{}\u2713{} {}\n".format(TerminalStyles.LIME, TerminalStyles.NORMAL, completion_message))
         sys.stderr.flush()
 
 
@@ -234,11 +262,8 @@ class ResearchProgressTracker:
             self._display_header()
 
     def _display_header(self):
-        if TERMINAL_AVAILABLE:
-            sys.stderr.write(COMPACT_HEADER + "\n")
-            sys.stderr.write("{}Topic: {}{}{}{}\n\n".format(TerminalStyles.SUBDUED, TerminalStyles.NORMAL, TerminalStyles.EMPHASIZED, self.subject_matter, TerminalStyles.NORMAL))
-        else:
-            sys.stderr.write("/briefbot \xb7 researching: {}\n".format(self.subject_matter))
+        sys.stderr.write(COMPACT_HEADER + "\n")
+        sys.stderr.write("{}Topic: {}{}{}{}\n\n".format(TerminalStyles.SUBDUED, TerminalStyles.NORMAL, TerminalStyles.EMPHASIZED, self.subject_matter, TerminalStyles.NORMAL))
         sys.stderr.flush()
 
     def start_reddit(self):
@@ -286,23 +311,17 @@ class ResearchProgressTracker:
 
     def show_complete(self, reddit_count: int, x_count: int, youtube_count: int = 0, linkedin_count: int = 0):
         elapsed_seconds = time.time() - self.start_timestamp
-        if TERMINAL_AVAILABLE:
-            sys.stderr.write("\n{}{}\u2713 Research complete{} ".format(TerminalStyles.LIME, TerminalStyles.EMPHASIZED, TerminalStyles.NORMAL))
-            sys.stderr.write("{}({:.1f}s){}\n".format(TerminalStyles.SUBDUED, elapsed_seconds, TerminalStyles.NORMAL))
-            sys.stderr.write("  {}Reddit:{} {} threads  ".format(TerminalStyles.AMBER, TerminalStyles.NORMAL, reddit_count))
-            sys.stderr.write("{}X:{} {} posts".format(TerminalStyles.TEAL, TerminalStyles.NORMAL, x_count))
-            if youtube_count > 0:
-                sys.stderr.write("  {}YouTube:{} {} videos".format(TerminalStyles.CRIMSON, TerminalStyles.NORMAL, youtube_count))
-            if linkedin_count > 0:
-                sys.stderr.write("  {}LinkedIn:{} {} posts".format(TerminalStyles.AZURE, TerminalStyles.NORMAL, linkedin_count))
-            sys.stderr.write("\n\n")
-        else:
-            components = ["Reddit: {} threads".format(reddit_count), "X: {} posts".format(x_count)]
-            if youtube_count > 0:
-                components.append("YouTube: {} videos".format(youtube_count))
-            if linkedin_count > 0:
-                components.append("LinkedIn: {} posts".format(linkedin_count))
-            sys.stderr.write("\u2713 Research complete ({:.1f}s) - {}\n".format(elapsed_seconds, ", ".join(components)))
+        separator = "{}{}\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500{}".format(TerminalStyles.SUBDUED, TerminalStyles.EMPHASIZED, TerminalStyles.NORMAL)
+        sys.stderr.write("\n" + separator + "\n")
+        sys.stderr.write("{}{}\u2713 Research complete{} ".format(TerminalStyles.LIME, TerminalStyles.EMPHASIZED, TerminalStyles.NORMAL))
+        sys.stderr.write("{}({:.1f}s){}\n".format(TerminalStyles.SUBDUED, elapsed_seconds, TerminalStyles.NORMAL))
+        sys.stderr.write("  {}Reddit:{} {} threads  ".format(TerminalStyles.AMBER, TerminalStyles.NORMAL, reddit_count))
+        sys.stderr.write("{}X:{} {} posts".format(TerminalStyles.TEAL, TerminalStyles.NORMAL, x_count))
+        if youtube_count > 0:
+            sys.stderr.write("  {}YouTube:{} {} videos".format(TerminalStyles.CRIMSON, TerminalStyles.NORMAL, youtube_count))
+        if linkedin_count > 0:
+            sys.stderr.write("  {}LinkedIn:{} {} posts".format(TerminalStyles.AZURE, TerminalStyles.NORMAL, linkedin_count))
+        sys.stderr.write("\n" + separator + "\n\n")
         sys.stderr.flush()
 
     def show_cached(self, cache_age_hours: float = None):
@@ -331,12 +350,12 @@ class ResearchProgressTracker:
     def show_web_only_complete(self):
         """Displays completion for web-only mode."""
         elapsed_seconds = time.time() - self.start_timestamp
-        if TERMINAL_AVAILABLE:
-            sys.stderr.write("\n{}{}\u2713 Ready for web search{} ".format(TerminalStyles.LIME, TerminalStyles.EMPHASIZED, TerminalStyles.NORMAL))
-            sys.stderr.write("{}({:.1f}s){}\n".format(TerminalStyles.SUBDUED, elapsed_seconds, TerminalStyles.NORMAL))
-            sys.stderr.write("  {}Web:{} Claude will search blogs, docs & news\n\n".format(TerminalStyles.LIME, TerminalStyles.NORMAL))
-        else:
-            sys.stderr.write("\u2713 Ready for web search ({:.1f}s)\n".format(elapsed_seconds))
+        separator = "{}{}\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500{}".format(TerminalStyles.SUBDUED, TerminalStyles.EMPHASIZED, TerminalStyles.NORMAL)
+        sys.stderr.write("\n" + separator + "\n")
+        sys.stderr.write("{}{}\u2713 Ready for web search{} ".format(TerminalStyles.LIME, TerminalStyles.EMPHASIZED, TerminalStyles.NORMAL))
+        sys.stderr.write("{}({:.1f}s){}\n".format(TerminalStyles.SUBDUED, elapsed_seconds, TerminalStyles.NORMAL))
+        sys.stderr.write("  {}Web:{} Claude will search blogs, docs & news\n".format(TerminalStyles.LIME, TerminalStyles.NORMAL))
+        sys.stderr.write(separator + "\n\n")
         sys.stderr.flush()
 
     def start_tts(self):
@@ -358,15 +377,9 @@ class ResearchProgressTracker:
             missing_keys: Which keys are absent - 'both', 'reddit', or 'x'
         """
         if missing_keys == "both":
-            if TERMINAL_AVAILABLE:
-                sys.stderr.write(UPGRADE_NOTICE)
-            else:
-                sys.stderr.write(UPGRADE_NOTICE_PLAIN)
+            sys.stderr.write(UPGRADE_NOTICE)
         elif missing_keys in SINGLE_KEY_HINTS:
-            if TERMINAL_AVAILABLE:
-                sys.stderr.write(SINGLE_KEY_HINTS[missing_keys])
-            else:
-                sys.stderr.write(SINGLE_KEY_HINTS_PLAIN[missing_keys])
+            sys.stderr.write(SINGLE_KEY_HINTS[missing_keys])
         sys.stderr.flush()
 
 
