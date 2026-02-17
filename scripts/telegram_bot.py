@@ -23,6 +23,7 @@ import logging
 import re
 import secrets
 import shutil
+import os as _os
 import subprocess
 import sys
 import threading
@@ -73,11 +74,15 @@ RECOGNIZED_KV_FLAGS = {"--days", "--sources"}  # flags that take =VALUE
 # Additional @usernames the bot responds to (lowercase, without @)
 EXTRA_USERNAMES = ["ALPHAGORILLADRAGONBOT"]
 
+PID_FILE = Path.home() / ".config" / "briefbot" / "telegram_bot.pid"
 PAIRINGS_FILE = Path.home() / ".config" / "briefbot" / "pairings.json"
+SESSIONS_FILE = Path.home() / ".config" / "briefbot" / "sessions.json"
+SESSION_EXPIRY_SECONDS = 3600  # 1 hour idle → start fresh
 ENV_FILE = Path.home() / ".config" / "briefbot" / ".env"
 
 HELP_TEXT = (
-    "Mention me with a topic and I'll research it.\n\n"
+    "Mention me with a topic and I'll research it.\n"
+    "Follow-up messages continue the conversation.\n\n"
     "Examples:\n"
     "  @{bot} ai news\n"
     "  @{bot} best python frameworks --deep\n"
@@ -88,7 +93,10 @@ HELP_TEXT = (
     "  --quick       Faster, fewer sources\n"
     "  --days=N      Search last N days (default 30)\n"
     "  --sources=X   Source filter (auto/reddit/x/all)\n"
-    "  --include-web Include general web search\n"
+    "  --include-web Include general web search\n\n"
+    "Commands:\n"
+    "  /new   Start fresh research (clears current conversation)\n"
+    "  /help  Show this help message\n"
 )
 
 # ---------------------------------------------------------------------------
@@ -111,9 +119,7 @@ def _load_pairings() -> dict:
 def _save_pairings(pairings: dict) -> None:
     """Writes pending pairing requests to disk."""
     PAIRINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    PAIRINGS_FILE.write_text(
-        json.dumps(pairings, indent=2), encoding="utf-8"
-    )
+    PAIRINGS_FILE.write_text(json.dumps(pairings, indent=2), encoding="utf-8")
 
 
 def _generate_code() -> str:
@@ -184,7 +190,8 @@ def revoke_chat_id(chat_id: str) -> None:
     with _pairings_lock:
         pairings = _load_pairings()
         to_remove = [
-            code for code, e in pairings.items()
+            code
+            for code, e in pairings.items()
             if str(e.get("chat_id")) == str(chat_id)
         ]
         for code in to_remove:
@@ -240,7 +247,9 @@ def _remove_chat_id_from_env(chat_id: str) -> None:
             existing = {v.strip() for v in value.split(",") if v.strip()}
             existing.discard(str(chat_id))
             if existing:
-                new_lines.append("{}={}".format(key.strip(), ",".join(sorted(existing))))
+                new_lines.append(
+                    "{}={}".format(key.strip(), ",".join(sorted(existing)))
+                )
             # If empty, drop the line entirely
         else:
             new_lines.append(line)
@@ -253,6 +262,74 @@ def _load_allowed_chat_ids() -> set:
     config = env.get_config()
     raw = config.get("TELEGRAM_CHAT_ID", "")
     return {cid.strip() for cid in raw.split(",") if cid.strip()}
+
+
+# ---------------------------------------------------------------------------
+# Session persistence (multi-turn conversation continuity)
+# ---------------------------------------------------------------------------
+
+_sessions_lock = threading.Lock()
+
+
+def _load_sessions() -> dict:
+    """Loads active sessions from disk."""
+    if not SESSIONS_FILE.exists():
+        return {}
+    try:
+        return json.loads(SESSIONS_FILE.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def _save_sessions(sessions: dict) -> None:
+    """Writes active sessions to disk."""
+    SESSIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    SESSIONS_FILE.write_text(json.dumps(sessions, indent=2), encoding="utf-8")
+
+
+def get_session(chat_id: str) -> dict:
+    """Returns the active session for a chat, or {} if none/expired."""
+    with _sessions_lock:
+        sessions = _load_sessions()
+        entry = sessions.get(str(chat_id))
+        if not entry:
+            return {}
+        # Check expiry
+        last_active = entry.get("last_active", 0)
+        if time.time() - last_active > SESSION_EXPIRY_SECONDS:
+            del sessions[str(chat_id)]
+            _save_sessions(sessions)
+            return {}
+        return entry
+
+
+def save_session(chat_id: str, session_id: str, topic: str) -> None:
+    """Saves or updates a session for a chat."""
+    with _sessions_lock:
+        sessions = _load_sessions()
+        sessions[str(chat_id)] = {
+            "session_id": session_id,
+            "last_active": time.time(),
+            "topic": topic,
+        }
+        _save_sessions(sessions)
+
+
+def clear_session(chat_id: str) -> None:
+    """Removes the session for a chat."""
+    with _sessions_lock:
+        sessions = _load_sessions()
+        if str(chat_id) in sessions:
+            del sessions[str(chat_id)]
+            _save_sessions(sessions)
+
+
+# ---------------------------------------------------------------------------
+# Duplicate-submission guard
+# ---------------------------------------------------------------------------
+
+_active_chats = set()
+_active_chats_lock = threading.Lock()
 
 
 # ---------------------------------------------------------------------------
@@ -298,10 +375,12 @@ def cli_pair_approve(code: str) -> None:
     username = entry.get("username", "")
 
     print("Approved! Chat {} is now whitelisted.".format(entry["chat_id"]))
-    print("  User: {}{}".format(
-        display_name,
-        " @{}".format(username) if username else "",
-    ))
+    print(
+        "  User: {}{}".format(
+            display_name,
+            " @{}".format(username) if username else "",
+        )
+    )
     print("\nThe bot will pick up the new whitelist automatically.")
 
     # Try to notify the user on Telegram
@@ -310,7 +389,8 @@ def cli_pair_approve(code: str) -> None:
     if token:
         try:
             _send_message(
-                token, entry["chat_id"],
+                token,
+                entry["chat_id"],
                 "You've been approved! Send me a topic to research.\n"
                 "Type /help for usage info.",
             )
@@ -473,36 +553,163 @@ def find_claude_cli() -> str:
     return shutil.which("claude")
 
 
-def run_research_full(claude_exe: str, topic: str, flags: str, chat_id: str) -> str:
+def _clean_env():
+    """Return a copy of the environment without CLAUDECODE so subprocesses
+    don't think they are nested inside another Claude Code session."""
+    had_var = "CLAUDECODE" in _os.environ
+    env = _os.environ.copy()
+    env.pop("CLAUDECODE", None)
+    if had_var:
+        log.debug("_clean_env: stripped CLAUDECODE from subprocess environment")
+    return env
+
+
+def _run_new_research(claude_exe: str, topic: str, flags: str, chat_id: str) -> str:
     """
     Runs the full BriefBot pipeline via Claude CLI.
 
-    Returns stdout/stderr output for logging, or raises on failure.
+    Returns the session_id on success (or None if unparseable).
+    Raises on failure.
     """
+    log.info(
+        "_run_new_research called — topic=%r, flags=%r, chat_id=%s, claude_exe=%s",
+        topic,
+        flags,
+        chat_id,
+        claude_exe,
+    )
     cmd = "/briefbot {} {} --telegram {}".format(topic, flags, chat_id).strip()
     # Collapse multiple spaces
     while "  " in cmd:
         cmd = cmd.replace("  ", " ")
 
-    log.info('Running: claude -p "%s" --dangerously-skip-permissions', cmd)
+    full_args = [
+        claude_exe,
+        "-p",
+        cmd,
+        "--output-format",
+        "json",
+        "--dangerously-skip-permissions",
+    ]
+    log.info("_run_new_research: spawning subprocess: %s", full_args)
 
     result = subprocess.run(
-        [claude_exe, "-p", cmd, "--dangerously-skip-permissions"],
+        full_args,
         capture_output=True,
         text=True,
         timeout=600,  # 10 minute max
+        env=_clean_env(),
     )
+
+    stdout_len = len(result.stdout or "")
+    stderr_len = len(result.stderr or "")
+    log.info(
+        "_run_new_research: subprocess exited — returncode=%d, stdout=%d bytes, stderr=%d bytes",
+        result.returncode,
+        stdout_len,
+        stderr_len,
+    )
+    if result.stderr:
+        log.debug(
+            "_run_new_research: stderr (last 500 chars): %s", result.stderr[-500:]
+        )
 
     output = (result.stdout or "") + (result.stderr or "")
 
     if result.returncode != 0:
+        log.error(
+            "_run_new_research: FAILED — returncode=%d, output tail: %s",
+            result.returncode,
+            output[-500:] if output else "(no output)",
+        )
         raise RuntimeError(
             "Claude exited with code {} — {}".format(
                 result.returncode, output[-500:] if output else "(no output)"
             )
         )
 
-    return output
+    # Try to parse session_id from JSON output
+    session_id = None
+    try:
+        data = json.loads(result.stdout)
+        if isinstance(data, dict):
+            session_id = data.get("session_id")
+    except (json.JSONDecodeError, TypeError):
+        log.warning("_run_new_research: could not parse session_id from JSON output")
+
+    log.info("_run_new_research: done — session_id=%s", session_id)
+    return session_id
+
+
+def _run_followup(claude_exe: str, session_id: str, message: str) -> str:
+    """
+    Sends a follow-up message to an existing Claude session.
+
+    Returns the response text, or raises on failure.
+    """
+    log.info(
+        "_run_followup called — session_id=%s, message=%r, claude_exe=%s",
+        session_id[:8],
+        message[:80],
+        claude_exe,
+    )
+
+    full_args = [
+        claude_exe,
+        "-p",
+        message,
+        "--resume",
+        session_id,
+        "--output-format",
+        "json",
+        "--dangerously-skip-permissions",
+    ]
+    log.info("_run_followup: spawning subprocess: %s", full_args)
+
+    result = subprocess.run(
+        full_args,
+        capture_output=True,
+        text=True,
+        timeout=600,  # 10 minute max
+        env=_clean_env(),
+    )
+
+    stdout_len = len(result.stdout or "")
+    stderr_len = len(result.stderr or "")
+    log.info(
+        "_run_followup: subprocess exited — returncode=%d, stdout=%d bytes, stderr=%d bytes",
+        result.returncode,
+        stdout_len,
+        stderr_len,
+    )
+    if result.stderr:
+        log.debug("_run_followup: stderr (last 500 chars): %s", result.stderr[-500:])
+
+    output = (result.stdout or "") + (result.stderr or "")
+
+    if result.returncode != 0:
+        log.error(
+            "_run_followup: FAILED — returncode=%d, output tail: %s",
+            result.returncode,
+            output[-500:] if output else "(no output)",
+        )
+        raise RuntimeError(
+            "Claude exited with code {} — {}".format(
+                result.returncode, output[-500:] if output else "(no output)"
+            )
+        )
+
+    # Parse response text from JSON output
+    try:
+        data = json.loads(result.stdout)
+        if isinstance(data, dict):
+            log.info("_run_followup: done — parsed JSON response, %d bytes", stdout_len)
+            return data.get("result", result.stdout)
+    except (json.JSONDecodeError, TypeError):
+        log.warning("_run_followup: could not parse JSON from stdout")
+
+    log.info("_run_followup: done — returning raw stdout, %d bytes", stdout_len)
+    return result.stdout or ""
 
 
 def run_research_lite(topic: str, flags: str, chat_id: str, config: dict) -> None:
@@ -555,30 +762,127 @@ def handle_research(
     chat_id: str,
     topic: str,
     flags: str,
+    raw_text: str,
     claude_exe: str,
     config: dict,
 ) -> None:
     """
     Executes research and sends results. Runs inside a thread pool.
 
+    Checks for an active session to continue, otherwise starts new research.
     On error, sends an error message to the chat.
     """
+    log.info(
+        "handle_research called — chat_id=%s, topic=%r, flags=%r, "
+        "claude_exe=%s, has_raw_text=%d chars",
+        chat_id,
+        topic,
+        flags,
+        claude_exe,
+        len(raw_text or ""),
+    )
     try:
         if claude_exe:
-            run_research_full(claude_exe, topic, flags, chat_id)
+            # Check for active session (follow-up)
+            session = get_session(chat_id)
+            if session:
+                log.info(
+                    "handle_research: found active session %s for chat %s (topic=%r) — attempting follow-up",
+                    session["session_id"][:8],
+                    chat_id,
+                    session.get("topic"),
+                )
+                try:
+                    response = _run_followup(
+                        claude_exe,
+                        session["session_id"],
+                        raw_text,
+                    )
+                    if response:
+                        log.info(
+                            "handle_research: follow-up succeeded — sending %d byte response to chat %s",
+                            len(response),
+                            chat_id,
+                        )
+                        telegram_sender.send_telegram_message(
+                            chat_id=chat_id,
+                            markdown_body=response,
+                            subject="Follow-up: {}".format(
+                                session.get("topic", "research"),
+                            ),
+                            config=config,
+                        )
+                        save_session(
+                            chat_id,
+                            session["session_id"],
+                            session.get("topic", topic),
+                        )
+                        log.info("Follow-up complete for chat %s", chat_id)
+                        return
+                    else:
+                        log.warning(
+                            "handle_research: follow-up returned empty response for chat %s",
+                            chat_id,
+                        )
+                except Exception as err:
+                    log.warning(
+                        "Follow-up failed for chat %s: %s — starting fresh",
+                        chat_id,
+                        err,
+                    )
+                    clear_session(chat_id)
+            else:
+                log.info(
+                    "handle_research: no active session for chat %s — starting new research",
+                    chat_id,
+                )
+
+            # New research
+            log.info(
+                "handle_research: calling _run_new_research for topic=%r, chat_id=%s",
+                topic,
+                chat_id,
+            )
+            session_id = _run_new_research(claude_exe, topic, flags, chat_id)
+            if session_id:
+                save_session(chat_id, session_id, topic)
+                log.info(
+                    "handle_research: saved session %s for chat %s",
+                    session_id[:8],
+                    chat_id,
+                )
+            else:
+                log.warning(
+                    "handle_research: no session_id returned for topic=%r", topic
+                )
         else:
+            log.info(
+                "handle_research: no claude_exe — falling back to lite mode for topic=%r",
+                topic,
+            )
             run_research_lite(topic, flags, chat_id, config)
-        log.info("Research complete for topic: %s", topic)
+        log.info("handle_research: DONE — topic=%r, chat_id=%s", topic, chat_id)
     except subprocess.TimeoutExpired:
-        log.error("Research timed out for topic: %s", topic)
+        log.error(
+            "handle_research: TIMEOUT after 600s — topic=%r, chat_id=%s", topic, chat_id
+        )
         _send_message(token, chat_id, "Research timed out for: {}".format(topic))
     except Exception as err:
-        log.error("Research failed for '%s': %s", topic, err)
+        log.error(
+            "handle_research: FAILED — topic=%r, chat_id=%s, error=%s",
+            topic,
+            chat_id,
+            err,
+            exc_info=True,
+        )
         _send_message(
             token,
             chat_id,
             "Research failed for '{}': {}".format(topic, str(err)[:300]),
         )
+    finally:
+        with _active_chats_lock:
+            _active_chats.discard(chat_id)
 
 
 # ---------------------------------------------------------------------------
@@ -587,6 +891,11 @@ def handle_research(
 
 
 def main() -> None:
+    # Write PID file so stop/status commands work even when run directly
+    PID_FILE.parent.mkdir(parents=True, exist_ok=True)
+    PID_FILE.write_text(str(_os.getpid()), encoding="utf-8")
+    log.info("Wrote PID file: %s (pid=%d)", PID_FILE, _os.getpid())
+
     # Load config
     config = env.get_config()
     token = config.get("TELEGRAM_BOT_TOKEN")
@@ -653,19 +962,25 @@ def main() -> None:
                         code = create_pairing(chat_id, from_user)
                         log.info(
                             "Pairing code %s issued to chat %s (@%s)",
-                            code, chat_id, from_user.get("username", "?"),
+                            code,
+                            chat_id,
+                            from_user.get("username", "?"),
                         )
                         _send_message(
-                            token, chat_id,
+                            token,
+                            chat_id,
                             "You're not authorized yet.\n\n"
                             "Your pairing code: {}\n\n"
                             "Ask the bot owner to run:\n"
-                            "  python telegram_bot.py pair approve {}".format(code, code),
+                            "  python telegram_bot.py pair approve {}".format(
+                                code, code
+                            ),
                         )
                     else:
                         log.warning(
                             "Ignored message from unknown chat %s: %s",
-                            chat_id, text[:50],
+                            chat_id,
+                            text[:50],
                         )
                     continue
 
@@ -698,6 +1013,15 @@ def main() -> None:
                     )
                     continue
 
+                if cmd in ("/new",):
+                    clear_session(chat_id)
+                    _send_message(
+                        token,
+                        chat_id,
+                        "Session cleared. Send a topic to start fresh research.",
+                    )
+                    continue
+
                 # Ignore other / commands
                 if text.startswith("/"):
                     _send_message(
@@ -707,10 +1031,23 @@ def main() -> None:
                     )
                     continue
 
+                # Duplicate-submission guard
+                with _active_chats_lock:
+                    if chat_id in _active_chats:
+                        _send_message(
+                            token,
+                            chat_id,
+                            "Still processing your previous request...",
+                        )
+                        continue
+                    _active_chats.add(chat_id)
+
                 # Parse topic and flags
                 topic, flags = parse_message(text)
 
                 if not topic:
+                    with _active_chats_lock:
+                        _active_chats.discard(chat_id)
                     _send_message(
                         token,
                         chat_id,
@@ -718,8 +1055,12 @@ def main() -> None:
                     )
                     continue
 
-                # Acknowledge
-                _send_message(token, chat_id, "Researching {}...".format(topic))
+                # Acknowledge (session-aware)
+                session = get_session(chat_id)
+                if session:
+                    _send_message(token, chat_id, "Thinking...")
+                else:
+                    _send_message(token, chat_id, "Researching {}...".format(topic))
 
                 # Run research in background thread
                 executor.submit(
@@ -728,6 +1069,7 @@ def main() -> None:
                     chat_id,
                     topic,
                     flags,
+                    text,
                     claude_exe,
                     config,
                 )
@@ -736,7 +1078,8 @@ def main() -> None:
         log.info("Shutting down...")
     finally:
         executor.shutdown(wait=False)
-        log.info("Bye.")
+        PID_FILE.unlink(missing_ok=True)
+        log.info("Removed PID file. Bye.")
 
 
 # ---------------------------------------------------------------------------
@@ -760,24 +1103,29 @@ if __name__ == "__main__":
             print("Usage:")
             print("  python telegram_bot.py pair list            Show pending requests")
             print("  python telegram_bot.py pair approve CODE    Approve a pairing")
-            print("  python telegram_bot.py pair revoke CHAT_ID  Remove a chat from whitelist")
+            print(
+                "  python telegram_bot.py pair revoke CHAT_ID  Remove a chat from whitelist"
+            )
             sys.exit(1)
 
     # Subcommands: start / stop / status (delegate to setup.py lifecycle)
     elif args and args[0] == "start":
         from setup import bot_start
+
         ok, msg = bot_start()
         print(msg)
         sys.exit(0 if ok else 1)
 
     elif args and args[0] == "stop":
         from setup import bot_stop
+
         ok, msg = bot_stop()
         print(msg)
         sys.exit(0 if ok else 1)
 
     elif args and args[0] == "status":
         from setup import bot_status
+
         running, pid = bot_status()
         if running:
             print("Telegram bot is RUNNING (PID {})".format(pid))

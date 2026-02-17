@@ -537,6 +537,7 @@ def run_setup():
                 updated[key] = new_val
             elif key in updated:
                 del updated[key]
+            print()
 
         print()
 

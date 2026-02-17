@@ -509,10 +509,35 @@ Key Techniques
 
 ---
 
-### Video Generation
+### Dario Amodei News
 
-**1. Prompt:** Best video AI to create ads for your company
-**Answer:**
+**1. Prompt:** Amodei --days 7
+
+**Answer:** What Amodei has been up to this week
+
+1. $30B Series G at $380B valuation (Feb 12) — The largest AI funding round in history. Amodei framed it as a necessity given projected compute scaling: 3x annual growth
+   reaching 300GW of AI compute by 2029.
+
+2. Dwarkesh Podcast: "Near the end of the exponential" (Feb 13) — A 3-hour deep dive where Amodei laid out his clearest AGI timeline yet, predicting a "country of geniuses
+   in a data center" in 2026-2027. He argued AI models are approaching the capability to build their own successors.
+
+3. India expansion (Feb 16) — Opened Anthropic's Bengaluru office and keynoted the India AI Impact Summit in Delhi. India is now Anthropic's second-largest market (revenue
+   doubled in 4 months). Improving Claude in 10 Indian languages.
+
+4. Bankruptcy risk candor — Told Fortune that if growth is 5x/year instead of 10x, or if timelines slip by one year, "you go bankrupt." Remarkable candor days after raising
+   $30B.
+
+5. AI consciousness remarks — Stated "we don't know if the models are conscious" and framed AI development as "cultivating" rather than "programming" intelligence. Went
+   viral on X (595+ likes on top posts).
+
+X engagement
+
+21 posts tracked, ~3,478 total likes. Top voices: @kimmonismus (595 likes), @VraserX (500 likes), @JonhernandezIA (902 combined), @shanaka86 (297 likes).
+
+The thread worth pulling
+
+The tension between "we might go bankrupt" and a $30B raise — what does this signal about AI capex risk broadly? His India bet (talent, market, or regulatory arbitrage?),
+and the "cultivation vs programming" framing for AI safety.
 
 > ---
 

@@ -4,6 +4,7 @@
 #
 
 import json
+import os
 import re
 import sys
 from typing import Any, Dict, List, Optional
@@ -15,6 +16,13 @@ def _emit_error_log(message_content: str):
     """Writes error diagnostic to stderr."""
     sys.stderr.write("[X ERROR] {}\n".format(message_content))
     sys.stderr.flush()
+
+
+def _log(message: str):
+    """Emit a debug log line to stderr, gated by LAST30DAYS_DEBUG."""
+    if os.environ.get("LAST30DAYS_DEBUG", "").lower() in ("1", "true", "yes"):
+        sys.stderr.write("[XAI_X] {}\n".format(message))
+        sys.stderr.flush()
 
 
 # xAI uses the responses endpoint with Agent Tools API
@@ -83,10 +91,20 @@ def search_x(
     Returns:
         Raw API response dictionary
     """
+    _log("=== search_x START ===")
+    _log("  API credential: {}...{} ({} chars)".format(
+        api_credential[:8], api_credential[-4:], len(api_credential)))
+    _log("  Model: {}".format(model_identifier))
+    _log("  Subject: '{}'".format(search_subject))
+    _log("  Date range: {} to {}".format(range_start, range_end))
+    _log("  Thoroughness: {}".format(thoroughness))
+
     if mock_api_response is not None:
+        _log("  Using MOCK response")
         return mock_api_response
 
     min_results, max_results = QUANTITY_SETTINGS.get(thoroughness, QUANTITY_SETTINGS["default"])
+    _log("  Requesting {}-{} results".format(min_results, max_results))
 
     request_headers = {
         "Authorization": "Bearer {}".format(api_credential),
@@ -96,6 +114,7 @@ def search_x(
     # Adjust timeout based on search depth
     timeout_mapping = {"quick": 90, "default": 120, "deep": 180}
     request_timeout = timeout_mapping.get(thoroughness, 120)
+    _log("  Timeout: {}s".format(request_timeout))
 
     # Construct request using Agent Tools API with x_search tool
     request_payload = {
@@ -117,7 +136,40 @@ def search_x(
         ],
     }
 
-    return http.post(XAI_API_ENDPOINT, request_payload, request_headers=request_headers, timeout_seconds=request_timeout)
+    _log("  Endpoint: {}".format(XAI_API_ENDPOINT))
+    _log("  Payload model: {}, tools: {}, input_length: {} chars".format(
+        request_payload["model"],
+        [t["type"] for t in request_payload["tools"]],
+        len(request_payload["input"][0]["content"]),
+    ))
+    _log("  Sending POST request...")
+
+    response = http.post(XAI_API_ENDPOINT, request_payload, request_headers=request_headers, timeout_seconds=request_timeout)
+
+    _log("  Response received, type: {}, keys: {}".format(
+        type(response).__name__,
+        list(response.keys()) if isinstance(response, dict) else "N/A"))
+    if isinstance(response, dict):
+        if "error" in response:
+            _log("  Response contains ERROR: {}".format(
+                str(response["error"])[:300]))
+        if "output" in response:
+            output = response["output"]
+            if isinstance(output, list):
+                _log("  Response output: list with {} elements".format(len(output)))
+                for i, elem in enumerate(output):
+                    if isinstance(elem, dict):
+                        _log("    output[{}]: type='{}', keys={}".format(
+                            i, elem.get("type", "?"), list(elem.keys())))
+            elif isinstance(output, str):
+                _log("  Response output: string ({} chars)".format(len(output)))
+        if "id" in response:
+            _log("  Response id: {}".format(response["id"]))
+        if "model" in response:
+            _log("  Response model: {}".format(response["model"]))
+
+    _log("=== search_x END ===")
+    return response
 
 
 def parse_x_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -128,13 +180,20 @@ def parse_x_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
     extracted_items = []
 
+    _log("=== parse_x_response START ===")
+    _log("  Response type: {}, keys: {}".format(
+        type(api_response).__name__,
+        list(api_response.keys()) if isinstance(api_response, dict) else "N/A"))
+
     # Check for API-level errors
     if "error" in api_response and api_response["error"]:
         error_data = api_response["error"]
         error_message = error_data.get("message", str(error_data)) if isinstance(error_data, dict) else str(error_data)
         _emit_error_log("xAI API error: {}".format(error_message))
+        _log("  API ERROR detected: {}".format(error_message))
         if http.DEBUG:
             _emit_error_log("Full error response: {}".format(json.dumps(api_response, indent=2)[:1000]))
+        _log("=== parse_x_response END (error, 0 items) ===")
         return extracted_items
 
     # Locate the output text within the response structure
@@ -142,45 +201,74 @@ def parse_x_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]]:
 
     if "output" in api_response:
         output_data = api_response["output"]
+        _log("  'output' key found, type: {}".format(type(output_data).__name__))
 
         if isinstance(output_data, str):
             output_content = output_data
+            _log("  output is string, {} chars".format(len(output_content)))
         elif isinstance(output_data, list):
-            for output_element in output_data:
+            _log("  output is list with {} elements".format(len(output_data)))
+            for idx, output_element in enumerate(output_data):
                 if isinstance(output_element, dict):
+                    _log("    output[{}]: type='{}', keys={}".format(
+                        idx, output_element.get("type", "?"), list(output_element.keys())))
                     if output_element.get("type") == "message":
                         message_content = output_element.get("content", [])
-                        for content_block in message_content:
-                            if isinstance(content_block, dict) and content_block.get("type") == "output_text":
-                                output_content = content_block.get("text", "")
-                                break
+                        _log("    message has {} content blocks".format(len(message_content)))
+                        for block_idx, content_block in enumerate(message_content):
+                            if isinstance(content_block, dict):
+                                _log("      content[{}]: type='{}'".format(
+                                    block_idx, content_block.get("type", "?")))
+                                if content_block.get("type") == "output_text":
+                                    output_content = content_block.get("text", "")
+                                    _log("      Found output_text: {} chars".format(len(output_content)))
+                                    break
                     elif "text" in output_element:
                         output_content = output_element["text"]
+                        _log("    Found text field: {} chars".format(len(output_content)))
                 elif isinstance(output_element, str):
                     output_content = output_element
+                    _log("    output[{}] is string: {} chars".format(idx, len(output_content)))
 
                 if output_content:
                     break
+    else:
+        _log("  No 'output' key in response")
 
     # Check legacy response format
     if not output_content and "choices" in api_response:
+        _log("  Trying legacy 'choices' format...")
         for choice in api_response["choices"]:
             if "message" in choice:
                 output_content = choice["message"].get("content", "")
+                _log("  Found content in choices: {} chars".format(len(output_content)))
                 break
 
     if not output_content:
+        _log("  NO output content found in response, returning 0 items")
+        _log("  Full response preview: {}".format(
+            json.dumps(api_response, indent=2)[:500] if isinstance(api_response, dict) else str(api_response)[:500]))
+        _log("=== parse_x_response END (no content, 0 items) ===")
         return extracted_items
+
+    _log("  Output content: {} chars, preview: '{}'".format(
+        len(output_content), output_content[:200].replace('\n', '\\n')))
 
     # Extract JSON from the text response
     json_pattern = re.search(r'\{[\s\S]*"items"[\s\S]*\}', output_content)
 
     if json_pattern:
+        _log("  JSON pattern found ({} chars)".format(len(json_pattern.group())))
         try:
             parsed_data = json.loads(json_pattern.group())
             extracted_items = parsed_data.get("items", [])
-        except json.JSONDecodeError:
-            pass
+            _log("  Parsed {} items from JSON".format(len(extracted_items)))
+        except json.JSONDecodeError as jde:
+            _log("  JSON PARSE ERROR: {}".format(jde))
+            _emit_error_log("JSON parse error: {}".format(jde))
+    else:
+        _log("  NO JSON pattern with 'items' found in output")
+        _log("  Output preview for debugging: '{}'".format(output_content[:500].replace('\n', '\\n')))
 
     # Validate and clean extracted items
     validated_items = []
@@ -231,4 +319,11 @@ def parse_x_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]]:
         validated_items.append(cleaned_item)
         item_counter += 1
 
+    _log("  Validated {} of {} raw items".format(len(validated_items), len(extracted_items)))
+    if validated_items:
+        _log("  First item: author={}, url={}, date={}".format(
+            validated_items[0].get("author_handle", "?"),
+            validated_items[0].get("url", "?")[:60],
+            validated_items[0].get("date", "?")))
+    _log("=== parse_x_response END ({} items) ===".format(len(validated_items)))
     return validated_items

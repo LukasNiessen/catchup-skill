@@ -3,10 +3,19 @@
 # Handles model availability checks and version-based prioritization
 #
 
+import os
 import re
+import sys
 from typing import Dict, List, Optional, Tuple
 
 from . import cache, http
+
+
+def _log(message: str):
+    """Emit a debug log line to stderr, gated by LAST30DAYS_DEBUG."""
+    if os.environ.get("LAST30DAYS_DEBUG", "").lower() in ("1", "true", "yes"):
+        sys.stderr.write("[MODELS] {}\n".format(message))
+        sys.stderr.flush()
 
 # OpenAI API configuration
 OPENAI_MODEL_LISTING_ENDPOINT = "https://api.openai.com/v1/models"
@@ -14,10 +23,17 @@ OPENAI_DEFAULT_MODELS = ["gpt-5.2", "gpt-5.1", "gpt-5", "gpt-4o"]
 
 # xAI API configuration - Agent Tools API requires grok-4 family
 XAI_MODEL_LISTING_ENDPOINT = "https://api.x.ai/v1/models"
-XAI_MODEL_ALIASES = {
-    "latest": "grok-4-1-fast",  # Required for x_search tool
-    "stable": "grok-4-1-fast",
-}
+XAI_HARDCODED_FALLBACK = "grok-4-1-fast"
+
+# Preferred xAI models in priority order (first match wins).
+# Any grok-4+ model supports x_search, but we prefer fast variants.
+XAI_MODEL_PREFERENCE = [
+    "grok-4-1-fast",
+    "grok-4-1-fast-non-reasoning",
+    "grok-4-fast",
+    "grok-4-1",
+    "grok-4",
+]
 
 
 def extract_version_tuple(model_identifier: str) -> Optional[Tuple[int, ...]]:
@@ -143,32 +159,71 @@ def choose_xai_model(
     """
     Selects the optimal xAI model based on the specified policy.
 
+    Queries the xAI /v1/models API to discover which models the key
+    actually has access to, then picks the best grok-4+ model.
+
     Selection policies:
     - 'pinned': Use the exact model specified
-    - 'latest': Use the most recent stable model
-    - 'stable': Use the proven stable model
+    - 'latest'/'stable': Auto-select from available grok-4 models
 
     Returns the selected model identifier.
     """
+    _log("=== choose_xai_model ===")
+    _log("  Policy: '{}', Pinned: {}".format(selection_policy, pinned_model))
+
     # Honor explicit model pinning
     if selection_policy == "pinned" and pinned_model:
+        _log("  Using PINNED model: {}".format(pinned_model))
         return pinned_model
 
-    # Use alias system for named policies
-    if selection_policy in XAI_MODEL_ALIASES:
-        resolved_model = XAI_MODEL_ALIASES[selection_policy]
+    # Check cache first
+    cached_selection = cache.get_cached_model("xai")
+    if cached_selection:
+        _log("  Using CACHED model: {}".format(cached_selection))
+        return cached_selection
 
-        # Check cache first
-        cached_selection = cache.get_cached_model("xai")
-        if cached_selection:
-            return cached_selection
+    # Query the API for actually available models
+    if mock_model_list is not None:
+        available_models = mock_model_list
+        _log("  Using mock model list ({} models)".format(len(available_models)))
+    else:
+        try:
+            authorization_headers = {"Authorization": "Bearer {}".format(api_credential)}
+            api_response = http.get(XAI_MODEL_LISTING_ENDPOINT, request_headers=authorization_headers)
+            available_models = api_response.get("data", [])
+            _log("  Fetched {} models from xAI API".format(len(available_models)))
+        except http.HTTPError as err:
+            _log("  Failed to fetch models ({}), using hardcoded fallback: {}".format(
+                err, XAI_HARDCODED_FALLBACK))
+            cache.set_cached_model("xai", XAI_HARDCODED_FALLBACK)
+            return XAI_HARDCODED_FALLBACK
 
-        # Cache the resolved alias
-        cache.set_cached_model("xai", resolved_model)
-        return resolved_model
+    available_ids = {m.get("id", "") for m in available_models}
+    _log("  Available model IDs: {}".format(sorted(available_ids)))
 
-    # Default to latest
-    return XAI_MODEL_ALIASES["latest"]
+    # Pick the best model from the preference list
+    for preferred in XAI_MODEL_PREFERENCE:
+        if preferred in available_ids:
+            _log("  Matched preferred model: {}".format(preferred))
+            cache.set_cached_model("xai", preferred)
+            return preferred
+
+    # No preferred model found - pick any grok-4+ model
+    grok4_models = sorted(
+        [mid for mid in available_ids if mid.startswith("grok-4")],
+        reverse=True,
+    )
+    if grok4_models:
+        selected = grok4_models[0]
+        _log("  No preferred match, using first grok-4 model: {}".format(selected))
+        cache.set_cached_model("xai", selected)
+        return selected
+
+    # Last resort: hardcoded fallback
+    _log("  WARNING: No grok-4 models available! Falling back to: {}".format(XAI_HARDCODED_FALLBACK))
+    _log("  Available models were: {}".format(sorted(available_ids)))
+    cache.set_cached_model("xai", XAI_HARDCODED_FALLBACK)
+    return XAI_HARDCODED_FALLBACK
 
 
 # Preserve the original function name for API compatibility
@@ -186,10 +241,12 @@ def get_models(
     Returns a dictionary with 'openai' and 'xai' keys containing
     the selected model identifiers (or None if provider not configured).
     """
+    _log("=== get_models ===")
     selected_models = {"openai": None, "xai": None}
 
     # Select OpenAI model if key is configured
     openai_key = configuration.get("OPENAI_API_KEY")
+    _log("  OpenAI key present: {}".format(bool(openai_key)))
     if openai_key:
         selected_models["openai"] = choose_openai_model(
             openai_key,
@@ -197,9 +254,11 @@ def get_models(
             configuration.get("OPENAI_MODEL_PIN"),
             mock_openai_listing,
         )
+        _log("  OpenAI model selected: {}".format(selected_models["openai"]))
 
     # Select xAI model if key is configured
     xai_key = configuration.get("XAI_API_KEY")
+    _log("  xAI key present: {}".format(bool(xai_key)))
     if xai_key:
         selected_models["xai"] = choose_xai_model(
             xai_key,
@@ -207,5 +266,9 @@ def get_models(
             configuration.get("XAI_MODEL_PIN"),
             mock_xai_listing,
         )
+        _log("  xAI model selected: {}".format(selected_models["xai"]))
+    else:
+        _log("  xAI key NOT present, skipping model selection (xai=None)")
 
+    _log("  Final models: {}".format(selected_models))
     return selected_models

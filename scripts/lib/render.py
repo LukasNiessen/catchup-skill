@@ -584,44 +584,44 @@ def persist_all_artifacts(
     initialize_output_directory()
 
     # Write structured JSON report
-    file_handle = open(ARTIFACT_DIRECTORY / "report.json", 'w')
-    json.dump(research_report.to_dict(), file_handle, indent=2)
+    file_handle = open(ARTIFACT_DIRECTORY / "report.json", 'w', encoding="utf-8")
+    json.dump(research_report.to_dict(), file_handle, indent=2, ensure_ascii=False)
     file_handle.close()
 
     # Write markdown report
-    file_handle = open(ARTIFACT_DIRECTORY / "report.md", 'w')
+    file_handle = open(ARTIFACT_DIRECTORY / "report.md", 'w', encoding="utf-8")
     file_handle.write(generate_comprehensive_report(research_report))
     file_handle.close()
 
     # Write context fragment
-    file_handle = open(ARTIFACT_DIRECTORY / "briefbot.context.md", 'w')
+    file_handle = open(ARTIFACT_DIRECTORY / "briefbot.context.md", 'w', encoding="utf-8")
     file_handle.write(generate_context_fragment(research_report))
     file_handle.close()
 
     # Write raw API responses if available
     if raw_openai_response:
-        file_handle = open(ARTIFACT_DIRECTORY / "raw_openai.json", 'w')
-        json.dump(raw_openai_response, file_handle, indent=2)
+        file_handle = open(ARTIFACT_DIRECTORY / "raw_openai.json", 'w', encoding="utf-8")
+        json.dump(raw_openai_response, file_handle, indent=2, ensure_ascii=False)
         file_handle.close()
 
     if raw_xai_response:
-        file_handle = open(ARTIFACT_DIRECTORY / "raw_xai.json", 'w')
-        json.dump(raw_xai_response, file_handle, indent=2)
+        file_handle = open(ARTIFACT_DIRECTORY / "raw_xai.json", 'w', encoding="utf-8")
+        json.dump(raw_xai_response, file_handle, indent=2, ensure_ascii=False)
         file_handle.close()
 
     if raw_enriched_reddit:
-        file_handle = open(ARTIFACT_DIRECTORY / "raw_reddit_threads_enriched.json", 'w')
-        json.dump(raw_enriched_reddit, file_handle, indent=2)
+        file_handle = open(ARTIFACT_DIRECTORY / "raw_reddit_threads_enriched.json", 'w', encoding="utf-8")
+        json.dump(raw_enriched_reddit, file_handle, indent=2, ensure_ascii=False)
         file_handle.close()
 
     if raw_youtube_response:
-        file_handle = open(ARTIFACT_DIRECTORY / "raw_youtube.json", 'w')
-        json.dump(raw_youtube_response, file_handle, indent=2)
+        file_handle = open(ARTIFACT_DIRECTORY / "raw_youtube.json", 'w', encoding="utf-8")
+        json.dump(raw_youtube_response, file_handle, indent=2, ensure_ascii=False)
         file_handle.close()
 
     if raw_linkedin_response:
-        file_handle = open(ARTIFACT_DIRECTORY / "raw_linkedin.json", 'w')
-        json.dump(raw_linkedin_response, file_handle, indent=2)
+        file_handle = open(ARTIFACT_DIRECTORY / "raw_linkedin.json", 'w', encoding="utf-8")
+        json.dump(raw_linkedin_response, file_handle, indent=2, ensure_ascii=False)
         file_handle.close()
 
 

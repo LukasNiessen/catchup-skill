@@ -12,6 +12,8 @@ A very minimalistic backlog for BriefBot.
 
 - IMPROVE FORMATTING, eg some space or divider in between lists of 1:, 2:, 3:, etc
 
+- Add compatibility for OpenClaw?
+
 - ~~For text-in-console UI: use colors etc for a more beautiful UI~~ done
 
 - README crazy, overview, sections, quickstart, CRAZY examples; including videos etc.

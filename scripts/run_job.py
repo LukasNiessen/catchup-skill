@@ -20,6 +20,7 @@
 #
 
 import logging
+import os
 import platform
 import shutil
 import subprocess
@@ -41,6 +42,9 @@ LOG_DIRECTORY = Path.home() / ".config" / "briefbot" / "logs"
 
 BANNER_PAUSE_SECONDS = 15
 
+# Module-level logger — set up once run_job() calls setup_logging()
+log = logging.getLogger("briefbot.job")
+
 
 def setup_logging(job_id: str) -> logging.Logger:
     """Configures file-based logging for this job run."""
@@ -58,6 +62,17 @@ def setup_logging(job_id: str) -> logging.Logger:
     logger.addHandler(file_handler)
 
     return logger
+
+
+def _clean_env(logger=None):
+    """Return a copy of the environment without CLAUDECODE so subprocesses
+    don't think they are nested inside another Claude Code session."""
+    had_var = "CLAUDECODE" in os.environ
+    env = os.environ.copy()
+    env.pop("CLAUDECODE", None)
+    if had_var and logger:
+        logger.info("_clean_env: stripped CLAUDECODE from subprocess environment")
+    return env
 
 
 def find_claude_cli() -> str:
@@ -235,14 +250,20 @@ def _run_claude_windows(claude_exe: str, skill_command: str) -> int:
     A threading.Timer injects an Enter keypress after 3 seconds to
     auto-accept the --dangerously-skip-permissions confirmation prompt.
     """
+    full_args = [claude_exe, skill_command, "--dangerously-skip-permissions"]
+    log.info("_run_claude_windows: spawning Popen: %s", full_args)
+    log.info("_run_claude_windows: CLAUDECODE in env: %s", "CLAUDECODE" in os.environ)
     proc = subprocess.Popen(
-        [claude_exe, skill_command, "--dangerously-skip-permissions"],
+        full_args,
+        env=_clean_env(log),
     )
+    log.info("_run_claude_windows: process started, pid=%d — injecting Enter in 3s", proc.pid)
     # After 3s, inject Enter to accept the bypass prompt
     timer = threading.Timer(3.0, _send_enter_windows)
     timer.start()
     rc = proc.wait()
     timer.cancel()  # No-op if already fired
+    log.info("_run_claude_windows: process exited — returncode=%d", rc)
     return rc
 
 
@@ -261,16 +282,22 @@ def _run_claude_unix(claude_exe: str, skill_command: str) -> int:
     import os
     import pty
 
+    log.info("_run_claude_unix: forking pty for Claude Code")
+    log.info("_run_claude_unix: CLAUDECODE in env: %s", "CLAUDECODE" in os.environ)
     pid, fd = pty.fork()
 
     if pid == 0:
         # Child process — becomes Claude Code with a real PTY
+        # Strip CLAUDECODE env var to avoid nested-session detection
+        os.environ.pop("CLAUDECODE", None)
         os.execvp(
             claude_exe,
             [claude_exe, skill_command, "--dangerously-skip-permissions"],
         )
         # execvp never returns on success; exit if it somehow fails
         os._exit(127)
+
+    log.info("_run_claude_unix: child pid=%d, reading PTY output", pid)
 
     # Inject Enter after 3s to accept bypass prompt
     def send_enter():
@@ -301,7 +328,10 @@ def _run_claude_unix(claude_exe: str, skill_command: str) -> int:
     _, status = os.waitpid(pid, 0)
 
     if os.WIFEXITED(status):
-        return os.WEXITSTATUS(status)
+        rc = os.WEXITSTATUS(status)
+        log.info("_run_claude_unix: child exited normally — returncode=%d", rc)
+        return rc
+    log.error("_run_claude_unix: child did not exit normally — status=%d", status)
     return 1
 
 
@@ -318,7 +348,9 @@ def run_claude(claude_exe: str, skill_command: str) -> int:
       - Windows: inherits console TTY from schtasks
       - Linux/macOS: creates a pseudo-terminal via pty.fork()
     """
-    if platform.system() == "Windows":
+    plat = platform.system()
+    log.info("run_claude called — platform=%s, claude_exe=%s, skill_command=%r", plat, claude_exe, skill_command)
+    if plat == "Windows":
         return _run_claude_windows(claude_exe, skill_command)
     else:
         return _run_claude_unix(claude_exe, skill_command)
