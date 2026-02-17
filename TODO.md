@@ -6,8 +6,6 @@ A very minimalistic backlog for BriefBot.
 
 - ~~SUGGEST NEXT PROMPTS; ALSO WHILE/BEFORE WRITING THE FIRST ONE~~ done
 
-- It should NOT always have a "key techniques" section
-
 - Fix PDF; looks terrible atm
 
 - Show option (eg a link) to show as HTML instead of text in console - show at very top. Use same HTML used for email. Offers a far more beautfil UI.
@@ -19,8 +17,6 @@ A very minimalistic backlog for BriefBot.
 - README crazy, overview, sections, quickstart, CRAZY examples; including videos etc.
 
 - Remove all traces
-
-- Skill.md a lil
 
 - Baron should test su mac
 
@@ -55,3 +51,13 @@ A very minimalistic backlog for BriefBot.
 Options for cost reduction:
 
 - model routing
+
+---
+
+- Create website with custom domain
+
+- documentation website
+
+- custom social media accs w automated posting
+
+- custom medium, dev.to etc

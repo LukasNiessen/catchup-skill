@@ -11,7 +11,9 @@
       "Bash(^d \")",
       "Bash(pip install:*)",
       "Bash(PYTHONIOENCODING=utf-8 python:*)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "WebSearch",
+      "WebFetch(domain:claudelog.com)"
     ]
   }
 }

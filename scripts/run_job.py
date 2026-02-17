@@ -106,6 +106,13 @@ def _build_briefbot_args(job: dict) -> list:
     if job.get("email"):
         args.append("--email {}".format(job["email"]))
 
+    telegram = job_args.get("telegram")
+    if telegram:
+        if telegram == "__default__":
+            args.append("--telegram")
+        else:
+            args.append("--telegram {}".format(telegram))
+
     return args
 
 

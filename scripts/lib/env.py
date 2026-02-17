@@ -7,6 +7,9 @@ import os
 from pathlib import Path
 from typing import Optional, Dict, Any
 
+# Set to True to skip Bird X search and force xAI API usage
+DISABLE_BIRD = True
+
 # Configuration file locations
 SETTINGS_DIRECTORY = Path.home() / ".config" / "briefbot"
 SETTINGS_FILEPATH = SETTINGS_DIRECTORY / ".env"
@@ -86,6 +89,11 @@ def assemble_configuration() -> Dict[str, Any]:
         'SMTP_PASSWORD': os.environ.get('SMTP_PASSWORD') or file_settings.get('SMTP_PASSWORD'),
         'SMTP_FROM': os.environ.get('SMTP_FROM') or file_settings.get('SMTP_FROM'),
         'SMTP_USE_TLS': os.environ.get('SMTP_USE_TLS') or file_settings.get('SMTP_USE_TLS', 'true'),
+        'TELEGRAM_BOT_TOKEN': os.environ.get('TELEGRAM_BOT_TOKEN') or file_settings.get('TELEGRAM_BOT_TOKEN'),
+        'TELEGRAM_CHAT_ID': os.environ.get('TELEGRAM_CHAT_ID') or file_settings.get('TELEGRAM_CHAT_ID'),
+        # X/Twitter browser cookies for Bird search (Chrome 127+ App-Bound Encryption workaround)
+        'AUTH_TOKEN': os.environ.get('AUTH_TOKEN') or file_settings.get('AUTH_TOKEN'),
+        'CT0': os.environ.get('CT0') or file_settings.get('CT0'),
     }
 
     return configuration
@@ -106,22 +114,26 @@ config_exists = settings_file_exists
 
 def determine_available_platforms(configuration: Dict[str, Any]) -> str:
     """
-    Identifies which data sources are accessible based on configured API keys.
+    Identifies which data sources are accessible based on configured API keys
+    and Bird X search availability (browser cookies).
 
     Returns:
-    - 'both': OpenAI and xAI keys present (Reddit + X available)
+    - 'both': OpenAI and X available (via xAI key or Bird)
     - 'reddit': Only OpenAI key present (Reddit/YouTube/LinkedIn available)
-    - 'x': Only xAI key present (X/Twitter available)
-    - 'web': No keys present (WebSearch fallback only)
+    - 'x': Only X available (via xAI key or Bird)
+    - 'web': No keys or Bird present (WebSearch fallback only)
     """
     openai_configured = bool(configuration.get('OPENAI_API_KEY'))
     xai_configured = bool(configuration.get('XAI_API_KEY'))
+    bird_available = is_bird_x_available()
 
-    if openai_configured and xai_configured:
+    x_available = xai_configured or bird_available
+
+    if openai_configured and x_available:
         return 'both'
     elif openai_configured:
         return 'reddit'
-    elif xai_configured:
+    elif x_available:
         return 'x'
     else:
         return 'web'
@@ -134,21 +146,25 @@ get_available_sources = determine_available_platforms
 def identify_missing_credentials(configuration: Dict[str, Any]) -> str:
     """
     Determines which API keys are not configured.
+    Bird X search (browser cookies) suppresses the xAI "missing" status.
 
     Returns:
-    - 'none': All keys present
-    - 'x': xAI key missing
+    - 'none': All keys present (or Bird covers X)
+    - 'x': xAI key missing and Bird unavailable
     - 'reddit': OpenAI key missing
-    - 'both': Both keys missing
+    - 'both': Both keys missing and Bird unavailable
     """
     openai_configured = bool(configuration.get('OPENAI_API_KEY'))
     xai_configured = bool(configuration.get('XAI_API_KEY'))
+    bird_available = is_bird_x_available()
 
-    if openai_configured and xai_configured:
+    has_x = xai_configured or bird_available
+
+    if openai_configured and has_x:
         return 'none'
     elif openai_configured:
         return 'x'
-    elif xai_configured:
+    elif has_x:
         return 'reddit'
     else:
         return 'both'
@@ -156,6 +172,21 @@ def identify_missing_credentials(configuration: Dict[str, Any]) -> str:
 
 # Preserve the original function name for API compatibility
 get_missing_keys = identify_missing_credentials
+
+
+def is_bird_x_available() -> bool:
+    """
+    Checks if Bird X search is installed and authenticated.
+    Lazy-imports bird_x to avoid circular dependencies.
+    Returns False immediately if DISABLE_BIRD is set.
+    """
+    if DISABLE_BIRD:
+        return False
+    try:
+        from lib import bird_x
+        return bird_x.is_bird_installed() and bool(bird_x.is_bird_authenticated())
+    except Exception:
+        return False
 
 
 def validate_sources(
@@ -205,7 +236,7 @@ def validate_sources(
         if available_platforms == 'both':
             return 'all', None
         elif available_platforms == 'reddit':
-            return 'all', "Note: xAI key not configured, X/Twitter will be skipped."
+            return 'all', "Note: No X source available (no xAI key and Bird not authenticated). X/Twitter will be skipped."
         elif available_platforms == 'x':
             return 'all', "Note: OpenAI key not configured, Reddit/YouTube/LinkedIn will be skipped."
         return 'web', "No API keys configured."

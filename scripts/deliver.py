@@ -20,7 +20,7 @@ if sys.platform == "win32":
 MODULE_ROOT = Path(__file__).parent.resolve()
 sys.path.insert(0, str(MODULE_ROOT))
 
-from lib import email_sender, env, pdf, tts
+from lib import email_sender, env, pdf, telegram_sender, tts
 
 
 def main():
@@ -43,6 +43,14 @@ def main():
         "--audio",
         action="store_true",
         help="Generate MP3 audio of the briefing",
+    )
+    parser.add_argument(
+        "--telegram",
+        type=str,
+        nargs="?",
+        const="__default__",
+        metavar="CHAT_ID",
+        help="Send via Telegram (optional CHAT_ID overrides config default)",
     )
     parser.add_argument(
         "--subject",
@@ -119,8 +127,57 @@ def main():
             print("Email failed: {}".format(err), file=sys.stderr)
             sys.exit(1)
 
-    if not args.audio and not args.email:
-        print("Nothing to deliver. Use --audio and/or --email.", file=sys.stderr)
+    # Send via Telegram
+    if args.telegram:
+        telegram_error = telegram_sender.validate_telegram_config(config)
+        if telegram_error:
+            print("Error: {}".format(telegram_error), file=sys.stderr)
+            sys.exit(1)
+
+        # Resolve chat ID: CLI override > config default
+        if args.telegram == "__default__":
+            chat_id = config.get("TELEGRAM_CHAT_ID")
+            if not chat_id:
+                print(
+                    "Error: No chat ID. Use --telegram CHAT_ID or set TELEGRAM_CHAT_ID in ~/.config/briefbot/.env",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+        else:
+            chat_id = args.telegram
+
+        # Build PDF for Telegram attachment (reuse if already created for email)
+        tg_pdf_path = None
+        if args.email and pdf_path:
+            tg_pdf_path = pdf_path
+        else:
+            try:
+                output_dir = MODULE_ROOT.parent / "output"
+                newsletter_html = email_sender.build_newsletter_html(
+                    args.subject, briefing_text
+                )
+                tg_pdf_path = pdf.generate_pdf(
+                    newsletter_html, output_dir / "briefing.pdf"
+                )
+            except Exception as err:
+                print("PDF generation for Telegram failed: {}".format(err), file=sys.stderr)
+
+        try:
+            telegram_sender.send_telegram_message(
+                chat_id=chat_id,
+                markdown_body=briefing_text,
+                subject=args.subject,
+                config=config,
+                audio_path=audio_path,
+                pdf_path=tg_pdf_path,
+            )
+            print("Telegram message sent to chat {}".format(chat_id))
+        except Exception as err:
+            print("Telegram failed: {}".format(err), file=sys.stderr)
+            sys.exit(1)
+
+    if not args.audio and not args.email and not args.telegram:
+        print("Nothing to deliver. Use --audio, --email, and/or --telegram.", file=sys.stderr)
         sys.exit(1)
 
 

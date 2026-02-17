@@ -7,7 +7,21 @@ disable-model-invocation: true
 allowed-tools: Bash, Read, Write, AskUserQuestion, WebSearch
 ---
 
-# 🔎 BriefBot: Investigate Any Subject Over the Past 30 Days
+# 🔎 BriefBot
+
+## ROUTING — Read this first, skip to the correct section
+
+The user's input is: `$ARGUMENTS`
+
+**If the input is `--setup` or `setup`:** Skip everything below. Go DIRECTLY to the section titled **"Configuration Wizard"** and follow those instructions. Do NOT determine intent. Do NOT run research. Do NOT parse a topic.
+
+**If the input is `--list-jobs` or `list-jobs`:** Run `PY=$(python3 -c "" 2>/dev/null && echo python3 || echo python) && $PY ~/.claude/skills/briefbot/scripts/briefbot.py --list-jobs 2>&1`, show the output, and STOP.
+
+**If the input starts with `--delete-job` or `delete-job`:** Run `PY=$(python3 -c "" 2>/dev/null && echo python3 || echo python) && $PY ~/.claude/skills/briefbot/scripts/briefbot.py $ARGUMENTS 2>&1`, show the output, and STOP.
+
+**Otherwise:** The input is a research topic. Continue to "Determine User Intent" below.
+
+---
 
 Investigate ANY subject across Reddit, X, YouTube, LinkedIn, and the web. Surface what people are actually discussing, recommending, and debating right now — or answer knowledge questions directly from expertise.
 
@@ -81,7 +95,15 @@ The skill operates in multiple modes based on available API keys:
 
 ### First-Time Setup (Optional but Encouraged)
 
-If the user wants to add API keys for richer results:
+If the user wants to configure API keys, email, Telegram, or other settings, run the interactive setup wizard:
+
+```bash
+PY=$(python3 -c "" 2>/dev/null && echo python3 || echo python) && $PY ~/.claude/skills/briefbot/scripts/setup.py
+```
+
+The wizard walks through all settings (API keys, audio, email/SMTP, Telegram, X cookies) and for each one shows the current value (masked for secrets) with options to keep, update, or clear it. It also offers to start/stop the Telegram bot listener.
+
+Alternatively, users can manually create the config file:
 
 ```bash
 mkdir -p ~/.config/briefbot
@@ -105,6 +127,77 @@ echo "Edit to add your API keys for enhanced research."
 ````
 
 **DO NOT stop if no keys are configured.** Proceed with web-only mode.
+
+---
+
+## Configuration Wizard (triggered by `/briefbot setup`)
+
+**If the user invoked `/briefbot setup` (or `/briefbot --setup`), follow the steps below and STOP.**
+
+The Bash tool cannot handle interactive stdin, so we drive the wizard conversationally.
+
+### Step 1: Read current config
+
+```bash
+PY=$(python3 -c "" 2>/dev/null && echo python3 || echo python) && $PY ~/.claude/skills/briefbot/scripts/setup.py --show
+```
+
+### Step 2: Show the user their current config
+
+Display a clean summary grouped by section. For each setting show the key, its current value (the `--show` output already masks secrets), and whether it's set or not. Example:
+
+```
+Here's your current BriefBot config:
+
+**Research API Keys**
+- OPENAI_API_KEY: sk-***xyz (set)
+- XAI_API_KEY: not set
+
+**Email Delivery**
+- SMTP_HOST: smtp.gmail.com (set)
+...
+
+**Telegram**
+- TELEGRAM_BOT_TOKEN: 843***Ml4 (set)
+- TELEGRAM_CHAT_ID: -5195114281,... (set)
+```
+
+### Step 3: Ask what to change
+
+After showing the config, say:
+
+> What would you like to change? You can say things like:
+> - "set OPENAI_API_KEY to sk-abc123"
+> - "clear SMTP_PASSWORD"
+> - "start the telegram bot"
+> - "nothing, looks good"
+
+Then **STOP and wait** for the user to respond.
+
+### Step 4: Apply changes
+
+When the user tells you what to change, apply each change using:
+
+```bash
+PY=$(python3 -c "" 2>/dev/null && echo python3 || echo python) && $PY ~/.claude/skills/briefbot/scripts/setup.py --set KEY=VALUE
+```
+
+Or to clear a value:
+
+```bash
+PY=$(python3 -c "" 2>/dev/null && echo python3 || echo python) && $PY ~/.claude/skills/briefbot/scripts/setup.py --unset KEY
+```
+
+For bot lifecycle:
+
+```bash
+PY=$(python3 -c "" 2>/dev/null && echo python3 || echo python) && $PY ~/.claude/skills/briefbot/scripts/setup.py --start-bot
+PY=$(python3 -c "" 2>/dev/null && echo python3 || echo python) && $PY ~/.claude/skills/briefbot/scripts/setup.py --stop-bot
+```
+
+After applying changes, re-run `--show` and display the updated config. Ask if they want to change anything else. Repeat until the user says they're done.
+
+**Do not proceed to Research Execution.**
 
 ---
 
@@ -240,12 +333,19 @@ Use TaskOutput to get the script results before proceeding to synthesis.
   - Uses ElevenLabs if `ELEVENLABS_API_KEY` is set in `~/.config/briefbot/.env`
   - Otherwise uses `edge-tts` (install with `pip install edge-tts`)
 
+**Telegram delivery:**
+
+- `--telegram` → Send the briefing to the default Telegram chat (set `TELEGRAM_CHAT_ID` in config)
+- `--telegram CHAT_ID` → Send to a specific Telegram chat ID (overrides config default)
+  - Sends the briefing text, plus audio and PDF as attachments if generated
+  - Requires `TELEGRAM_BOT_TOKEN` in `~/.config/briefbot/.env`
+
 **Scheduled jobs:**
 
 - `--schedule "0 6 * * *" --email user@example.com` → Create a scheduled job that runs research and emails results
   - Cron expression format: `minute hour day-of-month month day-of-week`
   - Examples: `"0 6 * * *"` (daily 6am), `"0 8 * * 1-5"` (weekdays 8am), `"0 9 1 * *"` (1st of month)
-  - Captures current `--quick`/`--deep`/`--audio`/`--days`/`--sources` flags into the job
+  - Captures current `--quick`/`--deep`/`--audio`/`--telegram`/`--days`/`--sources` flags into the job
   - Requires SMTP configuration in `~/.config/briefbot/.env` (see below)
 - `--list-jobs` → Display all registered scheduled jobs with status
 - `--delete-job cu_XXXXXX` → Remove a job from the OS scheduler and registry
@@ -263,6 +363,28 @@ SMTP_USE_TLS=true
 ```
 
 `SMTP_FROM` is optional — defaults to `SMTP_USER` (only needed if the "From:" address differs from login).
+
+**Telegram setup for Telegram delivery:**
+
+Add these to `~/.config/briefbot/.env`:
+
+```
+TELEGRAM_BOT_TOKEN=123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11
+TELEGRAM_CHAT_ID=987654321
+```
+
+`TELEGRAM_CHAT_ID` is the default chat; `--telegram CHAT_ID` overrides it. Create a bot via [@BotFather](https://t.me/BotFather) and get your chat ID by messaging [@userinfobot](https://t.me/userinfobot).
+
+**Telegram bot listener** (receives research requests via Telegram messages):
+
+```bash
+PY=$(python3 -c "" 2>/dev/null && echo python3 || echo python)
+$PY ~/.claude/skills/briefbot/scripts/telegram_bot.py start    # Start in background
+$PY ~/.claude/skills/briefbot/scripts/telegram_bot.py stop     # Stop the bot
+$PY ~/.claude/skills/briefbot/scripts/telegram_bot.py status   # Check if running
+```
+
+Or manage it via the setup wizard (`python setup.py`), which includes a start/stop prompt.
 
 For Gmail: use an [App Password](https://support.google.com/accounts/answer/185833), not your regular password.
 
@@ -514,7 +636,7 @@ Pick the most compelling example from your invitation list — the one that best
 
 ## Output Delivery (Email and Audio)
 
-**After showing the summary above**, check if `$ARGUMENTS` contained `--email` or `--audio`. If neither flag is present, skip this section entirely.
+**After showing the summary above**, check if `$ARGUMENTS` contained `--email`, `--audio`, or `--telegram`. If none of these flags are present, skip this section entirely.
 
 If delivery is requested:
 
@@ -542,6 +664,7 @@ Build the `[FLAGS]` from `$ARGUMENTS`:
 
 - If `--audio` was in `$ARGUMENTS` → add `--audio`
 - If `--email ADDRESS` was in `$ARGUMENTS` → add `--email ADDRESS`
+- If `--telegram` was in `$ARGUMENTS` → add `--telegram` (or `--telegram CHAT_ID` if a specific ID was given)
 - Always add `--subject "BriefBot: TOPIC (YYYY-MM-DD)"` using the actual topic and today's date
 
 3. **Report delivery status** to the user based on the script output (e.g., "Email sent to ...", "PDF saved to ...", "Audio saved to ...").

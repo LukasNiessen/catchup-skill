@@ -33,6 +33,7 @@ MODULE_ROOT = Path(__file__).parent.resolve()
 sys.path.insert(0, str(MODULE_ROOT))
 
 from lib import (
+    bird_x,
     cron_parse,
     dates,
     dedupe,
@@ -159,7 +160,10 @@ def _execute_x_query(
     use_mock_data: bool,
 ) -> tuple:
     """
-    Queries X/Twitter content via the xAI API.
+    Queries X/Twitter content via Bird search (primary) or xAI API (fallback).
+
+    Bird search uses browser cookies (free, no API key needed).
+    xAI search uses the paid xAI API with XAI_API_KEY.
 
     Designed to execute within a thread pool for concurrent operation.
 
@@ -173,7 +177,45 @@ def _execute_x_query(
 
     if use_mock_data:
         api_response = retrieve_fixture_data("xai_sample.json")
-    else:
+        post_items = xai_x.parse_x_response(api_response or {})
+        return post_items, api_response, failure_message
+
+    # Determine which X backend to use: Bird (free) > xAI (paid)
+    use_bird = configuration.get("BIRD_X_AVAILABLE", False)
+    has_xai = bool(configuration.get("XAI_API_KEY"))
+
+    if use_bird:
+        # Primary path: Bird search (browser cookies, no API key)
+        try:
+            api_response = bird_x.search_x(
+                subject_matter,
+                start_date,
+                end_date,
+                depth=thoroughness,
+            )
+        except Exception as generic_err:
+            api_response = {"error": str(generic_err)}
+            failure_message = "Bird: {}: {}".format(type(generic_err).__name__, generic_err)
+
+        post_items = bird_x.parse_bird_response(api_response or {})
+
+        # If Bird returned 0 results and xAI is available, fall back
+        if not post_items and has_xai and failure_message is None:
+            try:
+                api_response = xai_x.search_x(
+                    configuration["XAI_API_KEY"],
+                    model_selection["xai"],
+                    subject_matter,
+                    start_date,
+                    end_date,
+                    depth=thoroughness,
+                )
+                post_items = xai_x.parse_x_response(api_response or {})
+                failure_message = None
+            except Exception:
+                pass  # Keep Bird's (empty) result
+    elif has_xai:
+        # Fallback path: xAI API (paid)
         try:
             api_response = xai_x.search_x(
                 configuration["XAI_API_KEY"],
@@ -190,8 +232,12 @@ def _execute_x_query(
             api_response = {"error": str(generic_err)}
             failure_message = "{}: {}".format(type(generic_err).__name__, generic_err)
 
-    # Transform raw response into structured items
-    post_items = xai_x.parse_x_response(api_response or {})
+        post_items = xai_x.parse_x_response(api_response or {})
+    else:
+        # No X backend available
+        api_response = {"error": "No X search backend available (no xAI key, Bird not authenticated)"}
+        failure_message = "No X search backend available"
+        post_items = []
 
     return post_items, api_response, failure_message
 
@@ -354,9 +400,11 @@ def orchestrate_research(
             reddit_error, x_error, youtube_error, linkedin_error
         )
 
-    # Determine API availability based on configured keys
+    # Determine API availability based on configured keys and Bird
     openai_available = bool(configuration.get("OPENAI_API_KEY"))
     xai_available = bool(configuration.get("XAI_API_KEY"))
+    bird_available = bool(configuration.get("BIRD_X_AVAILABLE"))
+    x_available = xai_available or bird_available
 
     # Compute which platform searches should execute
     reddit_platforms = ("both", "reddit", "all", "reddit-web")
@@ -365,7 +413,7 @@ def orchestrate_research(
     linkedin_platforms = ("all", "linkedin")
 
     should_query_reddit = platform_selection in reddit_platforms and openai_available
-    should_query_x = platform_selection in x_platforms and xai_available
+    should_query_x = platform_selection in x_platforms and x_available
     should_query_youtube = platform_selection in youtube_platforms and openai_available
     should_query_linkedin = platform_selection in linkedin_platforms and openai_available
 
@@ -589,6 +637,14 @@ def bootstrap():
         help="Email the report to this address (comma-separated for multiple recipients)",
     )
     argument_parser.add_argument(
+        "--telegram",
+        type=str,
+        nargs="?",
+        const="__default__",
+        metavar="CHAT_ID",
+        help="Send via Telegram (optional CHAT_ID overrides config default)",
+    )
+    argument_parser.add_argument(
         "--list-jobs",
         action="store_true",
         help="List all registered scheduled jobs",
@@ -604,8 +660,19 @@ def bootstrap():
         action="store_true",
         help="With --schedule: only create the job, don't run research now",
     )
+    argument_parser.add_argument(
+        "--setup",
+        action="store_true",
+        help="Run the interactive setup wizard to configure API keys and services",
+    )
 
     cli_args = argument_parser.parse_args()
+
+    # Handle setup wizard (exit early)
+    if cli_args.setup:
+        from setup import run_setup
+        run_setup()
+        return
 
     # Handle scheduling commands (exit early, no research)
     if cli_args.list_jobs:
@@ -646,6 +713,9 @@ def bootstrap():
 
     # Retrieve API configuration
     configuration = env.get_config()
+
+    # Detect Bird X search availability (browser cookies, free)
+    configuration["BIRD_X_AVAILABLE"] = env.is_bird_x_available()
 
     # Determine which platforms have valid credentials
     available_platforms = env.get_available_sources(configuration)
@@ -835,6 +905,12 @@ def _handle_list_jobs():
         print("    Schedule: {} ({})".format(job["schedule"], schedule_desc))
         if job.get("email"):
             print("    Email:    {}".format(job["email"]))
+        if job.get("args", {}).get("telegram"):
+            tg_val = job["args"]["telegram"]
+            if tg_val == "__default__":
+                print("    Telegram: enabled (default chat)")
+            else:
+                print("    Telegram: chat {}".format(tg_val))
         if job.get("args", {}).get("audio"):
             print("    Audio:    enabled")
         print("    Runs:     {}".format(job.get("run_count", 0)))
@@ -892,9 +968,9 @@ def _handle_create_schedule(cli_args):
             print("Error: {}".format(smtp_error), file=sys.stderr)
             sys.exit(1)
 
-    if not cli_args.email and not cli_args.audio:
-        print("Warning: No --email or --audio specified. The job will run research but produce no output.", file=sys.stderr)
-        print("Consider adding --audio and/or --email.", file=sys.stderr)
+    if not cli_args.email and not cli_args.audio and not cli_args.telegram:
+        print("Warning: No --email, --audio, or --telegram specified. The job will run research but produce no output.", file=sys.stderr)
+        print("Consider adding --audio, --email, and/or --telegram.", file=sys.stderr)
 
     # Capture current CLI arguments into the job record
     args_dict = {
@@ -904,6 +980,7 @@ def _handle_create_schedule(cli_args):
         "days": cli_args.days,
         "sources": cli_args.sources,
         "include_web": cli_args.include_web,
+        "telegram": cli_args.telegram,
     }
 
     # Create the job
@@ -919,6 +996,11 @@ def _handle_create_schedule(cli_args):
     print("  Schedule: {} ({})".format(job["schedule"], schedule_desc))
     if job["email"]:
         print("  Email:    {}".format(job["email"]))
+    if cli_args.telegram:
+        if cli_args.telegram == "__default__":
+            print("  Telegram: enabled (default chat)")
+        else:
+            print("  Telegram: chat {}".format(cli_args.telegram))
     if cli_args.audio:
         print("  Audio:    enabled")
 
