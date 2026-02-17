@@ -115,7 +115,7 @@ def _execute_reddit_query(
                 subject_matter,
                 start_date,
                 end_date,
-                depth=thoroughness,
+                thoroughness=thoroughness,
             )
         except http.HTTPError as network_err:
             api_response = {"error": str(network_err)}
@@ -143,7 +143,7 @@ def _execute_reddit_query(
                     simplified_subject,
                     start_date,
                     end_date,
-                    depth=thoroughness,
+                    thoroughness=thoroughness,
                 )
                 supplemental_items = openai_reddit.parse_reddit_response(
                     supplemental_response
@@ -328,7 +328,7 @@ def _execute_youtube_query(
                 subject_matter,
                 start_date,
                 end_date,
-                depth=thoroughness,
+                thoroughness=thoroughness,
             )
         except http.HTTPError as network_err:
             api_response = {"error": str(network_err)}
@@ -375,7 +375,7 @@ def _execute_linkedin_query(
                 subject_matter,
                 start_date,
                 end_date,
-                depth=thoroughness,
+                thoroughness=thoroughness,
             )
         except http.HTTPError as network_err:
             api_response = {"error": str(network_err)}

@@ -499,13 +499,286 @@ Key Techniques
 
 **1. Prompt:** Best agentic coding IDE or CLI tool at the moment
 
-**Answer:**
+**Answer:** Most mentioned
 
-> ---
+     1. Claude Code (Anthropic) -- mentioned 12x+ (https://www.kdnuggets.com/top-5-agentic-coding-cli-tools, https://www.faros.ai/blog/best-ai-coding-agents-2026,
+     https://www.builder.io/blog/agentic-ide, https://aimultiple.com/agentic-cli, X posts)
+     Terminal-native agent with 200K context window and the deepest reasoning. Developers consistently describe it as the "escalation path" -- the tool they reach for when
+     other agents fail on hard problems like subtle bugs or architecture-level refactors.
+     2. Cursor -- mentioned 10x+ (https://www.builder.io/blog/agentic-ide, https://www.faros.ai/blog/best-ai-coding-agents-2026,
+     https://www.nxgntools.com/blog/cursor-vs-claude-dev-vs-windsurf-which-next-gen-coding-agent-wins-in-2026, @Neiniciativ on X)
+     The "gold standard" IDE-based agent. VS Code fork with Composer mode that generates code across multiple files while maintaining full project context. $20/seat. Best for
+      developers who want agentic power without leaving a familiar editor.
+     3. Codex CLI / Codex IDE (OpenAI) -- mentioned 8x+ (@abhijitwt, @reach_vb, @samidip, @godofprompt on X, https://www.faros.ai/blog/best-ai-coding-agents-2026)
+     OpenAI's entry with gpt-5.2-codex backing it. Users praise its "skills" system, background terminal for parallel jobs, and autonomous git management. One developer built
+      an entire app hands-off in 30 minutes of pure CLI work. Claimed "70% more PRs at OpenAI" internally.
+     4. Cline -- mentioned 7x+ (https://www.kdnuggets.com/top-5-agentic-coding-cli-tools, https://www.builder.io/blog/agentic-ide, https://aimultiple.com/agentic-cli,
+     https://www.faros.ai/blog/best-ai-coding-agents-2026)
+     Open-source VS Code extension that lets you choose any model (including local via Ollama). The tool people adopt when they want serious agent workflows without vendor
+     lock-in. Every file change requires approval -- maximum transparency.
+     5. Windsurf -- mentioned 7x+ (https://www.builder.io/blog/agentic-ide, https://www.faros.ai/blog/best-ai-coding-agents-2026,
+     https://designrevision.com/blog/windsurf-vs-cursor)
+     VS Code fork at $15/seat (cheapest major option). Its Cascade feature pioneered autonomous agentic mode -- it anticipates your next move and can plan and execute
+     multi-file refactors without constant supervision.
+     6. Antigravity -- mentioned 5x (@antigravity, @PoisonslashX, @abhijitwt on X)
+     Bundles VS Code, Gemini, Claude, and Codex into one package. Parses terminal output in real-time to catch issues CLI tools miss. Multiple X users call it the most
+     "complete" all-in-one agentic IDE.
 
-**2. Follow-up Prompt:**
+     Notable mentions: https://x.com/NathanFlurry/status/2019759962482725149 (universal UI for multiple agents, 400+ likes), https://news.ycombinator.com/item?id=46060508
+     (free tier: 60 req/min, 1000 req/day), https://kiro.dev/ (AWS's spec-driven IDE, 77% benchmark accuracy), https://www.tembo.io/blog/coding-cli-tools-comparison (best for
+      git-heavy workflows with auto-commits), https://x.com/istdrc/status/2017981457692770737 (praised as best Claude Code alternative),
+     https://x.com/championswimmer/status/2022630198978711713 (lightweight editor with Agent Client Protocol support), https://www.faros.ai/blog/best-ai-coding-agents-2026
+     (agent mode for PRs and code review), https://x.com/championswimmer/status/2021551243945259190 (rising CLI agents)
 
-**3. Result:**
+     ---
+     What I learned
+
+     The agentic coding space has split into two distinct lanes: terminal-first CLI agents (Claude Code, Codex CLI, Aider, Gemini CLI) and IDE-native agents (Cursor,
+     Windsurf, Cline, Antigravity). The critical insight from the community is that there is no single winner -- developers are increasingly using tools from both lanes in
+     combination. Claude Code and Codex CLI serve as the "escalation path" for hard reasoning problems, while Cursor or Windsurf handle the flow state of everyday editing.
+     The tool that wins for you depends entirely on where you want leverage: deep reasoning, daily flow, cost control, or openness.
+
+     The second key signal is that the market is moving fast toward interoperability. Projects like OpenCode/Gigacode and Zed's Agent Client Protocol show that the next
+     competitive frontier is not which single agent is best, but which tools compose well together. Developers who lock into one ecosystem are starting to feel the cost.
+
+     Key techniques
+
+     1. Tiered agent stacking -- Use a high-reasoning model (Claude Code or Codex xhigh) for planning and architecture, then a faster/cheaper model for implementation. This
+     mirrors what top developers on X report: @reach_vb uses "xhigh for planning, medium for implementation" to balance quality and speed
+     (https://x.com/reach_vb/status/2016620523862544783)
+     2. CLI-first for autonomy, IDE for flow -- Terminal agents (Claude Code, Codex CLI) handle multi-step tasks like PR creation, CI fixes, and refactors with less friction
+     than IDE agents. But for exploratory editing and review, IDE agents (Cursor, Windsurf) keep you in flow state. The most productive setups use both
+     (https://www.builder.io/blog/agentic-ide)
+     3. Skills/automation layers -- Codex's "skills" system and Claude Code's custom slash commands let you encode repeatable workflows (fix CI, resolve merge conflicts, run
+     test suites). This turns one-off agent calls into reusable toolchains (https://x.com/reach_vb/status/2016620523862544783)
+     4. Model-agnostic tooling for cost control -- Cline and OpenCode let you swap models freely (including local models via Ollama). This avoids vendor lock-in and lets you
+     route cheap tasks to cheap models while reserving expensive reasoning for hard problems (https://www.kdnuggets.com/top-5-agentic-coding-cli-tools)
+     5. Real-time terminal parsing -- Antigravity and similar tools parse CLI output as it streams, catching errors and suggesting fixes before you even read the log. This
+     closes the gap between "the agent wrote code" and "the code actually works" (https://x.com/antigravity/status/2017300529584505100)
+
+     ---
+     Sources collected
+
+     Platform: X
+     Items: 21 posts
+     Engagement: 4,877 likes, 256 reposts
+     ────────────────────────────────────────
+     Platform: Web
+     Items: 20+ pages
+     Engagement: kdnuggets.com, faros.ai, builder.io, tembo.io, aimultiple.com, pinggy.io, dextralabs.com, kiro.dev, sourceforge.net, nxgntools.com, uibakery.io,
+     amplifilabs.com,
+       morphllm.com
+
+     Top voices: @NathanFlurry, @championswimmer, @antigravity, @abhijitwt, @reach_vb -- builder.io, Faros AI, KDnuggets, Tembo, aimultiple.com
+
+     ---
+     What do you want to dive into? For example:
+
+     - "Compare Claude Code vs Codex CLI for a large Python monorepo" -- if you need to pick between the two deepest CLI agents for a specific stack
+     - "Set up a tiered agent workflow with Cursor + Claude Code" -- to build the kind of stacked setup top developers are using
+     - "Which tool is best if I refuse to pay for a subscription" -- Gemini CLI's free tier and Cline with local models are the standouts here
+
+     Just tell me your stack or workflow and I'll give you a specific recommendation.
+
+**2. Follow-up Prompt:** Give me an amazing CLAUDE.md for a React TypeScript FrontEnd
+
+**3. Result:** # CLAUDE.md — Personal Website (React + TypeScript)
+
+## Project Overview
+
+Personal portfolio website built with React 18, TypeScript, Vite, Chakra UI, and Redux Toolkit.
+
+## Commands
+
+```bash
+npm run dev        # Start Vite dev server (http://localhost:5173)
+npm run build      # TypeScript check + production build (tsc -b && vite build)
+npm run lint       # ESLint — zero warnings allowed
+npm run preview    # Preview production build locally
+npm run test       # Jest (unit tests)
+npx playwright test # E2E tests (Chromium, Firefox, WebKit)
+
+Always run npm run build after making changes to verify nothing is broken.
+Always run npm run lint before considering a task done.
+
+Tech Stack
+
+┌────────────┬───────────────────────────────────────────────────────────┐
+│   Layer    │                        Technology                         │
+├────────────┼───────────────────────────────────────────────────────────┤
+│ Framework  │ React 18.3 + TypeScript 5.2                               │
+├────────────┼───────────────────────────────────────────────────────────┤
+│ Build      │ Vite 5                                                    │
+├────────────┼───────────────────────────────────────────────────────────┤
+│ State      │ Redux Toolkit (@reduxjs/toolkit + react-redux)            │
+├────────────┼───────────────────────────────────────────────────────────┤
+│ Routing    │ React Router v6 (react-router-dom)                        │
+├────────────┼───────────────────────────────────────────────────────────┤
+│ UI Library │ Chakra UI v2 (@chakra-ui/react)                           │
+├────────────┼───────────────────────────────────────────────────────────┤
+│ Styling    │ SCSS modules (component-level) + Chakra UI components     │
+├────────────┼───────────────────────────────────────────────────────────┤
+│ Animation  │ Framer Motion (available, use where appropriate)          │
+├────────────┼───────────────────────────────────────────────────────────┤
+│ Linting    │ ESLint + @typescript-eslint + react-hooks + react-refresh │
+├────────────┼───────────────────────────────────────────────────────────┤
+│ Testing    │ Jest (unit) + Playwright (E2E)                            │
+└────────────┴───────────────────────────────────────────────────────────┘
+
+Project Structure
+
+src/
+├── assets/                  # Static assets (images, etc.)
+├── components/
+│   ├── aboutme/             # AboutMe page component + styles
+│   ├── blog/                # Blog page component + styles
+│   ├── code-game/           # CodeGame interactive component + styles
+│   ├── constants/           # Shared constants (CodeSnippets.ts)
+│   ├── milestones/          # Milestones page component + styles
+│   └── navigation/          # TopNavigationBar + styles
+├── slices/                  # Redux Toolkit slices
+│   ├── appSlice.ts          # UI state (currentLocation)
+│   └── statsSlice.ts        # User interaction tracking stats
+├── stylesheets/
+│   └── common.scss          # Shared SCSS variables and utility classes
+├── utils/                   # Pure utility functions
+│   ├── RandomCodeGenerator.ts
+│   └── RandomUtils.ts
+├── App.tsx                  # Root component, global event listeners
+├── App.scss                 # Root layout styles
+├── AppRoutes.tsx            # All route definitions
+├── main.tsx                 # Entry point, BrowserRouter + Provider
+├── store.ts                 # Redux store configuration + type exports
+└── vite-env.d.ts
+
+
+Architecture Rules
+
+Components
+
+- Functional components only. Never use class components.
+- Each component lives in its own feature folder under src/components/ with a co-located .scss file.
+- Component files use kebab-case: code-game.tsx, top-navigationbar.tsx.
+- Component names use PascalCase: CodeGame, TopNavigationBar.
+- Use Chakra UI components (VStack, HStack, Box, Text, Heading, Button, etc.) for layout and primitives.
+- Use useColorModeValue for dark/light mode support when relevant.
+- Keep components focused on one responsibility. Extract sub-components when a component exceeds ~150 lines.
+
+TypeScript
+
+- Strict mode is ON. Do not use any — ever. Use unknown + type narrowing if the type is genuinely unknown.
+- Define interfaces/types locally in the file that uses them, co-located with the component or slice. Do not create a central types.ts unless a type is shared across 3+
+files.
+- Use interface for object shapes, type for unions/intersections/aliases.
+- Props interfaces are named [ComponentName]Props.
+- Use RootState and AppDispatch from src/store.ts for Redux typing.
+
+State Management (Redux Toolkit)
+
+- Store is configured in src/store.ts — two slices: stats and userInterface.
+- All new state goes into a new slice in src/slices/ or extends an existing one.
+- Use createSlice from RTK. Never write reducers manually.
+- Export pattern for slices:
+export const mySliceActions = mySlice.actions;
+export const mySliceReducer = mySlice.reducer;
+- Use useSelector with RootState type and useDispatch typed as AppDispatch.
+- Keep slice state minimal and serializable. Derive computed values in selectors or components.
+
+Routing
+
+- All routes are defined in src/AppRoutes.tsx using React Router v6 <Routes> and <Route>.
+- Route paths are lowercase, no trailing slashes: /about, /codegame, /blog, /stats, /milestones.
+- When adding a new page: (1) create component folder, (2) add route in AppRoutes.tsx, (3) add nav item in top-navigationbar.tsx.
+
+Styling
+
+- Component-level SCSS: Each component has a co-located .scss file with scoped class names.
+- Shared SCSS: Global variables and utility classes live in src/stylesheets/common.scss.
+- SCSS class names use kebab-case: .top-navbar-container, .flex-center-content.
+- SCSS variables use kebab-case with $ prefix: $divider-margin-top-bottom.
+- Prefer Chakra UI's built-in props (p, mt, bg, color) for one-off spacing/colors. Use SCSS for complex/reusable styles.
+- Container max-width is 1000px (defined in App.scss as .website-container).
+
+Utilities
+
+- Pure utility functions go in src/utils/.
+- Utility files use PascalCase: RandomCodeGenerator.ts.
+- Functions must be pure — no side effects, no state mutations.
+- Export named functions, not default exports.
+
+Code Style & Conventions
+
+Do
+
+- Use const arrow functions for components: export const MyComponent = () => { ... }
+- Use explicit return types on utility functions
+- Clean up event listeners and subscriptions in useEffect return
+- Use semantic Chakra components over raw HTML (Text over p, Heading over h1)
+- Use framer-motion for animations instead of CSS transitions
+
+Don't
+
+- Don't use console.log — remove any you encounter (existing ones are debug artifacts)
+- Don't use alert() — use Chakra UI useToast or a modal instead
+- Don't use useRef to track mount state — use useEffect with proper dependency arrays
+- Don't add barrel/index.ts files — import directly from the source file
+- Don't install new dependencies without asking first
+- Don't modify vite.config.ts or tsconfig.json unless absolutely necessary
+- Don't use inline styles — use Chakra props or SCSS classes
+- Don't add comments that restate what the code does. Only comment why when it's non-obvious
+
+Exports
+
+- Components: prefer export default for page-level components, export const for sub-components
+- Redux: always named exports (export const xyzActions, export const xyzReducer)
+- Utils: named exports only
+
+Naming
+
+┌───────────────────┬───────────────────────────────┬──────────────────────────┐
+│       Thing       │          Convention           │         Example          │
+├───────────────────┼───────────────────────────────┼──────────────────────────┤
+│ Component files   │ kebab-case.tsx                │ code-game.tsx            │
+├───────────────────┼───────────────────────────────┼──────────────────────────┤
+│ Component names   │ PascalCase                    │ CodeGame                 │
+├───────────────────┼───────────────────────────────┼──────────────────────────┤
+│ SCSS files        │ kebab-case.scss               │ code-game.scss           │
+├───────────────────┼───────────────────────────────┼──────────────────────────┤
+│ SCSS classes      │ kebab-case                    │ .game-container          │
+├───────────────────┼───────────────────────────────┼──────────────────────────┤
+│ Redux slices      │ camelCaseSlice.ts             │ statsSlice.ts            │
+├───────────────────┼───────────────────────────────┼──────────────────────────┤
+│ Slice actions     │ camelCase                     │ incrLeftMouse            │
+├───────────────────┼───────────────────────────────┼──────────────────────────┤
+│ Utility files     │ PascalCase.ts                 │ RandomUtils.ts           │
+├───────────────────┼───────────────────────────────┼──────────────────────────┤
+│ Utility functions │ camelCase                     │ randomIntFromInterval    │
+├───────────────────┼───────────────────────────────┼──────────────────────────┤
+│ Interfaces        │ PascalCase                    │ StatsState, NavItem      │
+├───────────────────┼───────────────────────────────┼──────────────────────────┤
+│ Type aliases      │ PascalCase                    │ RootState                │
+├───────────────────┼───────────────────────────────┼──────────────────────────┤
+│ Constants         │ camelCase or UPPER_SNAKE_CASE │ sliceName, CODE_SNIPPETS │
+└───────────────────┴───────────────────────────────┴──────────────────────────┘
+
+Error Handling
+
+- Wrap route-level components in React error boundaries when adding new features.
+- Use Chakra UI useToast for user-facing error messages, not alert().
+- Handle async errors with try/catch and display meaningful feedback.
+
+Testing Guidelines
+
+- Unit tests go next to the file they test: RandomUtils.test.ts beside RandomUtils.ts.
+- E2E tests go in the root tests/ directory using Playwright.
+- Test user behavior, not implementation details.
+- Every new component should have at least a smoke-render test.
+
+PR & Commit Conventions
+
+- Commits: imperative mood, concise (Add milestones page, Fix nav highlight on route change)
+- One logical change per commit
+- Run npm run build and npm run lint before committing — both must pass
 
 ---
 
@@ -516,19 +789,19 @@ Key Techniques
 **Answer:** What Amodei has been up to this week
 
 1. $30B Series G at $380B valuation (Feb 12) — The largest AI funding round in history. Amodei framed it as a necessity given projected compute scaling: 3x annual growth
-   reaching 300GW of AI compute by 2029.
+ reaching 300GW of AI compute by 2029.
 
 2. Dwarkesh Podcast: "Near the end of the exponential" (Feb 13) — A 3-hour deep dive where Amodei laid out his clearest AGI timeline yet, predicting a "country of geniuses
-   in a data center" in 2026-2027. He argued AI models are approaching the capability to build their own successors.
+ in a data center" in 2026-2027. He argued AI models are approaching the capability to build their own successors.
 
 3. India expansion (Feb 16) — Opened Anthropic's Bengaluru office and keynoted the India AI Impact Summit in Delhi. India is now Anthropic's second-largest market (revenue
-   doubled in 4 months). Improving Claude in 10 Indian languages.
+ doubled in 4 months). Improving Claude in 10 Indian languages.
 
 4. Bankruptcy risk candor — Told Fortune that if growth is 5x/year instead of 10x, or if timelines slip by one year, "you go bankrupt." Remarkable candor days after raising
-   $30B.
+ $30B.
 
 5. AI consciousness remarks — Stated "we don't know if the models are conscious" and framed AI development as "cultivating" rather than "programming" intelligence. Went
-   viral on X (595+ likes on top posts).
+ viral on X (595+ likes on top posts).
 
 X engagement
 
@@ -539,63 +812,50 @@ The thread worth pulling
 The tension between "we might go bankrupt" and a $30B raise — what does this signal about AI capex risk broadly? His India bet (talent, market, or regulatory arbitrage?),
 and the "cultivation vs programming" framing for AI safety.
 
-> ---
-
-**2. Follow-up Prompt:**
-
-**3. Result:**
-
 ---
 
-### Video Generation
+### OpenClaw / ClawdBot
 
-**1. Prompt:** Best video AI to create ads for your company
-**Answer:**
+**1. Prompt:** ClawdBot Use Cases
 
-> ---
+**Answer:** Top Use Cases Trending on X
 
-**2. Follow-up Prompt:**
+  1. Automated Trading & Finance
+  - Crypto trading bots (DOGE, SHIB, BONK) reporting ~5% profit in days
+  - Strategy inspired by someone who turned $20K into $40M net worth
+  - https://x.com/MoonDevOnYT/status/2020276169669738630 (3.4K likes)
 
-**3. Result:**
+  2. E-Commerce & TikTok Shop Scouting
+  - Scours TikTok Shop for trends/creators 24/7, generates UGC ads
+  - Described as a "$1B use case" — https://x.com/maverickecom/status/2021284803170140174
 
----
+  3. Real-World Negotiations & Transactions
+  - Someone's ClawdBot negotiated a Hyundai Palisade $4,200 under market
+  - A bot got a PR rejected, then wrote a blog post about it
+  - https://x.com/jasgong/status/2023215788342067680
 
-### Video Generation
+  4. Personal Assistant / Life Automation
+  - Reads & responds to Telegram voice notes
+  - Books services via WhatsApp
+  - Acts as a personal CRM
+  - https://x.com/afscott/status/2015229275365114082, https://x.com/AlexFinn/status/2016212448148389980
 
-**1. Prompt:** Best video AI to create ads for your company
-**Answer:**
+  5. Content Creation
+  - Scripts and thumbnails for YouTubers (noted as the dominant use case by some)
+  - Overnight code/app building
+  - Content research automation
 
-> ---
+  Sentiment Split
 
-**2. Follow-up Prompt:**
+  - Bullish: Most posts highlight creative, high-value use cases (trading, e-commerce, personal automation)
+  - Skeptical: A few voices say most use cases are "corporate BS jobs" (https://x.com/tunguz/status/2015078092553830780) or just "scripts for YouTubers"
+  (https://x.com/fudreaper_/status/2021963478693773565)
 
-**3. Result:**
+  Key Resources
 
----
-
-### Video Generation
-
-**1. Prompt:** Best video AI to create ads for your company
-**Answer:**
-
-> ---
-
-**2. Follow-up Prompt:**
-
-**3. Result:**
-
----
-
-### Video Generation
-
-**1. Prompt:** Best video AI to create ads for your company
-**Answer:**
-
-> ---
-
-**2. Follow-up Prompt:**
-
-**3. Result:**
+  - https://x.com/TanayVasishtha/status/2015443499886461116
+  - https://x.com/bigaiguy/status/2021841775607132670
+  - https://x.com/clawledge/status/2023412058121973828
 
 ---
 
@@ -606,7 +866,9 @@ BriefBot includes a Telegram bot listener that receives research requests via Te
 ### Quick start
 
 ```
+
 /briefbot setup
+
 ```
 
 Select the **Telegram** section, add your bot token and chat ID, then start the listener.
@@ -622,8 +884,10 @@ Select the **Telegram** section, add your bot token and chat ID, then start the 
 Unknown users receive a pairing code. The bot owner approves them:
 
 ```
-/briefbot setup     # to manage from Claude Code
-```
+
+/briefbot setup # to manage from Claude Code
+
+````
 
 Or standalone:
 
@@ -631,7 +895,7 @@ Or standalone:
 python ~/.claude/skills/briefbot/scripts/telegram_bot.py pair list
 python ~/.claude/skills/briefbot/scripts/telegram_bot.py pair approve CODE
 python ~/.claude/skills/briefbot/scripts/telegram_bot.py pair revoke CHAT_ID
-```
+````
 
 ### Standalone bot control
 
