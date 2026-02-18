@@ -72,7 +72,7 @@ RECOGNIZED_FLAGS = {"--audio", "--deep", "--quick", "--include-web"}
 RECOGNIZED_KV_FLAGS = {"--days", "--sources"}  # flags that take =VALUE
 
 # Additional @usernames the bot responds to (lowercase, without @)
-EXTRA_USERNAMES = ["ALPHAGORILLADRAGONBOT"]
+EXTRA_USERNAMES = ["ALPHAGORILLADRAGONBOT", "BRIEFBOT", "briefbot"]
 
 PID_FILE = Path.home() / ".config" / "briefbot" / "telegram_bot.pid"
 PAIRINGS_FILE = Path.home() / ".config" / "briefbot" / "pairings.json"
@@ -259,7 +259,7 @@ def _remove_chat_id_from_env(chat_id: str) -> None:
 
 def _load_allowed_chat_ids() -> set:
     """Reads the current whitelist from .env (live reload)."""
-    config = env.get_config()
+    config = env.assemble_configuration()
     raw = config.get("TELEGRAM_CHAT_ID", "")
     return {cid.strip() for cid in raw.split(",") if cid.strip()}
 
@@ -384,7 +384,7 @@ def cli_pair_approve(code: str) -> None:
     print("\nThe bot will pick up the new whitelist automatically.")
 
     # Try to notify the user on Telegram
-    config = env.get_config()
+    config = env.assemble_configuration()
     token = config.get("TELEGRAM_BOT_TOKEN")
     if token:
         try:
@@ -897,7 +897,7 @@ def main() -> None:
     log.info("Wrote PID file: %s (pid=%d)", PID_FILE, _os.getpid())
 
     # Load config
-    config = env.get_config()
+    config = env.assemble_configuration()
     token = config.get("TELEGRAM_BOT_TOKEN")
 
     if not token:

@@ -33,8 +33,8 @@ DISABLE_BIRD = True
 
 
 def _log(message: str):
-    """Emit a debug log line to stderr, gated by LAST30DAYS_DEBUG."""
-    if os.environ.get("LAST30DAYS_DEBUG", "").lower() in ("1", "true", "yes"):
+    """Emit a debug log line to stderr, gated by BRIEFBOT_DEBUG."""
+    if os.environ.get("BRIEFBOT_DEBUG", "").lower() in ("1", "true", "yes"):
         sys.stderr.write("[BRIEFBOT] {}\n".format(message))
         sys.stderr.flush()
 
@@ -399,7 +399,7 @@ def orchestrate_research(
     end_date: str,
     thoroughness: str = "default",
     use_mock_data: bool = False,
-    status_tracker: ui.ProgressDisplay = None,
+    status_tracker: ui.ResearchProgressTracker = None,
 ) -> tuple:
     """
     Orchestrates the complete research pipeline across all platforms.
@@ -812,7 +812,7 @@ def bootstrap():
 
     # Activate diagnostic output when requested
     if cli_args.debug:
-        os.environ["LAST30DAYS_DEBUG"] = "1"
+        os.environ["BRIEFBOT_DEBUG"] = "1"
         # Force http module to recognize debug flag
         from lib import http as http_module
 
@@ -832,19 +832,19 @@ def bootstrap():
     # Validate topic was provided
     if cli_args.topic is None:
         print("Error: Please provide a topic to research.", file=sys.stderr)
-        print("Usage: python3 last30days.py <topic> [options]", file=sys.stderr)
+        print("Usage: python3 briefbot.py <topic> [options]", file=sys.stderr)
         sys.exit(1)
 
     # Retrieve API configuration
     _log("=== bootstrap: Loading configuration ===")
-    configuration = env.get_config()
+    configuration = env.assemble_configuration()
 
     # Detect Bird X search availability (browser cookies, free)
     configuration["BIRD_X_AVAILABLE"] = env.is_bird_x_available()
     _log("BIRD_X_AVAILABLE: {}".format(configuration["BIRD_X_AVAILABLE"]))
 
     # Determine which platforms have valid credentials
-    available_platforms = env.get_available_sources(configuration)
+    available_platforms = env.determine_available_platforms(configuration)
     _log("Available platforms: '{}'".format(available_platforms))
 
     # Mock mode operates without API keys
@@ -869,13 +869,13 @@ def bootstrap():
 
     # Compute the date window based on --days argument
     day_count = cli_args.days
-    start_date, end_date = dates.get_date_range(day_count)
+    start_date, end_date = dates.compute_date_window(day_count)
 
     # Identify missing API keys for promotional messaging
-    absent_credentials = env.get_missing_keys(configuration)
+    absent_credentials = env.identify_missing_credentials(configuration)
 
     # Initialize the progress display subsystem
-    status_tracker = ui.ProgressDisplay(cli_args.topic, display_header=True)
+    status_tracker = ui.ResearchProgressTracker(cli_args.topic, display_header=True)
 
     # Display promotional content for missing credentials before research begins
     if absent_credentials != "none":
@@ -977,16 +977,16 @@ def bootstrap():
     )
 
     # Compute relevance scores for ranking
-    scored_reddit = score.score_reddit_items(filtered_reddit)
-    scored_x = score.score_x_items(filtered_x)
-    scored_youtube = score.score_youtube_items(filtered_youtube)
-    scored_linkedin = score.score_linkedin_items(filtered_linkedin)
+    scored_reddit = score.compute_reddit_scores(filtered_reddit)
+    scored_x = score.compute_x_scores(filtered_x)
+    scored_youtube = score.compute_youtube_scores(filtered_youtube)
+    scored_linkedin = score.compute_linkedin_scores(filtered_linkedin)
 
     # Order items by computed score
-    sorted_reddit = score.sort_items(scored_reddit)
-    sorted_x = score.sort_items(scored_x)
-    sorted_youtube = score.sort_items(scored_youtube)
-    sorted_linkedin = score.sort_items(scored_linkedin)
+    sorted_reddit = score.arrange_by_score(scored_reddit)
+    sorted_x = score.arrange_by_score(scored_x)
+    sorted_youtube = score.arrange_by_score(scored_youtube)
+    sorted_linkedin = score.arrange_by_score(scored_linkedin)
 
     # Remove duplicate entries
     deduped_reddit = dedupe.dedupe_reddit(sorted_reddit)
@@ -997,7 +997,7 @@ def bootstrap():
     status_tracker.end_processing()
 
     # Assemble the final report structure
-    report = schema.create_report(
+    report = schema.instantiate_report(
         cli_args.topic,
         start_date,
         end_date,
@@ -1015,10 +1015,10 @@ def bootstrap():
     report.linkedin_error = linkedin_error
 
     # Generate the condensed context snippet
-    report.context_snippet_md = render.render_context_snippet(report)
+    report.context_snippet_md = render.generate_context_fragment(report)
 
     # Persist all output artifacts
-    render.write_outputs(
+    render.persist_all_artifacts(
         report, raw_openai, raw_xai, raw_reddit_enriched, raw_youtube, raw_linkedin
     )
 
@@ -1144,7 +1144,7 @@ def _handle_create_schedule(cli_args):
 
     # Validate SMTP configuration only when email is requested
     if cli_args.email:
-        configuration = env.get_config()
+        configuration = env.assemble_configuration()
         smtp_error = email_sender.validate_smtp_config(configuration)
         if smtp_error:
             print("Error: {}".format(smtp_error), file=sys.stderr)
@@ -1230,12 +1230,12 @@ def emit_research_output(
     """
     format_handlers = {
         "compact": lambda: print(
-            render.render_compact(report, absent_credentials=absent_credentials)
+            render.generate_compact_output(report, absent_credentials=absent_credentials)
         ),
         "json": lambda: print(json.dumps(report.to_dict(), indent=2)),
-        "md": lambda: print(render.render_full_report(report)),
+        "md": lambda: print(render.generate_comprehensive_report(report)),
         "context": lambda: print(report.context_snippet_md),
-        "path": lambda: print(render.get_context_path()),
+        "path": lambda: print(render.retrieve_context_filepath()),
     }
 
     handler = format_handlers.get(output_format)

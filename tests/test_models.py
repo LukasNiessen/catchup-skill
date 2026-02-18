@@ -14,39 +14,39 @@ from lib import models
 
 class VersionExtractionVerification(unittest.TestCase):
     def test_extracts_major_version(self):
-        computed_result = models.parse_version("gpt-5")
+        computed_result = models.extract_version_tuple("gpt-5")
         self.assertEqual(computed_result, (5,))
 
     def test_extracts_minor_version(self):
-        computed_result = models.parse_version("gpt-5.2")
+        computed_result = models.extract_version_tuple("gpt-5.2")
         self.assertEqual(computed_result, (5, 2))
 
     def test_extracts_patch_version(self):
-        computed_result = models.parse_version("gpt-5.2.1")
+        computed_result = models.extract_version_tuple("gpt-5.2.1")
         self.assertEqual(computed_result, (5, 2, 1))
 
     def test_handles_unversioned_model(self):
-        computed_result = models.parse_version("custom-model")
+        computed_result = models.extract_version_tuple("custom-model")
         self.assertIsNone(computed_result)
 
 
 class MainlineModelDetectionVerification(unittest.TestCase):
     def test_gpt5_is_mainline(self):
-        self.assertTrue(models.is_mainline_openai_model("gpt-5"))
+        self.assertTrue(models.is_standard_gpt_model("gpt-5"))
 
     def test_gpt52_is_mainline(self):
-        self.assertTrue(models.is_mainline_openai_model("gpt-5.2"))
+        self.assertTrue(models.is_standard_gpt_model("gpt-5.2"))
 
     def test_gpt5_mini_is_not_mainline(self):
-        self.assertFalse(models.is_mainline_openai_model("gpt-5-mini"))
+        self.assertFalse(models.is_standard_gpt_model("gpt-5-mini"))
 
     def test_gpt4_is_not_mainline(self):
-        self.assertFalse(models.is_mainline_openai_model("gpt-4"))
+        self.assertFalse(models.is_standard_gpt_model("gpt-4"))
 
 
 class OpenAIModelSelectionVerification(unittest.TestCase):
     def test_pinned_policy_returns_pin(self):
-        computed_result = models.select_openai_model(
+        computed_result = models.choose_openai_model(
             "fake-key",
             selection_policy="pinned",
             pinned_model="gpt-5.1"
@@ -59,7 +59,7 @@ class OpenAIModelSelectionVerification(unittest.TestCase):
             {"id": "gpt-5.1", "created": 1701388800},
             {"id": "gpt-5", "created": 1698710400},
         ]
-        computed_result = models.select_openai_model(
+        computed_result = models.choose_openai_model(
             "fake-key",
             selection_policy="auto",
             mock_model_list=mock_model_list
@@ -72,7 +72,7 @@ class OpenAIModelSelectionVerification(unittest.TestCase):
             {"id": "gpt-5-mini", "created": 1704067200},
             {"id": "gpt-5.1", "created": 1701388800},
         ]
-        computed_result = models.select_openai_model(
+        computed_result = models.choose_openai_model(
             "fake-key",
             selection_policy="auto",
             mock_model_list=mock_model_list
@@ -82,7 +82,7 @@ class OpenAIModelSelectionVerification(unittest.TestCase):
 
 class XAIModelSelectionVerification(unittest.TestCase):
     def test_latest_policy_returns_latest(self):
-        computed_result = models.select_xai_model(
+        computed_result = models.choose_xai_model(
             "fake-key",
             selection_policy="latest"
         )
@@ -91,15 +91,15 @@ class XAIModelSelectionVerification(unittest.TestCase):
     def test_stable_policy_returns_stable(self):
         # Clear cache to avoid interference
         from lib import cache
-        cache.MODEL_CACHE_FILE.unlink(missing_ok=True)
-        computed_result = models.select_xai_model(
+        cache.MODEL_SELECTION_FILEPATH.unlink(missing_ok=True)
+        computed_result = models.choose_xai_model(
             "fake-key",
             selection_policy="stable"
         )
         self.assertEqual(computed_result, "grok-4-1-fast")
 
     def test_pinned_policy_returns_pin(self):
-        computed_result = models.select_xai_model(
+        computed_result = models.choose_xai_model(
             "fake-key",
             selection_policy="pinned",
             pinned_model="grok-3"

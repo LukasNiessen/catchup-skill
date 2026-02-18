@@ -45,21 +45,33 @@ Telegram can be used for receiving briefings **and** for triggering briefings - 
 
 Email can be used for receiving briefings. See how to set this up in the email section.
 
-### 3. Use the skill
+### 5. Use the skill
 
-Simply start Claude Code and run `/briefbot`. Here some examples.
+Simply start Claude Code and run `/briefbot`. The general prompt looks like this:
 
 ```
-/briefbot [topic]
-/briefbot [topic] for [tool]
-/briefbot [topic] --days=7
+/briefbot <topic> [--days=N] [--quick|--deep] [--sources=reddit|x|youtube|linkedin|all] [--email ADDRESS] [--telegram [CHAT_ID]] [--audio] [--schedule "CRON"] [--debug]
 ```
+
+After sending the initial command, you can either
+
+1. follow up with a normal sentence, Claude Code now has all the information that BriefBot gathered and can answer you well, or
+2. follow up with another `/briefbot` command.
+
+On Telegram you don't need to write `/briefbot`. In group chats however, you need to mention the bot (that is @BriefBot, or, alternatively, the name you have assigned to your bot).
+
+## Live Demo
+
+<video controls width="100%">
+  <source src="assets/live_demo.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
 
 ---
 
-TODO: alle bsple einklappen ausser 3-4. aber HINT, dass man klicken muss zum Ausklappen.
-
 ## 📋 Examples
+
+> **Tip:** Click on any collapsed section below to expand the full example.
 
 ### Nano Banano Pro Prompts
 
@@ -67,56 +79,54 @@ TODO: alle bsple einklappen ausser 3-4. aber HINT, dass man klicken muss zum Aus
 
 **Answer:**
 
+> **What I learned**
+
+> Nano Banana Pro is a reasoning-first image model — it has a "Deep Think" step that plans composition before generating pixels. This means it responds to structured,
+> constraint-rich design documents far better than keyword lists or vague requests. Think of your prompt as a visual design brief, not a search query.
+
+> The model's reasoning engine parses context, spatial relationships, and even structured data formats (JSON, HTML/CSS, grids). This is why short prompts like "make an
+> infographic" fail while multi-paragraph specifications with explicit MUST constraints produce studio-quality output. The single biggest leverage point is treating your
+> prompt like a specification document with clear sections for subject, layout, constraints, and negations.
+
+> Key techniques
+
+> 1. Design-document prompting — Structure your prompt as a full visual brief with sections for subject, composition, action, setting, style, and constraints. The
+> reasoning engine parses context hierarchically, so a narrative description ("a bartender polishing glasses in a speakeasy at golden hour") massively outperforms
+> comma-separated tags. Vague requests trigger the model's worst outputs. (https://www.radicalcuriosity.xyz/p/how-to-create-an-effective-prompt)
+> 2. MUST-constraint enforcement — ALL CAPS "MUST" statements activate the reasoning step's constraint-checking system. Writing "All elements MUST follow rule of thirds"
+> or "Text MUST be in Times New Roman, 24pt bold" is enforced systematically, unlike lowercase suggestions which the model may treat as optional. Structure constraints as
+> a bulleted list under "MUST obey ALL the FOLLOWING:" for maximum compliance. (https://minimaxir.com/2025/12/nano-banana-pro/)
+> 3. Camera-gear anchoring — Referencing specific camera models and lens specs (e.g., "Canon EOS R5 with 85mm f/1.8", "Shot on Arri Alexa") overrides generic style words
+> and forces physical realism. The model uses gear references to infer depth-of-field, film grain, and color science. Tags like "Shot on Arri Alexa" emulate specific film
+> characteristics, while focal length and aperture control bokeh and volumetric depth precisely. (https://higgsfield.ai/nano-banana-pro-prompt-guide,
+> https://minimaxir.com/2025/12/nano-banana-pro/)
+> 4. Explicit text rendering — Nano Banana Pro has exceptional text rendering. To activate it reliably: put the exact text in double quotes, specify font family (e.g.,
+> "Roboto Bold"), define placement location, and describe background treatment. For multilingual text, the model handles a wide range of global languages. This enables
+> posters, product mockups, UI designs, and diagrams with sharp, legible text — a capability most competing models lack.
+> (https://www.imagine.art/blogs/nano-banana-pro-prompt-guide)
+> 5. Negative constraints for cleanup — The model's reasoning engine responds to explicit exclusion rules. "NEVER include watermarks, text overlays, or extra limbs"
+> narrows the model's search space and prevents common artifacts. Define the boundaries of failure by listing what to exclude alongside what to include — this tightens the
+> output without sacrificing compositional richness. (https://higgsfield.ai/nano-banana-pro-prompt-guide, https://minimaxir.com/2025/12/nano-banana-pro/)
+
 > ---
+> Sources collected
 
-     What I learned
+> Platform: Web
+> Items: 12 pages
+> Engagement: minimaxir.com, blog.google, radicalcuriosity.xyz, higgsfield.ai, imagine.art, eweek.com, leonardo.ai, atlabs.ai, medium.com, github.com,
+> nanobananaprompt.org,
+> aixploria.com
 
-     Nano Banana Pro is a reasoning-first image model — it has a "Deep Think" step that plans composition before generating pixels. This means it responds to structured,
-     constraint-rich design documents far better than keyword lists or vague requests. Think of your prompt as a visual design brief, not a search query.
+> Top sources: Max Woolf on minimaxir.com, Google Blog (Bea Alessio), Radical Curiosity, Higgsfield AI, Imagine.art
 
-     The model's reasoning engine parses context, spatial relationships, and even structured data formats (JSON, HTML/CSS, grids). This is why short prompts like "make an
-     infographic" fail while multi-paragraph specifications with explicit MUST constraints produce studio-quality output. The single biggest leverage point is treating your
-     prompt like a specification document with clear sections for subject, layout, constraints, and negations.
+> ---
+> What do you want to make? For example:
 
-     Key techniques
+> - A photorealistic product shot with specific camera specs and studio lighting (the most reliable technique right now — camera-gear anchoring + MUST constraints)
+> - An infographic or data visualization with structured layout, precise text rendering, and color palette specs (exploits the Deep Think reasoning engine)
+> - A cinematic scene with volumetric lighting and film grain, specifying exact lens and aperture to nail the look (Arri Alexa emulation + narrative prompting)
 
-     1. Design-document prompting — Structure your prompt as a full visual brief with sections for subject, composition, action, setting, style, and constraints. The
-     reasoning engine parses context hierarchically, so a narrative description ("a bartender polishing glasses in a speakeasy at golden hour") massively outperforms
-     comma-separated tags. Vague requests trigger the model's worst outputs. (https://www.radicalcuriosity.xyz/p/how-to-create-an-effective-prompt)
-     2. MUST-constraint enforcement — ALL CAPS "MUST" statements activate the reasoning step's constraint-checking system. Writing "All elements MUST follow rule of thirds"
-     or "Text MUST be in Times New Roman, 24pt bold" is enforced systematically, unlike lowercase suggestions which the model may treat as optional. Structure constraints as
-     a bulleted list under "MUST obey ALL the FOLLOWING:" for maximum compliance. (https://minimaxir.com/2025/12/nano-banana-pro/)
-     3. Camera-gear anchoring — Referencing specific camera models and lens specs (e.g., "Canon EOS R5 with 85mm f/1.8", "Shot on Arri Alexa") overrides generic style words
-     and forces physical realism. The model uses gear references to infer depth-of-field, film grain, and color science. Tags like "Shot on Arri Alexa" emulate specific film
-     characteristics, while focal length and aperture control bokeh and volumetric depth precisely. (https://higgsfield.ai/nano-banana-pro-prompt-guide,
-     https://minimaxir.com/2025/12/nano-banana-pro/)
-     4. Explicit text rendering — Nano Banana Pro has exceptional text rendering. To activate it reliably: put the exact text in double quotes, specify font family (e.g.,
-     "Roboto Bold"), define placement location, and describe background treatment. For multilingual text, the model handles a wide range of global languages. This enables
-     posters, product mockups, UI designs, and diagrams with sharp, legible text — a capability most competing models lack.
-     (https://www.imagine.art/blogs/nano-banana-pro-prompt-guide)
-     5. Negative constraints for cleanup — The model's reasoning engine responds to explicit exclusion rules. "NEVER include watermarks, text overlays, or extra limbs"
-     narrows the model's search space and prevents common artifacts. Define the boundaries of failure by listing what to exclude alongside what to include — this tightens the
-      output without sacrificing compositional richness. (https://higgsfield.ai/nano-banana-pro-prompt-guide, https://minimaxir.com/2025/12/nano-banana-pro/)
-
-     ---
-     Sources collected
-
-     Platform: Web
-     Items: 12 pages
-     Engagement: minimaxir.com, blog.google, radicalcuriosity.xyz, higgsfield.ai, imagine.art, eweek.com, leonardo.ai, atlabs.ai, medium.com, github.com,
-     nanobananaprompt.org,
-       aixploria.com
-
-     Top sources: Max Woolf on minimaxir.com, Google Blog (Bea Alessio), Radical Curiosity, Higgsfield AI, Imagine.art
-
-     ---
-     What do you want to make? For example:
-
-     - A photorealistic product shot with specific camera specs and studio lighting (the most reliable technique right now — camera-gear anchoring + MUST constraints)
-     - An infographic or data visualization with structured layout, precise text rendering, and color palette specs (exploits the Deep Think reasoning engine)
-     - A cinematic scene with volumetric lighting and film grain, specifying exact lens and aperture to nail the look (Arri Alexa emulation + narrative prompting)
-
-     Just describe your vision and I'll write a prompt you can paste straight into Gemini.
+> Just describe your vision and I'll write a prompt you can paste straight into Gemini.
 
 **2. Follow-up Prompt:** "Make a mockup of an app for moms who cook"
 
@@ -162,48 +172,10 @@ CONSTRAINTS:
 ### Video Generation
 
 **1. Prompt:** Best video AI to create ads for your company
-**Answer:**
-
-> ---
-
-**2. Follow-up Prompt:**
-
-**3. Result:**
-
----
-
-### Video Generation
-
-**1. Prompt:** Best video AI to create ads for your company
-**Answer:**
-
-> ---
-
-**2. Follow-up Prompt:**
-
-**3. Result:**
-
----
-
-### Video Generation
-
-**1. Prompt:** Best video AI to create ads for your company
 
 **Answer:**
 
-> ---
-
-**2. Follow-up Prompt:**
-
-**3. Result:**
-
----
-
-### Video Generation
-
-**1. Prompt:** Best video AI to create ads for your company
-
-**Answer:** > Best Video AI Tools for Creating Company Ads (February 2026)
+> Best Video AI Tools for Creating Company Ads (February 2026)
 
 What I Learned
 
@@ -277,223 +249,224 @@ Key Techniques
 
 **Answer:** What I learned
 
-     The AI industry is in the middle of a civil war -- not over technology, but over
-      business models and ethics. The past week crystallized a three-way fracture:
-     Anthropic betting on premium subscriptions and trust ("no ads ever"), OpenAI
-     pivoting toward ad-supported mass distribution, and xAI imploding under the
-     weight of regulatory crackdowns and a talent exodus. The deeper signal is that
-     2026 is the year AI companies must prove they can make money without destroying
-     public trust -- and most are failing that test in real time.
+> The AI industry is in the middle of a civil war -- not over technology, but over
+> business models and ethics. The past week crystallized a three-way fracture:
+> Anthropic betting on premium subscriptions and trust ("no ads ever"), OpenAI
+> pivoting toward ad-supported mass distribution, and xAI imploding under the
+> weight of regulatory crackdowns and a talent exodus. The deeper signal is that
+> 2026 is the year AI companies must prove they can make money without destroying
+> public trust -- and most are failing that test in real time.
 
-     The feuds between Altman, Musk, and Amodei are not just ego clashes. They
-     reflect genuinely incompatible visions for how AI should be funded, governed,
-     and deployed. Meanwhile, the financial fundamentals are flashing warning signs:
-     $500 billion in projected U.S. AI capex against only $12 billion in consumer AI
-     spending, with 95% of enterprise generative AI projects returning zero ROI
-     according to MIT's Media Lab.
+> The feuds between Altman, Musk, and Amodei are not just ego clashes. They
+> reflect genuinely incompatible visions for how AI should be funded, governed,
+> and deployed. Meanwhile, the financial fundamentals are flashing warning signs:
+> $500 billion in projected U.S. AI capex against only $12 billion in consumer AI
+> spending, with 95% of enterprise generative AI projects returning zero ROI
+> according to MIT's Media Lab.
 
-     Key developments this week
+> Key developments this week
 
-     1. The Super Bowl ad war -- Anthropic vs. OpenAI
-     Anthropic aired four Super Bowl spots titled "Betrayal," "Deception,"
-     "Treachery," and "Violation," depicting chatbots hijacking personal
-     conversations with product pitches. The tagline: "Ads are coming to AI. But not
-     to Claude." Result: an
-     https://www.cnbc.com/2026/02/13/anthropic-open-ai-super-bowl-ads.html post-game.
-      Sam Altman called the ads https://techcrunch.com/2026/02/04/sam-altman-got-exce
-     ptionally-testy-over-claude-super-bowl-ads/ on X, while OpenAI VP Chris Lehane
-     argued https://fortune.com/2026/02/09/super-bowl-ads-anthropic-openai-rivalry-tr
-     ash-talk-ai-agent-war/. Google DeepMind chief Demis Hassabis said Google has
-     https://www.storyboard18.com/brand-makers/davos-2026-why-google-and-anthropic-ar
-     e-resisting-ads-in-ai-chatbots-as-openai-experiments-88089.htm either.
+> 1. The Super Bowl ad war -- Anthropic vs. OpenAI
+> Anthropic aired four Super Bowl spots titled "Betrayal," "Deception,"
+> "Treachery," and "Violation," depicting chatbots hijacking personal
+> conversations with product pitches. The tagline: "Ads are coming to AI. But not
+> to Claude." Result: an
+> https://www.cnbc.com/2026/02/13/anthropic-open-ai-super-bowl-ads.html post-game.
+> Sam Altman called the ads https://techcrunch.com/2026/02/04/sam-altman-got-exce
+> ptionally-testy-over-claude-super-bowl-ads/ on X, while OpenAI VP Chris Lehane
+> argued https://fortune.com/2026/02/09/super-bowl-ads-anthropic-openai-rivalry-tr
+> ash-talk-ai-agent-war/. Google DeepMind chief Demis Hassabis said Google has
+> https://www.storyboard18.com/brand-makers/davos-2026-why-google-and-anthropic-ar
+> e-resisting-ads-in-ai-chatbots-as-openai-experiments-88089.htm either.
 
-     2. Musk vs. Altman heads to trial
-     Their legal battle has been https://www.webpronews.com/openais-week-of-damage-co
-     ntrol-how-sam-altman-and-his-lieutenants-fought-a-multi-front-war-against-musk-r
-     ivals-and-rising-skepticism/. Musk's attorneys claim $134.5 billion in "wrongful
-      gains" from OpenAI's nonprofit-to-profit conversion. Altman taunted he's
-     https://blog.dynasage.com/2026/02/sam-altman-unloads-on-elon-musk-in.html,
-     calling it "Christmas in April." Musk separately called Anthropic's models
-     https://www.foxbusiness.com/technology/elon-musk-slams-anthropic-ai-models-misan
-     thropic-evil-scathing-social-media-post.
+> 2. Musk vs. Altman heads to trial
+> Their legal battle has been https://www.webpronews.com/openais-week-of-damage-co
+> ntrol-how-sam-altman-and-his-lieutenants-fought-a-multi-front-war-against-musk-r
+> ivals-and-rising-skepticism/. Musk's attorneys claim $134.5 billion in "wrongful
+> gains" from OpenAI's nonprofit-to-profit conversion. Altman taunted he's
+> https://blog.dynasage.com/2026/02/sam-altman-unloads-on-elon-musk-in.html,
+> calling it "Christmas in April." Musk separately called Anthropic's models
+> https://www.foxbusiness.com/technology/elon-musk-slams-anthropic-ai-models-misan
+> thropic-evil-scathing-social-media-post.
 
-     3. xAI's talent exodus
-     Half of xAI's 12 original cofounders have now
-     https://fortune.com/2026/02/11/half-of-xai-founding-team-has-left-elon-musks-ai-
-     company-potentially-complicating-his-plans-for-a-blockbuster-spacex-ipo/. In two
-      days, cofounders
-     https://www.cnbc.com/2026/02/10/elon-musk-xai-co-founder-tony-wu.html (reasoning
-      lead) and https://www.cnbc.com/2026/02/10/musks-xai-loses-second-co-founder-in-
-     two-days-as-jimmy-ba-departs.html (research/safety lead) both departed. Musk
-     https://techcrunch.com/2026/02/11/senior-engineers-including-co-founders-exit-xa
-     i-amid-controversy/ -- Grok chatbot, Coding, Imagine video, and "Macrohard" --
-     framing exits as restructuring.
+> 3. xAI's talent exodus
+> Half of xAI's 12 original cofounders have now
+> https://fortune.com/2026/02/11/half-of-xai-founding-team-has-left-elon-musks-ai-
+> company-potentially-complicating-his-plans-for-a-blockbuster-spacex-ipo/. In two
+> days, cofounders
+> https://www.cnbc.com/2026/02/10/elon-musk-xai-co-founder-tony-wu.html (reasoning
+> lead) and https://www.cnbc.com/2026/02/10/musks-xai-loses-second-co-founder-in-
+> two-days-as-jimmy-ba-departs.html (research/safety lead) both departed. Musk
+> https://techcrunch.com/2026/02/11/senior-engineers-including-co-founders-exit-xa
+> i-amid-controversy/ -- Grok chatbot, Coding, Imagine video, and "Macrohard" --
+> framing exits as restructuring.
 
-     4. The Grok deepfake scandal goes global
-     Grok's Aurora model enabled what researchers described as a
-     https://en.wikipedia.org/wiki/Grok_sexual_deepfake_scandal -- an estimated 6,700
-      nonconsensual images per hour at peak. https://www.deccanherald.com/world/elon-
-     musks-grok-faces-global-scrutiny-for-sexualised-ai-deepfakes-3901637. The UK
-     https://iapp.org/news/a/pressure-on-grok-mounts-after-uk-speeds-up-sexual-deepfa
-     ke-ban. French prosecutors https://lasvegassun.com/news/2026/feb/16/grok-faces-m
-     ore-scrutiny-over-deepfakes-as-irish-r/. Ireland's DPC
-     https://pbxscience.com/ireland-opens-eu-privacy-investigation-into-xs-grok-ai-ov
-     er-nonconsensual-deepfake-images/ this week.
+> 4. The Grok deepfake scandal goes global
+> Grok's Aurora model enabled what researchers described as a
+> https://en.wikipedia.org/wiki/Grok_sexual_deepfake_scandal -- an estimated 6,700
+> nonconsensual images per hour at peak. https://www.deccanherald.com/world/elon-
+> musks-grok-faces-global-scrutiny-for-sexualised-ai-deepfakes-3901637. The UK
+> https://iapp.org/news/a/pressure-on-grok-mounts-after-uk-speeds-up-sexual-deepfa
+> ke-ban. French prosecutors https://lasvegassun.com/news/2026/feb/16/grok-faces-m
+> ore-scrutiny-over-deepfakes-as-irish-r/. Ireland's DPC
+> https://pbxscience.com/ireland-opens-eu-privacy-investigation-into-xs-grok-ai-ov
+> er-nonconsensual-deepfake-images/ this week.
 
-     5. OpenAI safety researcher resigns over ads
-     Zoe Hitzig https://www.marketingprofs.com/opinions/2026/54304/ai-update-february
-     -13-2026-ai-news-and-views-from-the-past-week over the ChatGPT advertising
-     decision, writing she had "repeatedly seen how hard it is to truly let our
-     values govern our actions" and "the world is in peril."
+> 5. OpenAI safety researcher resigns over ads
+> Zoe Hitzig https://www.marketingprofs.com/opinions/2026/54304/ai-update-february
+> -13-2026-ai-news-and-views-from-the-past-week over the ChatGPT advertising
+> decision, writing she had "repeatedly seen how hard it is to truly let our
+> values govern our actions" and "the world is in peril."
 
-     6. Enterprise buildout at staggering scale
-     Anthropic plans to https://www.anthropic.com/news/expanding-our-use-of-google-cl
-     oud-tpus-and-services (over a gigawatt of compute). Snowflake and OpenAI inked a
-      https://www.marketingprofs.com/opinions/2026/54257/ai-update-february-6-2026-ai
-     -news-and-views-from-the-past-week. Perplexity launched
-     https://llm-stats.com/llm-updates running Claude, GPT-5.2, and Gemini in
-     parallel. Inference costs
-     https://techcrunch.com/2026/01/02/in-2026-ai-will-move-from-hype-to-pragmatism/
-     on NVIDIA Blackwell GPUs.
+> 6. Enterprise buildout at staggering scale
+> Anthropic plans to https://www.anthropic.com/news/expanding-our-use-of-google-cl
+> oud-tpus-and-services (over a gigawatt of compute). Snowflake and OpenAI inked a
+> https://www.marketingprofs.com/opinions/2026/54257/ai-update-february-6-2026-ai
+> -news-and-views-from-the-past-week. Perplexity launched
+> https://llm-stats.com/llm-updates running Claude, GPT-5.2, and Gemini in
+> parallel. Inference costs
+> https://techcrunch.com/2026/01/02/in-2026-ai-will-move-from-hype-to-pragmatism/
+> on NVIDIA Blackwell GPUs.
 
-     7. The AI bubble question intensifies
-     https://www.nasdaq.com/articles/prediction-artificial-intelligence-ai-bubble-wil
-     l-burst-2026-heres-why. $500B in projected U.S. AI capex vs.
-     https://www.alleywatch.com/2026/01/161759/. Nvidia P/S ratio above 30, Palantir
-     at 112 -- https://www.fool.com/investing/2025/12/04/prediction-ai-bubble-will-bu
-     rst-in-2026-heres-why/. The WEF published a https://www.weforum.org/stories/2026
-     /01/how-would-the-bursting-of-an-ai-bubble-actually-play-out/ of what an AI
-     reckoning would look like.
+> 7. The AI bubble question intensifies
+> https://www.nasdaq.com/articles/prediction-artificial-intelligence-ai-bubble-wil
+> l-burst-2026-heres-why. $500B in projected U.S. AI capex vs.
+> https://www.alleywatch.com/2026/01/161759/. Nvidia P/S ratio above 30, Palantir
+> at 112 -- https://www.fool.com/investing/2025/12/04/prediction-ai-bubble-will-bu
+> rst-in-2026-heres-why/. The WEF published a https://www.weforum.org/stories/2026
+> /01/how-would-the-bursting-of-an-ai-bubble-actually-play-out/ of what an AI
+> reckoning would look like.
 
-     Bold Prediction for 2026
+> Bold Prediction for 2026
 
-     By December 2026, OpenAI will reverse its ads-in-ChatGPT strategy and slash
-     subscription prices -- conceding Anthropic's bet was right.
+> By December 2026, OpenAI will reverse its ads-in-ChatGPT strategy and slash
+> subscription prices -- conceding Anthropic's bet was right.
 
-     The logic: The Super Bowl ad war was not just marketing theater. It exposed a
-     tension users viscerally understand -- the moment your AI assistant optimizes
-     for an advertiser instead of you, trust is broken. Anthropic's 11% user surge
-     proved the sentiment is real and actionable. OpenAI's safety talent is
-     hemorrhaging specifically over the ads decision. As enterprise customers demand
-     guarantees that their conversations are not feeding ad-targeting models, OpenAI
-     will find that ad revenue does not compensate for churn. Expect a dramatic Q4
-     pivot -- framed as "listening to our community" -- where OpenAI drops ads and
-     repositions on price. The real loser is xAI, which by year-end will have either
-     been folded into SpaceX's infrastructure or lost enough talent and regulatory
-     goodwill to become a niche player. The industry's first real shakeout will not
-     be about whose model is smartest -- it will be about whose business model
-     survives contact with reality.
+> The logic: The Super Bowl ad war was not just marketing theater. It exposed a
+> tension users viscerally understand -- the moment your AI assistant optimizes
+> for an advertiser instead of you, trust is broken. Anthropic's 11% user surge
+> proved the sentiment is real and actionable. OpenAI's safety talent is
+> hemorrhaging specifically over the ads decision. As enterprise customers demand
+> guarantees that their conversations are not feeding ad-targeting models, OpenAI
+> will find that ad revenue does not compensate for churn. Expect a dramatic Q4
+> pivot -- framed as "listening to our community" -- where OpenAI drops ads and
+> repositions on price. The real loser is xAI, which by year-end will have either
+> been folded into SpaceX's infrastructure or lost enough talent and regulatory
+> goodwill to become a niche player. The industry's first real shakeout will not
+> be about whose model is smartest -- it will be about whose business model
+> survives contact with reality.
 
-     ---
-     Sources collected
+> ---
+> Sources collected
 
-     Platform: Web
-     Items: 30+ pages
-     Engagement: TechCrunch, CNBC, Fortune, CNN, Bloomberg, Axios, MIT Tech Review,
-       Nasdaq, WEF, PBS, Wikipedia
+> Platform: Web
+> Items: 30+ pages
+> Engagement: TechCrunch, CNBC, Fortune, CNN, Bloomberg, Axios, MIT Tech Review,
+> Nasdaq, WEF, PBS, Wikipedia
 
-     Top sources: https://www.cnbc.com, https://techcrunch.com, https://fortune.com,
-     https://www.cnn.com/business, https://www.bloomberg.com, https://www.axios.com
+> Top sources: https://www.cnbc.com, https://techcrunch.com, https://fortune.com,
+> https://www.cnn.com/business, https://www.bloomberg.com, https://www.axios.com
 
-     ---
-     Audio briefing saved to: ~/.claude/skills/briefbot/output/briefbot.mp3
+> ---
+> Audio briefing saved to: ~/.claude/skills/briefbot/output/briefbot.mp3
 
-     ---
-     What angle interests you most? For example:
+> ---
+> What angle interests you most? For example:
 
-     - "Deep dive into the Musk trial -- what are the actual legal arguments and who
-     has the stronger case heading into April?"
-     - "Break down the AI bubble math -- is the $500B capex vs $12B revenue gap
-     really as bad as it looks, or are the bears missing something?"
-     - "Which xAI cofounders went where, and what does the talent flow tell us about
-     which labs are winning the hiring war?"
+> - "Deep dive into the Musk trial -- what are the actual legal arguments and who
+> has the stronger case heading into April?"
+> - "Break down the AI bubble math -- is the $500B capex vs $12B revenue gap
+> really as bad as it looks, or are the bears missing something?"
+> - "Which xAI cofounders went where, and what does the talent flow tell us about
+> which labs are winning the hiring war?"
 
 ---
 
-### Best Tool for Agentic Coding
+<details>
+<summary><h3>Best Tool for Agentic Coding</h3></summary>
 
 **1. Prompt:** Best agentic coding IDE or CLI tool at the moment
 
 **Answer:** Most mentioned
 
-     1. Claude Code (Anthropic) -- mentioned 12x+ (https://www.kdnuggets.com/top-5-agentic-coding-cli-tools, https://www.faros.ai/blog/best-ai-coding-agents-2026,
-     https://www.builder.io/blog/agentic-ide, https://aimultiple.com/agentic-cli, X posts)
-     Terminal-native agent with 200K context window and the deepest reasoning. Developers consistently describe it as the "escalation path" -- the tool they reach for when
-     other agents fail on hard problems like subtle bugs or architecture-level refactors.
-     2. Cursor -- mentioned 10x+ (https://www.builder.io/blog/agentic-ide, https://www.faros.ai/blog/best-ai-coding-agents-2026,
-     https://www.nxgntools.com/blog/cursor-vs-claude-dev-vs-windsurf-which-next-gen-coding-agent-wins-in-2026, @Neiniciativ on X)
-     The "gold standard" IDE-based agent. VS Code fork with Composer mode that generates code across multiple files while maintaining full project context. $20/seat. Best for
-      developers who want agentic power without leaving a familiar editor.
-     3. Codex CLI / Codex IDE (OpenAI) -- mentioned 8x+ (@abhijitwt, @reach_vb, @samidip, @godofprompt on X, https://www.faros.ai/blog/best-ai-coding-agents-2026)
-     OpenAI's entry with gpt-5.2-codex backing it. Users praise its "skills" system, background terminal for parallel jobs, and autonomous git management. One developer built
-      an entire app hands-off in 30 minutes of pure CLI work. Claimed "70% more PRs at OpenAI" internally.
-     4. Cline -- mentioned 7x+ (https://www.kdnuggets.com/top-5-agentic-coding-cli-tools, https://www.builder.io/blog/agentic-ide, https://aimultiple.com/agentic-cli,
-     https://www.faros.ai/blog/best-ai-coding-agents-2026)
-     Open-source VS Code extension that lets you choose any model (including local via Ollama). The tool people adopt when they want serious agent workflows without vendor
-     lock-in. Every file change requires approval -- maximum transparency.
-     5. Windsurf -- mentioned 7x+ (https://www.builder.io/blog/agentic-ide, https://www.faros.ai/blog/best-ai-coding-agents-2026,
-     https://designrevision.com/blog/windsurf-vs-cursor)
-     VS Code fork at $15/seat (cheapest major option). Its Cascade feature pioneered autonomous agentic mode -- it anticipates your next move and can plan and execute
-     multi-file refactors without constant supervision.
-     6. Antigravity -- mentioned 5x (@antigravity, @PoisonslashX, @abhijitwt on X)
-     Bundles VS Code, Gemini, Claude, and Codex into one package. Parses terminal output in real-time to catch issues CLI tools miss. Multiple X users call it the most
-     "complete" all-in-one agentic IDE.
+> 1. Claude Code (Anthropic) -- mentioned 12x+ (https://www.kdnuggets.com/top-5-agentic-coding-cli-tools, https://www.faros.ai/blog/best-ai-coding-agents-2026,
+> https://www.builder.io/blog/agentic-ide, https://aimultiple.com/agentic-cli, X posts)
+> Terminal-native agent with 200K context window and the deepest reasoning. Developers consistently describe it as the "escalation path" -- the tool they reach for when
+> other agents fail on hard problems like subtle bugs or architecture-level refactors.
+> 2. Cursor -- mentioned 10x+ (https://www.builder.io/blog/agentic-ide, https://www.faros.ai/blog/best-ai-coding-agents-2026,
+> https://www.nxgntools.com/blog/cursor-vs-claude-dev-vs-windsurf-which-next-gen-coding-agent-wins-in-2026, @Neiniciativ on X)
+> The "gold standard" IDE-based agent. VS Code fork with Composer mode that generates code across multiple files while maintaining full project context. $20/seat. Best for
+> developers who want agentic power without leaving a familiar editor.
+> 3. Codex CLI / Codex IDE (OpenAI) -- mentioned 8x+ (@abhijitwt, @reach_vb, @samidip, @godofprompt on X, https://www.faros.ai/blog/best-ai-coding-agents-2026)
+> OpenAI's entry with gpt-5.2-codex backing it. Users praise its "skills" system, background terminal for parallel jobs, and autonomous git management. One developer built
+> an entire app hands-off in 30 minutes of pure CLI work. Claimed "70% more PRs at OpenAI" internally.
+> 4. Cline -- mentioned 7x+ (https://www.kdnuggets.com/top-5-agentic-coding-cli-tools, https://www.builder.io/blog/agentic-ide, https://aimultiple.com/agentic-cli,
+> https://www.faros.ai/blog/best-ai-coding-agents-2026)
+> Open-source VS Code extension that lets you choose any model (including local via Ollama). The tool people adopt when they want serious agent workflows without vendor
+> lock-in. Every file change requires approval -- maximum transparency.
+> 5. Windsurf -- mentioned 7x+ (https://www.builder.io/blog/agentic-ide, https://www.faros.ai/blog/best-ai-coding-agents-2026,
+> https://designrevision.com/blog/windsurf-vs-cursor)
+> VS Code fork at $15/seat (cheapest major option). Its Cascade feature pioneered autonomous agentic mode -- it anticipates your next move and can plan and execute
+> multi-file refactors without constant supervision.
+> 6. Antigravity -- mentioned 5x (@antigravity, @PoisonslashX, @abhijitwt on X)
+> Bundles VS Code, Gemini, Claude, and Codex into one package. Parses terminal output in real-time to catch issues CLI tools miss. Multiple X users call it the most
+> "complete" all-in-one agentic IDE.
 
-     Notable mentions: https://x.com/NathanFlurry/status/2019759962482725149 (universal UI for multiple agents, 400+ likes), https://news.ycombinator.com/item?id=46060508
-     (free tier: 60 req/min, 1000 req/day), https://kiro.dev/ (AWS's spec-driven IDE, 77% benchmark accuracy), https://www.tembo.io/blog/coding-cli-tools-comparison (best for
-      git-heavy workflows with auto-commits), https://x.com/istdrc/status/2017981457692770737 (praised as best Claude Code alternative),
-     https://x.com/championswimmer/status/2022630198978711713 (lightweight editor with Agent Client Protocol support), https://www.faros.ai/blog/best-ai-coding-agents-2026
-     (agent mode for PRs and code review), https://x.com/championswimmer/status/2021551243945259190 (rising CLI agents)
+> Notable mentions: https://x.com/NathanFlurry/status/2019759962482725149 (universal UI for multiple agents, 400+ likes), https://news.ycombinator.com/item?id=46060508
+> (free tier: 60 req/min, 1000 req/day), https://kiro.dev/ (AWS's spec-driven IDE, 77% benchmark accuracy), https://www.tembo.io/blog/coding-cli-tools-comparison (best for
+> git-heavy workflows with auto-commits), https://x.com/istdrc/status/2017981457692770737 (praised as best Claude Code alternative),
+> https://x.com/championswimmer/status/2022630198978711713 (lightweight editor with Agent Client Protocol support), https://www.faros.ai/blog/best-ai-coding-agents-2026
+> (agent mode for PRs and code review), https://x.com/championswimmer/status/2021551243945259190 (rising CLI agents)
 
-     ---
-     What I learned
+> ---
+> What I learned
 
-     The agentic coding space has split into two distinct lanes: terminal-first CLI agents (Claude Code, Codex CLI, Aider, Gemini CLI) and IDE-native agents (Cursor,
-     Windsurf, Cline, Antigravity). The critical insight from the community is that there is no single winner -- developers are increasingly using tools from both lanes in
-     combination. Claude Code and Codex CLI serve as the "escalation path" for hard reasoning problems, while Cursor or Windsurf handle the flow state of everyday editing.
-     The tool that wins for you depends entirely on where you want leverage: deep reasoning, daily flow, cost control, or openness.
+> The agentic coding space has split into two distinct lanes: terminal-first CLI agents (Claude Code, Codex CLI, Aider, Gemini CLI) and IDE-native agents (Cursor,
+> Windsurf, Cline, Antigravity). The critical insight from the community is that there is no single winner -- developers are increasingly using tools from both lanes in
+> combination. Claude Code and Codex CLI serve as the "escalation path" for hard reasoning problems, while Cursor or Windsurf handle the flow state of everyday editing.
+> The tool that wins for you depends entirely on where you want leverage: deep reasoning, daily flow, cost control, or openness.
 
-     The second key signal is that the market is moving fast toward interoperability. Projects like OpenCode/Gigacode and Zed's Agent Client Protocol show that the next
-     competitive frontier is not which single agent is best, but which tools compose well together. Developers who lock into one ecosystem are starting to feel the cost.
+> The second key signal is that the market is moving fast toward interoperability. Projects like OpenCode/Gigacode and Zed's Agent Client Protocol show that the next
+> competitive frontier is not which single agent is best, but which tools compose well together. Developers who lock into one ecosystem are starting to feel the cost.
 
-     Key techniques
+> Key techniques
 
-     1. Tiered agent stacking -- Use a high-reasoning model (Claude Code or Codex xhigh) for planning and architecture, then a faster/cheaper model for implementation. This
-     mirrors what top developers on X report: @reach_vb uses "xhigh for planning, medium for implementation" to balance quality and speed
-     (https://x.com/reach_vb/status/2016620523862544783)
-     2. CLI-first for autonomy, IDE for flow -- Terminal agents (Claude Code, Codex CLI) handle multi-step tasks like PR creation, CI fixes, and refactors with less friction
-     than IDE agents. But for exploratory editing and review, IDE agents (Cursor, Windsurf) keep you in flow state. The most productive setups use both
-     (https://www.builder.io/blog/agentic-ide)
-     3. Skills/automation layers -- Codex's "skills" system and Claude Code's custom slash commands let you encode repeatable workflows (fix CI, resolve merge conflicts, run
-     test suites). This turns one-off agent calls into reusable toolchains (https://x.com/reach_vb/status/2016620523862544783)
-     4. Model-agnostic tooling for cost control -- Cline and OpenCode let you swap models freely (including local models via Ollama). This avoids vendor lock-in and lets you
-     route cheap tasks to cheap models while reserving expensive reasoning for hard problems (https://www.kdnuggets.com/top-5-agentic-coding-cli-tools)
-     5. Real-time terminal parsing -- Antigravity and similar tools parse CLI output as it streams, catching errors and suggesting fixes before you even read the log. This
-     closes the gap between "the agent wrote code" and "the code actually works" (https://x.com/antigravity/status/2017300529584505100)
+> 1. Tiered agent stacking -- Use a high-reasoning model (Claude Code or Codex xhigh) for planning and architecture, then a faster/cheaper model for implementation. This
+> mirrors what top developers on X report: @reach_vb uses "xhigh for planning, medium for implementation" to balance quality and speed
+> (https://x.com/reach_vb/status/2016620523862544783)
+> 2. CLI-first for autonomy, IDE for flow -- Terminal agents (Claude Code, Codex CLI) handle multi-step tasks like PR creation, CI fixes, and refactors with less friction
+> than IDE agents. But for exploratory editing and review, IDE agents (Cursor, Windsurf) keep you in flow state. The most productive setups use both
+> (https://www.builder.io/blog/agentic-ide)
+> 3. Skills/automation layers -- Codex's "skills" system and Claude Code's custom slash commands let you encode repeatable workflows (fix CI, resolve merge conflicts, run
+> test suites). This turns one-off agent calls into reusable toolchains (https://x.com/reach_vb/status/2016620523862544783)
+> 4. Model-agnostic tooling for cost control -- Cline and OpenCode let you swap models freely (including local models via Ollama). This avoids vendor lock-in and lets you
+> route cheap tasks to cheap models while reserving expensive reasoning for hard problems (https://www.kdnuggets.com/top-5-agentic-coding-cli-tools)
+> 5. Real-time terminal parsing -- Antigravity and similar tools parse CLI output as it streams, catching errors and suggesting fixes before you even read the log. This
+> closes the gap between "the agent wrote code" and "the code actually works" (https://x.com/antigravity/status/2017300529584505100)
 
-     ---
-     Sources collected
+> ---
+> Sources collected
 
-     Platform: X
-     Items: 21 posts
-     Engagement: 4,877 likes, 256 reposts
-     ────────────────────────────────────────
-     Platform: Web
-     Items: 20+ pages
-     Engagement: kdnuggets.com, faros.ai, builder.io, tembo.io, aimultiple.com, pinggy.io, dextralabs.com, kiro.dev, sourceforge.net, nxgntools.com, uibakery.io,
-     amplifilabs.com,
-       morphllm.com
+> Platform: X
+> Items: 21 posts
+> Engagement: 4,877 likes, 256 reposts
+> ────────────────────────────────────────
+> Platform: Web
+> Items: 20+ pages
+> Engagement: kdnuggets.com, faros.ai, builder.io, tembo.io, aimultiple.com, pinggy.io, dextralabs.com, kiro.dev, sourceforge.net, nxgntools.com, uibakery.io,
+> amplifilabs.com,
+> morphllm.com
 
-     Top voices: @NathanFlurry, @championswimmer, @antigravity, @abhijitwt, @reach_vb -- builder.io, Faros AI, KDnuggets, Tembo, aimultiple.com
+> Top voices: @NathanFlurry, @championswimmer, @antigravity, @abhijitwt, @reach_vb -- builder.io, Faros AI, KDnuggets, Tembo, aimultiple.com
 
-     ---
-     What do you want to dive into? For example:
+> ---
+> What do you want to dive into? For example:
 
-     - "Compare Claude Code vs Codex CLI for a large Python monorepo" -- if you need to pick between the two deepest CLI agents for a specific stack
-     - "Set up a tiered agent workflow with Cursor + Claude Code" -- to build the kind of stacked setup top developers are using
-     - "Which tool is best if I refuse to pay for a subscription" -- Gemini CLI's free tier and Cline with local models are the standouts here
+> - "Compare Claude Code vs Codex CLI for a large Python monorepo" -- if you need to pick between the two deepest CLI agents for a specific stack
+> - "Set up a tiered agent workflow with Cursor + Claude Code" -- to build the kind of stacked setup top developers are using
+> - "Which tool is best if I refuse to pay for a subscription" -- Gemini CLI's free tier and Cline with local models are the standouts here
 
-     Just tell me your stack or workflow and I'll give you a specific recommendation.
+> Just tell me your stack or workflow and I'll give you a specific recommendation.
 
 **2. Follow-up Prompt:** Give me an amazing CLAUDE.md for a React TypeScript FrontEnd
 
@@ -695,9 +668,12 @@ PR & Commit Conventions
 - One logical change per commit
 - Run npm run build and npm run lint before committing — both must pass
 
+</details>
+
 ---
 
-### Dario Amodei News
+<details>
+<summary><h3>Dario Amodei News</h3></summary>
 
 **1. Prompt:** Amodei --days 7
 
@@ -727,9 +703,12 @@ The thread worth pulling
 The tension between "we might go bankrupt" and a $30B raise — what does this signal about AI capex risk broadly? His India bet (talent, market, or regulatory arbitrage?),
 and the "cultivation vs programming" framing for AI safety.
 
+</details>
+
 ---
 
-### OpenClaw / ClawdBot
+<details>
+<summary><h3>OpenClaw / ClawdBot</h3></summary>
 
 **1. Prompt:** ClawdBot Use Cases
 
@@ -772,9 +751,12 @@ and the "cultivation vs programming" framing for AI safety.
   - https://x.com/bigaiguy/status/2021841775607132670
   - https://x.com/clawledge/status/2023412058121973828
 
+</details>
+
 ---
 
-### Hot new AI Papers
+<details>
+<summary><h3>Hot new AI Papers</h3></summary>
 
 **1. Prompt:** Hot new AI Papers
 
@@ -844,7 +826,12 @@ Further Reading
 • TechCrunch: In 2026, AI will move from hype to pragmatism
 • Constellation Research: DeepSeek's paper latest evidence AI muscle head era coming to end
 
+</details>
+
 ---
+
+<details>
+<summary><h3>Trump News</h3></summary>
 
 /briefbot trump --days 3
 
@@ -953,7 +940,12 @@ Further Reading
      Try next: deep dive on the Colbert FCC censorship story and what it means for
      the 2026 midterms
 
+</details>
+
 ---
+
+<details>
+<summary><h3>Keir Starmer</h3></summary>
 
 /briefbot Keir Starmer
 
@@ -1069,7 +1061,12 @@ Further Reading
      Try next: What are the realistic scenarios for Starmer being replaced before the
       next general election?
 
+</details>
+
 ---
+
+<details>
+<summary><h3>Photorealistic Portraits</h3></summary>
 
 /briefbot Photorealistic Portraits. Best techniques for ChatGPT image generation
 
@@ -1137,7 +1134,12 @@ Paste that straight into ChatGPT. The ages are spaced roughly evenly (0, 33, 66,
 
 <img src="assets/elon-age-grid.png" width="500" alt="Elon Musk age grid generated with gpt-image-1.5-high-fidelity"/>
 
+</details>
+
 ---
+
+<details>
+<summary><h3>Legal Prompting (Prevent Hallucination)</h3></summary>
 
 /briefbot Legal prompting (prevent hallucination)
 
@@ -1305,9 +1307,12 @@ Outcome: An in-depth 3000+ word guide examining Florida’s eviction (unlawful d
 
 This case study demonstrates recent /briefbot progress in crafting highly specialized legal-domain prompts (with strong emphasis on hallucination avoidance), resulting in reliable, cautious, and actually actionable output for real-world use.
 
+</details>
+
 ---
 
-### All together: Research, Music and Video Prompting (OpenClaw Song)
+<details>
+<summary><h3>All together: Research, Music and Video Prompting (OpenClaw Song)</h3></summary>
 
 /briefbot Best Suno AI Music prompting techniques
 
@@ -1523,6 +1528,8 @@ This case study demonstrates recent /briefbot progress in crafting highly specia
 I followed up with prompts for a Kling 3.0 music video and the final result was this banger:
 
 <video> ...
+
+</details>
 
 ---
 

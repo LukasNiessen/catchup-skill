@@ -19,8 +19,8 @@ def _emit_error_log(message_content: str):
 
 
 def _log(message: str):
-    """Emit a debug log line to stderr, gated by LAST30DAYS_DEBUG."""
-    if os.environ.get("LAST30DAYS_DEBUG", "").lower() in ("1", "true", "yes"):
+    """Emit a debug log line to stderr, gated by BRIEFBOT_DEBUG."""
+    if os.environ.get("BRIEFBOT_DEBUG", "").lower() in ("1", "true", "yes"):
         sys.stderr.write("[XAI_X] {}\n".format(message))
         sys.stderr.flush()
 
@@ -144,7 +144,7 @@ def search_x(
     ))
     _log("  Sending POST request...")
 
-    response = http.post(XAI_API_ENDPOINT, request_payload, request_headers=request_headers, timeout_seconds=request_timeout)
+    response = http.perform_post_request(XAI_API_ENDPOINT, request_payload, request_headers=request_headers, timeout_seconds=request_timeout)
 
     _log("  Response received, type: {}, keys: {}".format(
         type(response).__name__,

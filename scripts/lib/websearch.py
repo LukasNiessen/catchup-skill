@@ -36,9 +36,6 @@ MONTH_NAME_MAPPING = {
     "dec": 12, "december": 12,
 }
 
-# Preserve the original variable name for API compatibility
-MONTH_MAP = MONTH_NAME_MAPPING
-
 
 def detect_date_in_url(page_url: str) -> Optional[str]:
     """
@@ -77,10 +74,6 @@ def detect_date_in_url(page_url: str) -> Optional[str]:
             return "{}-{}-{}".format(year_val, month_val, day_val)
 
     return None
-
-
-# Preserve the original function name for API compatibility
-extract_date_from_url = detect_date_in_url
 
 
 def detect_date_in_text(content_text: str) -> Optional[str]:
@@ -174,10 +167,6 @@ def detect_date_in_text(content_text: str) -> Optional[str]:
     return None
 
 
-# Preserve the original function name for API compatibility
-extract_date_from_snippet = detect_date_in_text
-
-
 def analyze_date_signals(
     page_url: str,
     snippet_text: str,
@@ -217,10 +206,6 @@ def analyze_date_signals(
     return None, "low"
 
 
-# Preserve the original function name for API compatibility
-extract_date_signals = analyze_date_signals
-
-
 # Domains to exclude (Reddit and X are handled separately)
 BLOCKED_DOMAINS = {
     "reddit.com",
@@ -232,9 +217,6 @@ BLOCKED_DOMAINS = {
     "www.x.com",
     "mobile.twitter.com",
 }
-
-# Preserve the original variable name for API compatibility
-EXCLUDED_DOMAINS = BLOCKED_DOMAINS
 
 
 def isolate_domain(full_url: str) -> str:
@@ -258,10 +240,6 @@ def isolate_domain(full_url: str) -> str:
         return ""
 
 
-# Preserve the original function name for API compatibility
-extract_domain = isolate_domain
-
-
 def domain_is_blocked(full_url: str) -> bool:
     """
     Checks if URL is from a blocked domain (Reddit/X).
@@ -278,10 +256,6 @@ def domain_is_blocked(full_url: str) -> bool:
         return domain_name in BLOCKED_DOMAINS
     except Exception:
         return False
-
-
-# Preserve the original function name for API compatibility
-is_excluded_domain = domain_is_blocked
 
 
 def process_websearch_output(
@@ -381,10 +355,6 @@ def process_websearch_output(
     return processed_items
 
 
-# Preserve the original function name for API compatibility
-parse_websearch_results = process_websearch_output
-
-
 def transform_to_websearch_items(
     processed_items: List[Dict[str, Any]],
     period_start: str,
@@ -423,10 +393,6 @@ def transform_to_websearch_items(
     return converted_items
 
 
-# Preserve the original function name for API compatibility
-normalize_websearch_items = transform_to_websearch_items
-
-
 def eliminate_duplicates(item_collection: List[schema.WebSearchItem]) -> List[schema.WebSearchItem]:
     """
     Removes duplicate WebSearch items.
@@ -453,7 +419,3 @@ def eliminate_duplicates(item_collection: List[schema.WebSearchItem]) -> List[sc
         item_index += 1
 
     return unique_items
-
-
-# Preserve the original function name for API compatibility
-dedupe_websearch = eliminate_duplicates

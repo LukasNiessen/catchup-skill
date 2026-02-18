@@ -18,10 +18,6 @@ def compute_date_window(day_count: int = 30) -> Tuple[str, str]:
     return window_start.isoformat(), current_date.isoformat()
 
 
-# Preserve the original function name for API compatibility
-get_date_range = compute_date_window
-
-
 def interpret_date_string(date_input: Optional[str]) -> Optional[datetime]:
     """
     Parses a date string from various formats into a datetime object.
@@ -60,10 +56,6 @@ def interpret_date_string(date_input: Optional[str]) -> Optional[datetime]:
     return None
 
 
-# Preserve the original function name for API compatibility
-parse_date = interpret_date_string
-
-
 def convert_timestamp_to_date(unix_timestamp: Optional[float]) -> Optional[str]:
     """
     Transforms a Unix timestamp into an ISO date string (YYYY-MM-DD).
@@ -78,10 +70,6 @@ def convert_timestamp_to_date(unix_timestamp: Optional[float]) -> Optional[str]:
         return converted_datetime.date().isoformat()
     except (ValueError, TypeError, OSError):
         return None
-
-
-# Preserve the original function name for API compatibility
-timestamp_to_date = convert_timestamp_to_date
 
 
 def assess_date_reliability(
@@ -118,10 +106,6 @@ def assess_date_reliability(
         return 'low'
 
 
-# Preserve the original function name for API compatibility
-get_date_confidence = assess_date_reliability
-
-
 def calculate_age_in_days(date_input: Optional[str]) -> Optional[int]:
     """
     Determines how many days have elapsed since the given date.
@@ -138,10 +122,6 @@ def calculate_age_in_days(date_input: Optional[str]) -> Optional[int]:
         return difference.days
     except ValueError:
         return None
-
-
-# Preserve the original function name for API compatibility
-days_ago = calculate_age_in_days
 
 
 def compute_recency_score(date_input: Optional[str], maximum_age_days: int = 30) -> int:
@@ -167,7 +147,3 @@ def compute_recency_score(date_input: Optional[str], maximum_age_days: int = 30)
 
     freshness_ratio = 1 - (age_days / maximum_age_days)
     return int(100 * freshness_ratio)
-
-
-# Preserve the original function name for API compatibility
-recency_score = compute_recency_score

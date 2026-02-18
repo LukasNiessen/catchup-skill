@@ -200,8 +200,8 @@ def _print_summary_table(values: dict):
     """
     Prints a full configuration summary table grouped by section.
     """
-    config = env.get_config()
-    available = env.get_available_sources(config)
+    config = env.assemble_configuration()
+    available = env.determine_available_platforms(config)
 
     mode_descriptions = {
         "both": "Full mode (Reddit + X + YouTube + LinkedIn + Web)",
@@ -355,7 +355,7 @@ def bot_start() -> tuple:
         return False, "Bot is already running (PID {})".format(pid)
 
     # Validate config
-    config = env.get_config()
+    config = env.assemble_configuration()
     if not config.get("TELEGRAM_BOT_TOKEN"):
         return False, "TELEGRAM_BOT_TOKEN not set. Run setup first."
 
@@ -425,8 +425,8 @@ def show_config():
     Non-interactive — designed for Claude to read and present to the user.
     """
     current = _read_current_env()
-    config = env.get_config()
-    available = env.get_available_sources(config)
+    config = env.assemble_configuration()
+    available = env.determine_available_platforms(config)
 
     mode_descriptions = {
         "both": "Full mode (Reddit + X + YouTube + LinkedIn + Web)",

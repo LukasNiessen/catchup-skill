@@ -63,9 +63,10 @@ class TestParseCronExpression:
         with pytest.raises(ValueError, match="every minute"):
             parse_cron_expression("* 6 * * *")
 
-    def test_wildcard_hour_rejected(self):
-        with pytest.raises(ValueError, match="every hour"):
-            parse_cron_expression("0 * * * *")
+    def test_wildcard_hour_accepted(self):
+        result = parse_cron_expression("0 * * * *")
+        assert result["hour"] == "*"
+        assert result["minute"] == [0]
 
     def test_out_of_range_minute(self):
         with pytest.raises(ValueError, match="out of range"):

@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 # Storage location for cached artifacts
-STORAGE_DIRECTORY = Path.home() / ".cache" / "last30days"
+STORAGE_DIRECTORY = Path.home() / ".cache" / "briefbot"
 
 # Time-to-live settings for different cache types
 STANDARD_TTL_HOURS = 24
@@ -212,10 +212,3 @@ def set_cached_model(provider_name: str, model_identifier: str):
     selections[provider_name] = model_identifier
     selections['updated_at'] = datetime.now(timezone.utc).isoformat()
     persist_model_selections(selections)
-
-
-# Preserve original function names for API compatibility
-get_cache_key = compute_cache_identifier
-get_cache_path = resolve_cache_filepath
-is_cache_valid = verify_cache_validity
-MODEL_CACHE_FILE = MODEL_SELECTION_FILEPATH

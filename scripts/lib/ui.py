@@ -48,9 +48,6 @@ class TerminalStyles:
     NORMAL = '\033[0m'
 
 
-# Preserve the original class name for API compatibility
-Colors = TerminalStyles
-
 # Respect NO_COLOR convention (https://no-color.org/)
 if "NO_COLOR" in os.environ:
     for _attr in ("MAGENTA", "AZURE", "TEAL", "LIME", "AMBER", "CRIMSON",
@@ -61,10 +58,6 @@ if "NO_COLOR" in os.environ:
 HEADER_ART = """{}{}\n   \u2588\u2588\u2588\u2588\u2588\u2588\u2557 \u2588\u2588\u2588\u2588\u2588\u2557 \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2557 \u2588\u2588\u2588\u2588\u2588\u2588\u2557\u2588\u2588\u2557  \u2588\u2588\u2557\u2588\u2588\u2557   \u2588\u2588\u2557\u2588\u2588\u2588\u2588\u2588\u2588\u2557\n  \u2588\u2588\u2554\u2550\u2550\u2550\u2550\u255d\u2588\u2588\u2554\u2550\u2550\u2588\u2588\u2557\u255a\u2550\u2550\u2588\u2588\u2554\u2550\u2550\u255d\u2588\u2588\u2554\u2550\u2550\u2550\u2550\u255d\u2588\u2588\u2551  \u2588\u2588\u2551\u2588\u2588\u2551   \u2588\u2588\u2551\u2588\u2588\u2554\u2550\u2550\u2588\u2588\u2557\n  \u2588\u2588\u2551     \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2551   \u2588\u2588\u2551   \u2588\u2588\u2551     \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2551\u2588\u2588\u2551   \u2588\u2588\u2551\u2588\u2588\u2588\u2588\u2588\u2588\u2554\u255d\n  \u2588\u2588\u2551     \u2588\u2588\u2554\u2550\u2550\u2588\u2588\u2551   \u2588\u2588\u2551   \u2588\u2588\u2551     \u2588\u2588\u2554\u2550\u2550\u2588\u2588\u2551\u2588\u2588\u2551   \u2588\u2588\u2551\u2588\u2588\u2554\u2550\u2550\u2550\u255d\n  \u255a\u2588\u2588\u2588\u2588\u2588\u2588\u2557\u2588\u2588\u2551  \u2588\u2588\u2551   \u2588\u2588\u2551   \u255a\u2588\u2588\u2588\u2588\u2588\u2588\u2557\u2588\u2588\u2551  \u2588\u2588\u2551\u255a\u2588\u2588\u2588\u2588\u2588\u2588\u2554\u255d\u2588\u2588\u2551\n   \u255a\u2550\u2550\u2550\u2550\u2550\u255d\u255a\u2550\u255d  \u255a\u2550\u255d   \u255a\u2550\u255d    \u255a\u2550\u2550\u2550\u2550\u2550\u255d\u255a\u2550\u255d  \u255a\u2550\u255d \u255a\u2550\u2550\u2550\u2550\u2550\u255d \u255a\u2550\u255d\n{}{}  30 days of research. 30 seconds of work.{}\n""".format(TerminalStyles.MAGENTA, TerminalStyles.EMPHASIZED, TerminalStyles.NORMAL, TerminalStyles.SUBDUED, TerminalStyles.NORMAL)
 
 COMPACT_HEADER = "{}{}/briefbot{} {}\xb7 researching...{}".format(TerminalStyles.MAGENTA, TerminalStyles.EMPHASIZED, TerminalStyles.NORMAL, TerminalStyles.SUBDUED, TerminalStyles.NORMAL)
-
-# Preserve the original variable names for API compatibility
-BANNER = HEADER_ART
-MINI_BANNER = COMPACT_HEADER
 
 # Status messages for Reddit phase
 REDDIT_STATUS_VARIANTS = [
@@ -122,13 +115,6 @@ TTS_STATUS_VARIANTS = [
     "Synthesizing audio...",
 ]
 
-# Preserve the original variable names for API compatibility
-REDDIT_MESSAGES = REDDIT_STATUS_VARIANTS
-X_MESSAGES = X_STATUS_VARIANTS
-ENRICHING_MESSAGES = ENRICHMENT_STATUS_VARIANTS
-PROCESSING_MESSAGES = PROCESSING_STATUS_VARIANTS
-WEB_ONLY_MESSAGES = WEB_STATUS_VARIANTS
-
 # Promotional content for users without API keys
 UPGRADE_NOTICE = """
 {}{}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501{}
@@ -166,10 +152,6 @@ Setup: Edit ~/.config/briefbot/.env
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 """
 
-# Preserve the original variable names for API compatibility
-PROMO_MESSAGE = UPGRADE_NOTICE
-PROMO_MESSAGE_PLAIN = UPGRADE_NOTICE_PLAIN
-
 # Shorter hints for single missing key
 SINGLE_KEY_HINTS = {
     "reddit": "\n{}\U0001f4a1 Tip: Add {}{}{}{} to ~/.config/briefbot/.env for Reddit, YouTube & LinkedIn data!{}\n".format(TerminalStyles.SUBDUED, TerminalStyles.AMBER, "OPENAI_API_KEY", TerminalStyles.NORMAL, TerminalStyles.SUBDUED, TerminalStyles.NORMAL),
@@ -181,20 +163,9 @@ SINGLE_KEY_HINTS_PLAIN = {
     "x": "\n\U0001f4a1 Tip: Add XAI_API_KEY to ~/.config/briefbot/.env for X/Twitter data with real likes & reposts!\n",
 }
 
-# Preserve the original variable names for API compatibility
-PROMO_SINGLE_KEY = SINGLE_KEY_HINTS
-PROMO_SINGLE_KEY_PLAIN = SINGLE_KEY_HINTS_PLAIN
-
 # Animation frames
 ROTATION_FRAMES = ['\u280b', '\u2819', '\u2839', '\u2838', '\u283c', '\u2834', '\u2826', '\u2827', '\u2807', '\u280f']
 ELLIPSIS_FRAMES = ['   ', '.  ', '.. ', '...']
-
-# Preserve the original variable names for API compatibility
-SPINNER_FRAMES = ROTATION_FRAMES
-DOTS_FRAMES = ELLIPSIS_FRAMES
-
-# Preserve the original constant for API compatibility
-IS_TTY = TERMINAL_AVAILABLE
 
 
 class AnimatedIndicator:
@@ -244,10 +215,6 @@ class AnimatedIndicator:
         if completion_message:
             sys.stderr.write("{}\u2713{} {}\n".format(TerminalStyles.LIME, TerminalStyles.NORMAL, completion_message))
         sys.stderr.flush()
-
-
-# Preserve the original class name for API compatibility
-Spinner = AnimatedIndicator
 
 
 class ResearchProgressTracker:
@@ -383,10 +350,6 @@ class ResearchProgressTracker:
         sys.stderr.flush()
 
 
-# Preserve the original class name for API compatibility
-ProgressDisplay = ResearchProgressTracker
-
-
 def emit_phase_status(phase_name: str, status_text: str):
     """Outputs a phase status message."""
     phase_styles = {
@@ -399,7 +362,3 @@ def emit_phase_status(phase_name: str, status_text: str):
     style_code = phase_styles.get(phase_name, TerminalStyles.NORMAL)
     sys.stderr.write("{}\u25b8{} {}\n".format(style_code, TerminalStyles.NORMAL, status_text))
     sys.stderr.flush()
-
-
-# Preserve the original function name for API compatibility
-print_phase = emit_phase_status

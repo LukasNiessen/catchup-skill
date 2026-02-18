@@ -17,10 +17,6 @@ def initialize_output_directory():
     ARTIFACT_DIRECTORY.mkdir(parents=True, exist_ok=True)
 
 
-# Preserve the original function name for API compatibility
-ensure_output_dir = initialize_output_directory
-
-
 def _evaluate_content_freshness(research_report: schema.Report) -> dict:
     """Evaluates what proportion of results are genuinely from the target period."""
     reddit_fresh_count = 0
@@ -79,10 +75,6 @@ def _evaluate_content_freshness(research_report: schema.Report) -> dict:
     }
 
 
-# Preserve the original function name for API compatibility
-_assess_data_freshness = _evaluate_content_freshness
-
-
 def generate_compact_output(research_report: schema.Report, maximum_per_source: int = 15, absent_credentials: str = "none") -> str:
     """
     Produces condensed output suitable for synthesis by Claude.
@@ -117,7 +109,7 @@ def generate_compact_output(research_report: schema.Report, maximum_per_source: 
         output_lines.append("**\u26a1 Want better results?** Add API keys to unlock Reddit & X data:")
         output_lines.append("- `OPENAI_API_KEY` \u2192 Reddit threads with real upvotes & comments")
         output_lines.append("- `XAI_API_KEY` \u2192 X posts with real likes & reposts")
-        output_lines.append("- Edit `~/.config/last30days/.env` to add keys")
+        output_lines.append("- Edit `~/.config/briefbot/.env` to add keys")
         output_lines.append("---")
         output_lines.append("")
 
@@ -321,10 +313,6 @@ def generate_compact_output(research_report: schema.Report, maximum_per_source: 
     return "\n".join(output_lines)
 
 
-# Preserve the original function name for API compatibility
-render_compact = generate_compact_output
-
-
 def generate_context_fragment(research_report: schema.Report) -> str:
     """
     Produces a reusable context fragment for embedding.
@@ -391,10 +379,6 @@ def generate_context_fragment(research_report: schema.Report) -> str:
     output_lines.append("")
 
     return "\n".join(output_lines)
-
-
-# Preserve the original function name for API compatibility
-render_context_snippet = generate_context_fragment
 
 
 def generate_comprehensive_report(research_report: schema.Report) -> str:
@@ -558,10 +542,6 @@ def generate_comprehensive_report(research_report: schema.Report) -> str:
     return "\n".join(output_lines)
 
 
-# Preserve the original function name for API compatibility
-render_full_report = generate_comprehensive_report
-
-
 def persist_all_artifacts(
     research_report: schema.Report,
     raw_openai_response: Optional[dict] = None,
@@ -625,14 +605,6 @@ def persist_all_artifacts(
         file_handle.close()
 
 
-# Preserve the original function name for API compatibility
-write_outputs = persist_all_artifacts
-
-
 def retrieve_context_filepath() -> str:
     """Returns the filesystem path to the context fragment file."""
     return str(ARTIFACT_DIRECTORY / "briefbot.context.md")
-
-
-# Preserve the original function name for API compatibility
-get_context_path = retrieve_context_filepath

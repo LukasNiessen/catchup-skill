@@ -194,7 +194,7 @@ def search_reddit(
         }
 
         try:
-            return http.post(OPENAI_API_ENDPOINT, request_payload, request_headers=request_headers, timeout_seconds=request_timeout)
+            return http.perform_post_request(OPENAI_API_ENDPOINT, request_payload, request_headers=request_headers, timeout_seconds=request_timeout)
         except http.HTTPError as api_error:
             most_recent_error = api_error
             if _is_model_access_error(api_error):

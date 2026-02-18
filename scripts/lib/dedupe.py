@@ -25,10 +25,6 @@ def standardize_text(raw_text: str) -> str:
     return processed.strip()
 
 
-# Preserve the original function name for API compatibility
-normalize_text = standardize_text
-
-
 def extract_character_ngrams(raw_text: str, gram_size: int = 3) -> Set[str]:
     """
     Extracts overlapping character sequences from text.
@@ -52,10 +48,6 @@ def extract_character_ngrams(raw_text: str, gram_size: int = 3) -> Set[str]:
     return ngram_collection
 
 
-# Preserve the original function name for API compatibility
-get_ngrams = extract_character_ngrams
-
-
 def compute_jaccard_coefficient(collection_a: Set[str], collection_b: Set[str]) -> float:
     """
     Measures similarity between two sets using Jaccard index.
@@ -74,10 +66,6 @@ def compute_jaccard_coefficient(collection_a: Set[str], collection_b: Set[str]) 
     return shared_elements / total_elements
 
 
-# Preserve the original function name for API compatibility
-jaccard_similarity = compute_jaccard_coefficient
-
-
 def extract_comparable_text(
     content_item: Union[schema.RedditItem, schema.XItem, schema.YouTubeItem, schema.LinkedInItem]
 ) -> str:
@@ -93,10 +81,6 @@ def extract_comparable_text(
     else:
         # XItem and LinkedInItem both use 'text' field
         return content_item.text
-
-
-# Preserve the original function name for API compatibility
-get_item_text = extract_comparable_text
 
 
 def identify_duplicate_pairs(
@@ -133,10 +117,6 @@ def identify_duplicate_pairs(
     return duplicate_pairs
 
 
-# Preserve the original function name for API compatibility
-find_duplicates = identify_duplicate_pairs
-
-
 def remove_near_duplicates(
     content_items: List[Union[schema.RedditItem, schema.XItem, schema.YouTubeItem, schema.LinkedInItem]],
     similarity_threshold: float = 0.7,
@@ -170,10 +150,6 @@ def remove_near_duplicates(
         item_index += 1
 
     return filtered_items
-
-
-# Preserve the original function name for API compatibility
-dedupe_items = remove_near_duplicates
 
 
 def dedupe_reddit(

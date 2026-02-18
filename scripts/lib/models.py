@@ -12,8 +12,8 @@ from . import cache, http
 
 
 def _log(message: str):
-    """Emit a debug log line to stderr, gated by LAST30DAYS_DEBUG."""
-    if os.environ.get("LAST30DAYS_DEBUG", "").lower() in ("1", "true", "yes"):
+    """Emit a debug log line to stderr, gated by BRIEFBOT_DEBUG."""
+    if os.environ.get("BRIEFBOT_DEBUG", "").lower() in ("1", "true", "yes"):
         sys.stderr.write("[MODELS] {}\n".format(message))
         sys.stderr.flush()
 
@@ -55,10 +55,6 @@ def extract_version_tuple(model_identifier: str) -> Optional[Tuple[int, ...]]:
     return tuple(int(component) for component in version_components)
 
 
-# Preserve the original function name for API compatibility
-parse_version = extract_version_tuple
-
-
 def is_standard_gpt_model(model_identifier: str) -> bool:
     """
     Determines if a model is a mainline GPT model (not a specialized variant).
@@ -81,10 +77,6 @@ def is_standard_gpt_model(model_identifier: str) -> bool:
             return False
 
     return True
-
-
-# Preserve the original function name for API compatibility
-is_mainline_openai_model = is_standard_gpt_model
 
 
 def choose_openai_model(
@@ -117,7 +109,7 @@ def choose_openai_model(
     else:
         try:
             authorization_headers = {"Authorization": "Bearer {}".format(api_credential)}
-            api_response = http.get(OPENAI_MODEL_LISTING_ENDPOINT, request_headers=authorization_headers)
+            api_response = http.perform_get_request(OPENAI_MODEL_LISTING_ENDPOINT, request_headers=authorization_headers)
             available_models = api_response.get("data", [])
         except http.HTTPError:
             return OPENAI_DEFAULT_MODELS[0]
@@ -144,10 +136,6 @@ def choose_openai_model(
     cache.set_cached_model("openai", optimal_model)
 
     return optimal_model
-
-
-# Preserve the original function name for API compatibility
-select_openai_model = choose_openai_model
 
 
 def choose_xai_model(
@@ -189,7 +177,7 @@ def choose_xai_model(
     else:
         try:
             authorization_headers = {"Authorization": "Bearer {}".format(api_credential)}
-            api_response = http.get(XAI_MODEL_LISTING_ENDPOINT, request_headers=authorization_headers)
+            api_response = http.perform_get_request(XAI_MODEL_LISTING_ENDPOINT, request_headers=authorization_headers)
             available_models = api_response.get("data", [])
             _log("  Fetched {} models from xAI API".format(len(available_models)))
         except http.HTTPError as err:
@@ -224,10 +212,6 @@ def choose_xai_model(
     _log("  Available models were: {}".format(sorted(available_ids)))
     cache.set_cached_model("xai", XAI_HARDCODED_FALLBACK)
     return XAI_HARDCODED_FALLBACK
-
-
-# Preserve the original function name for API compatibility
-select_xai_model = choose_xai_model
 
 
 def get_models(

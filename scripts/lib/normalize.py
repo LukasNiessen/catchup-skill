@@ -93,7 +93,7 @@ def normalize_reddit_items(
 
         # Assess date reliability
         item_date = raw_item.get("date")
-        date_reliability = dates.get_date_confidence(item_date, range_start, range_end)
+        date_reliability = dates.assess_date_reliability(item_date, range_start, range_end)
 
         # Construct normalized item
         normalized_item = schema.RedditItem(
@@ -142,7 +142,7 @@ def normalize_x_items(
 
         # Assess date reliability
         item_date = raw_item.get("date")
-        date_reliability = dates.get_date_confidence(item_date, range_start, range_end)
+        date_reliability = dates.assess_date_reliability(item_date, range_start, range_end)
 
         # Construct normalized item
         normalized_item = schema.XItem(
@@ -188,7 +188,7 @@ def normalize_youtube_items(
 
         # Assess date reliability
         item_date = raw_item.get("date")
-        date_reliability = dates.get_date_confidence(item_date, range_start, range_end)
+        date_reliability = dates.assess_date_reliability(item_date, range_start, range_end)
 
         # Construct normalized item
         normalized_item = schema.YouTubeItem(
@@ -235,7 +235,7 @@ def normalize_linkedin_items(
 
         # Assess date reliability
         item_date = raw_item.get("date")
-        date_reliability = dates.get_date_confidence(item_date, range_start, range_end)
+        date_reliability = dates.assess_date_reliability(item_date, range_start, range_end)
 
         # Construct normalized item
         normalized_item = schema.LinkedInItem(

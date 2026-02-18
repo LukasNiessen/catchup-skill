@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * bird-search.mjs - Vendored Bird CLI search wrapper for /last30days.
+ * bird-search.mjs - Vendored Bird CLI search wrapper for /briefbot.
  * Subset of @steipete/bird v0.8.0 (MIT License, Peter Steinberger).
  *
  * Usage:

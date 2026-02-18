@@ -509,7 +509,3 @@ def instantiate_report(
         openai_model_used=openai_model,
         xai_model_used=xai_model,
     )
-
-
-# Preserve the original function name for API compatibility
-create_report = instantiate_report

@@ -34,10 +34,6 @@ def safe_logarithm(metric_value: Optional[int]) -> float:
     return math.log1p(metric_value)
 
 
-# Preserve the original function name for API compatibility
-log1p_safe = safe_logarithm
-
-
 def calculate_reddit_engagement_value(engagement_metrics: Optional[schema.Engagement]) -> Optional[float]:
     """
     Derives raw engagement value for Reddit content.
@@ -55,10 +51,6 @@ def calculate_reddit_engagement_value(engagement_metrics: Optional[schema.Engage
     ratio_component = (engagement_metrics.upvote_ratio or 0.5) * 10
 
     return 0.55 * score_component + 0.40 * comments_component + 0.05 * ratio_component
-
-
-# Preserve the original function name for API compatibility
-compute_reddit_engagement_raw = calculate_reddit_engagement_value
 
 
 def calculate_x_engagement_value(engagement_metrics: Optional[schema.Engagement]) -> Optional[float]:
@@ -81,10 +73,6 @@ def calculate_x_engagement_value(engagement_metrics: Optional[schema.Engagement]
     return 0.55 * likes_component + 0.25 * reposts_component + 0.15 * replies_component + 0.05 * quotes_component
 
 
-# Preserve the original function name for API compatibility
-compute_x_engagement_raw = calculate_x_engagement_value
-
-
 def calculate_youtube_engagement_value(engagement_metrics: Optional[schema.Engagement]) -> Optional[float]:
     """
     Derives raw engagement value for YouTube content.
@@ -104,10 +92,6 @@ def calculate_youtube_engagement_value(engagement_metrics: Optional[schema.Engag
     return 0.70 * views_component + 0.30 * likes_component
 
 
-# Preserve the original function name for API compatibility
-compute_youtube_engagement_raw = calculate_youtube_engagement_value
-
-
 def calculate_linkedin_engagement_value(engagement_metrics: Optional[schema.Engagement]) -> Optional[float]:
     """
     Derives raw engagement value for LinkedIn content.
@@ -124,10 +108,6 @@ def calculate_linkedin_engagement_value(engagement_metrics: Optional[schema.Enga
     comments_component = safe_logarithm(engagement_metrics.comments)
 
     return 0.60 * reactions_component + 0.40 * comments_component
-
-
-# Preserve the original function name for API compatibility
-compute_linkedin_engagement_raw = calculate_linkedin_engagement_value
 
 
 def scale_to_percentage(raw_values: List[float], fallback: float = 50) -> List[float]:
@@ -167,10 +147,6 @@ def scale_to_percentage(raw_values: List[float], fallback: float = 50) -> List[f
     return scaled_results
 
 
-# Preserve the original function name for API compatibility
-normalize_to_100 = scale_to_percentage
-
-
 def compute_reddit_scores(item_collection: List[schema.RedditItem]) -> List[schema.RedditItem]:
     """
     Assigns scores to Reddit items based on the weighted formula.
@@ -202,7 +178,7 @@ def compute_reddit_scores(item_collection: List[schema.RedditItem]) -> List[sche
         relevance_component = int(current_item.relevance * 100)
 
         # Recency component
-        recency_component = dates.recency_score(current_item.date)
+        recency_component = dates.compute_recency_score(current_item.date)
 
         # Engagement component
         if scaled_engagement[item_index] is not None:
@@ -238,10 +214,6 @@ def compute_reddit_scores(item_collection: List[schema.RedditItem]) -> List[sche
         item_index += 1
 
     return item_collection
-
-
-# Preserve the original function name for API compatibility
-score_reddit_items = compute_reddit_scores
 
 
 def compute_x_scores(item_collection: List[schema.XItem]) -> List[schema.XItem]:
@@ -275,7 +247,7 @@ def compute_x_scores(item_collection: List[schema.XItem]) -> List[schema.XItem]:
         relevance_component = int(current_item.relevance * 100)
 
         # Recency component
-        recency_component = dates.recency_score(current_item.date)
+        recency_component = dates.compute_recency_score(current_item.date)
 
         # Engagement component
         if scaled_engagement[item_index] is not None:
@@ -311,10 +283,6 @@ def compute_x_scores(item_collection: List[schema.XItem]) -> List[schema.XItem]:
         item_index += 1
 
     return item_collection
-
-
-# Preserve the original function name for API compatibility
-score_x_items = compute_x_scores
 
 
 def compute_youtube_scores(item_collection: List[schema.YouTubeItem]) -> List[schema.YouTubeItem]:
@@ -348,7 +316,7 @@ def compute_youtube_scores(item_collection: List[schema.YouTubeItem]) -> List[sc
         relevance_component = int(current_item.relevance * 100)
 
         # Recency component
-        recency_component = dates.recency_score(current_item.date)
+        recency_component = dates.compute_recency_score(current_item.date)
 
         # Engagement component
         if scaled_engagement[item_index] is not None:
@@ -384,10 +352,6 @@ def compute_youtube_scores(item_collection: List[schema.YouTubeItem]) -> List[sc
         item_index += 1
 
     return item_collection
-
-
-# Preserve the original function name for API compatibility
-score_youtube_items = compute_youtube_scores
 
 
 def compute_linkedin_scores(item_collection: List[schema.LinkedInItem]) -> List[schema.LinkedInItem]:
@@ -421,7 +385,7 @@ def compute_linkedin_scores(item_collection: List[schema.LinkedInItem]) -> List[
         relevance_component = int(current_item.relevance * 100)
 
         # Recency component
-        recency_component = dates.recency_score(current_item.date)
+        recency_component = dates.compute_recency_score(current_item.date)
 
         # Engagement component
         if scaled_engagement[item_index] is not None:
@@ -459,10 +423,6 @@ def compute_linkedin_scores(item_collection: List[schema.LinkedInItem]) -> List[
     return item_collection
 
 
-# Preserve the original function name for API compatibility
-score_linkedin_items = compute_linkedin_scores
-
-
 def compute_websearch_scores(item_collection: List[schema.WebSearchItem]) -> List[schema.WebSearchItem]:
     """
     Assigns scores to WebSearch items using the engagement-free formula.
@@ -492,7 +452,7 @@ def compute_websearch_scores(item_collection: List[schema.WebSearchItem]) -> Lis
         relevance_component = int(current_item.relevance * 100)
 
         # Recency component
-        recency_component = dates.recency_score(current_item.date)
+        recency_component = dates.compute_recency_score(current_item.date)
 
         # Record component scores (engagement is 0 - no data available)
         current_item.subs = schema.SubScores(
@@ -523,10 +483,6 @@ def compute_websearch_scores(item_collection: List[schema.WebSearchItem]) -> Lis
         item_index += 1
 
     return item_collection
-
-
-# Preserve the original function name for API compatibility
-score_websearch_items = compute_websearch_scores
 
 
 def arrange_by_score(item_collection: List[Union[schema.RedditItem, schema.XItem, schema.YouTubeItem, schema.LinkedInItem, schema.WebSearchItem]]) -> List:
@@ -565,7 +521,3 @@ def arrange_by_score(item_collection: List[Union[schema.RedditItem, schema.XItem
         return (score_key, date_key, source_rank, content_text)
 
     return sorted(item_collection, key=ordering_key)
-
-
-# Preserve the original function name for API compatibility
-sort_items = arrange_by_score

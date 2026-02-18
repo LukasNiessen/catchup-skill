@@ -71,7 +71,7 @@ def main():
         print("Error: Content file is empty: {}".format(content_path), file=sys.stderr)
         sys.exit(1)
 
-    config = env.get_config()
+    config = env.assemble_configuration()
     audio_path = None
 
     # Generate audio first so it can be attached to the email

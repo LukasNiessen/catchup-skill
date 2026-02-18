@@ -16,10 +16,10 @@ from urllib.parse import urlencode
 REQUEST_TIMEOUT_SECONDS = 30
 MAXIMUM_RETRY_ATTEMPTS = 3
 RETRY_BACKOFF_SECONDS = 1.0
-CLIENT_IDENTIFIER = "last30days-skill/1.0 (Claude Code Skill)"
+CLIENT_IDENTIFIER = "briefbot-skill/1.0 (Claude Code Skill)"
 
 # Debug mode flag (controlled by environment variable)
-DEBUG = os.environ.get("LAST30DAYS_DEBUG", "").lower() in ("1", "true", "yes")
+DEBUG = os.environ.get("BRIEFBOT_DEBUG", "").lower() in ("1", "true", "yes")
 
 
 def emit_debug_message(message_text: str):
@@ -31,10 +31,6 @@ def emit_debug_message(message_text: str):
     if DEBUG:
         sys.stderr.write("[DEBUG] {}\n".format(message_text))
         sys.stderr.flush()
-
-
-# Preserve the original function name for API compatibility
-log = emit_debug_message
 
 
 class HTTPError(Exception):
@@ -177,10 +173,6 @@ def execute_http_request(
     raise HTTPError("Request failed with no error details")
 
 
-# Preserve the original function name for API compatibility
-request = execute_http_request
-
-
 def perform_get_request(
     target_url: str,
     request_headers: Optional[Dict[str, str]] = None,
@@ -188,10 +180,6 @@ def perform_get_request(
 ) -> Dict[str, Any]:
     """Convenience wrapper for GET requests."""
     return execute_http_request("GET", target_url, request_headers=request_headers, **additional_options)
-
-
-# Preserve the original function name for API compatibility
-get = perform_get_request
 
 
 def perform_post_request(
@@ -207,10 +195,6 @@ def perform_post_request(
         json_payload=json_payload,
         **additional_options
     )
-
-
-# Preserve the original function name for API compatibility
-post = perform_post_request
 
 
 def fetch_reddit_thread_data(thread_path: str) -> Dict[str, Any]:
@@ -240,7 +224,3 @@ def fetch_reddit_thread_data(thread_path: str) -> Dict[str, Any]:
     }
 
     return perform_get_request(full_url, request_headers=custom_headers)
-
-
-# Preserve the original function name for API compatibility
-get_reddit_json = fetch_reddit_thread_data

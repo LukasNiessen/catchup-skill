@@ -10,8 +10,8 @@ from typing import Optional, Dict, Any
 
 
 def _log(message: str):
-    """Emit a debug log line to stderr, gated by LAST30DAYS_DEBUG."""
-    if os.environ.get("LAST30DAYS_DEBUG", "").lower() in ("1", "true", "yes"):
+    """Emit a debug log line to stderr, gated by BRIEFBOT_DEBUG."""
+    if os.environ.get("BRIEFBOT_DEBUG", "").lower() in ("1", "true", "yes"):
         sys.stderr.write("[ENV] {}\n".format(message))
         sys.stderr.flush()
 
@@ -74,10 +74,6 @@ def parse_environment_file(filepath: Path) -> Dict[str, str]:
 
     _log("Parsed {} key-value pairs from config file".format(len(parsed_values)))
     return parsed_values
-
-
-# Preserve the original function name for API compatibility
-load_env_file = parse_environment_file
 
 
 def assemble_configuration() -> Dict[str, Any]:
@@ -157,17 +153,9 @@ def assemble_configuration() -> Dict[str, Any]:
     return configuration
 
 
-# Preserve the original function name for API compatibility
-get_config = assemble_configuration
-
-
 def settings_file_exists() -> bool:
     """Checks whether the configuration file has been created."""
     return SETTINGS_FILEPATH.exists()
-
-
-# Preserve the original function name for API compatibility
-config_exists = settings_file_exists
 
 
 def determine_available_platforms(configuration: Dict[str, Any]) -> str:
@@ -207,10 +195,6 @@ def determine_available_platforms(configuration: Dict[str, Any]) -> str:
         return "web"
 
 
-# Preserve the original function name for API compatibility
-get_available_sources = determine_available_platforms
-
-
 def identify_missing_credentials(configuration: Dict[str, Any]) -> str:
     """
     Determines which API keys are not configured.
@@ -236,10 +220,6 @@ def identify_missing_credentials(configuration: Dict[str, Any]) -> str:
         return "reddit"
     else:
         return "both"
-
-
-# Preserve the original function name for API compatibility
-get_missing_keys = identify_missing_credentials
 
 
 def is_bird_x_available() -> bool:

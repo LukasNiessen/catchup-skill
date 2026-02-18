@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
 from lib.email_sender import (
     _build_email_message,
-    _markdown_to_basic_html,
+    _markdown_to_news_html,
     parse_recipients,
     validate_smtp_config,
 )
@@ -72,39 +72,40 @@ class TestValidateSmtpConfig:
 
 
 class TestMarkdownToBasicHtml:
-    """Tests for _markdown_to_basic_html()."""
+    """Tests for _markdown_to_news_html()."""
 
     def test_headers(self):
-        html = _markdown_to_basic_html("# Title")
-        assert "<h1>Title</h1>" in html
+        html = _markdown_to_news_html("# Title")
+        assert "<h1" in html and "Title</h1>" in html
 
     def test_h2(self):
-        html = _markdown_to_basic_html("## Subtitle")
-        assert "<h2>Subtitle</h2>" in html
+        html = _markdown_to_news_html("## Subtitle")
+        assert "<h2" in html and "Subtitle</h2>" in html
 
     def test_bold(self):
-        html = _markdown_to_basic_html("This is **bold** text")
+        html = _markdown_to_news_html("This is **bold** text")
         assert "<strong>bold</strong>" in html
 
     def test_italic(self):
-        html = _markdown_to_basic_html("This is *italic* text")
+        html = _markdown_to_news_html("This is *italic* text")
         assert "<em>italic</em>" in html
 
     def test_link(self):
-        html = _markdown_to_basic_html("[Click here](https://example.com)")
-        assert '<a href="https://example.com">Click here</a>' in html
+        html = _markdown_to_news_html("[Click here](https://example.com)")
+        assert 'href="https://example.com"' in html
+        assert "Click here</a>" in html
 
     def test_horizontal_rule(self):
-        html = _markdown_to_basic_html("---")
-        assert "<hr>" in html
+        html = _markdown_to_news_html("---")
+        assert "<hr" in html
 
     def test_list_items(self):
-        html = _markdown_to_basic_html("- Item one\n- Item two")
-        assert "<li>Item one</li>" in html
-        assert "<li>Item two</li>" in html
+        html = _markdown_to_news_html("- Item one\n- Item two")
+        assert "Item one</li>" in html
+        assert "Item two</li>" in html
 
     def test_inline_code(self):
-        html = _markdown_to_basic_html("Run `pip install`")
+        html = _markdown_to_news_html("Run `pip install`")
         assert "<code" in html
         assert "pip install" in html
 

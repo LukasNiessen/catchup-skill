@@ -24,7 +24,7 @@ class CompactRenderVerification(unittest.TestCase):
             xai_model_used="grok-4-latest",
         )
 
-        computed_result = render.render_compact(test_report)
+        computed_result = render.generate_compact_output(test_report)
 
         self.assertIn("test topic", computed_result)
         self.assertIn("2026-01-01", computed_result)
@@ -52,7 +52,7 @@ class CompactRenderVerification(unittest.TestCase):
             ],
         )
 
-        computed_result = render.render_compact(test_report)
+        computed_result = render.generate_compact_output(test_report)
 
         self.assertIn("R1", computed_result)
         self.assertIn("Test Thread", computed_result)
@@ -67,7 +67,7 @@ class CompactRenderVerification(unittest.TestCase):
             mode="reddit-only",
         )
 
-        computed_result = render.render_compact(test_report)
+        computed_result = render.generate_compact_output(test_report)
 
         self.assertIn("reddit-only", computed_result)
 
@@ -82,7 +82,7 @@ class ContextSnippetRenderVerification(unittest.TestCase):
             mode="both",
         )
 
-        computed_result = render.render_context_snippet(test_report)
+        computed_result = render.generate_context_fragment(test_report)
 
         self.assertIn("Claude Code Skills", computed_result)
         self.assertIn("Last 30 Days", computed_result)
@@ -100,7 +100,7 @@ class FullReportRenderVerification(unittest.TestCase):
             xai_model_used="grok-4-latest",
         )
 
-        computed_result = render.render_full_report(test_report)
+        computed_result = render.generate_comprehensive_report(test_report)
 
         self.assertIn("# test topic", computed_result)
         self.assertIn("## Models Used", computed_result)
@@ -109,7 +109,7 @@ class FullReportRenderVerification(unittest.TestCase):
 
 class ContextPathRetrievalVerification(unittest.TestCase):
     def test_returns_path_string(self):
-        computed_result = render.get_context_path()
+        computed_result = render.retrieve_context_filepath()
         self.assertIsInstance(computed_result, str)
         self.assertIn("briefbot.context.md", computed_result)
 

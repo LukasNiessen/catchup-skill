@@ -27,10 +27,6 @@ def parse_reddit_url_path(thread_url: str) -> Optional[str]:
         return None
 
 
-# Preserve the original function name for API compatibility
-extract_reddit_path = parse_reddit_url_path
-
-
 def retrieve_thread_json(thread_url: str, mock_data: Optional[Dict] = None) -> Optional[Dict[str, Any]]:
     """
     Fetches the JSON representation of a Reddit thread.
@@ -51,14 +47,10 @@ def retrieve_thread_json(thread_url: str, mock_data: Optional[Dict] = None) -> O
         return None
 
     try:
-        response_data = http.get_reddit_json(url_path)
+        response_data = http.fetch_reddit_thread_data(url_path)
         return response_data
     except http.HTTPError:
         return None
-
-
-# Preserve the original function name for API compatibility
-fetch_thread_data = retrieve_thread_json
 
 
 def extract_thread_components(raw_data: Any) -> Dict[str, Any]:
@@ -132,10 +124,6 @@ def extract_thread_components(raw_data: Any) -> Dict[str, Any]:
     return components
 
 
-# Preserve the original function name for API compatibility
-parse_thread_data = extract_thread_components
-
-
 def select_top_comments(comment_list: List[Dict], maximum_count: int = 10) -> List[Dict[str, Any]]:
     """
     Selects the highest-scored comments from a thread.
@@ -157,10 +145,6 @@ def select_top_comments(comment_list: List[Dict], maximum_count: int = 10) -> Li
     )
 
     return sorted_comments[:maximum_count]
-
-
-# Preserve the original function name for API compatibility
-get_top_comments = select_top_comments
 
 
 def distill_comment_insights(comment_list: List[Dict], maximum_count: int = 7) -> List[str]:
@@ -225,10 +209,6 @@ def distill_comment_insights(comment_list: List[Dict], maximum_count: int = 7) -
     return insights_collected
 
 
-# Preserve the original function name for API compatibility
-extract_comment_insights = distill_comment_insights
-
-
 def enrich_reddit_item(
     item_data: Dict[str, Any],
     mock_thread_json: Optional[Dict] = None,
@@ -268,7 +248,7 @@ def enrich_reddit_item(
         creation_timestamp = submission_data.get("created_utc")
 
         if creation_timestamp is not None:
-            item_data["date"] = dates.timestamp_to_date(creation_timestamp)
+            item_data["date"] = dates.convert_timestamp_to_date(creation_timestamp)
 
     # Extract top comments
     top_comments = select_top_comments(comment_data)
@@ -280,7 +260,7 @@ def enrich_reddit_item(
 
         formatted_comment = {
             "score": comment.get("score", 0),
-            "date": dates.timestamp_to_date(comment.get("created_utc")),
+            "date": dates.convert_timestamp_to_date(comment.get("created_utc")),
             "author": comment.get("author", ""),
             "excerpt": comment.get("body", "")[:200],
             "url": comment_url,
