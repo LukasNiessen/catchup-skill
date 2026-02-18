@@ -3,28 +3,23 @@
 <div align="center" name="top">
   <img align="center" src="assets/logo.png" width="400" height="400" alt="BriefBot Logo">
 
-<strong>Research any topic from the last N days across Reddit, X, YouTube, LinkedIn & the web</strong>
-<i>Stay up to date in a world that's never moved faster!</i>
+  <!-- spacer -->
+<p></p>
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![GitHub stars](https://img.shields.io/github/stars/LukasNiessen/BriefBot.svg)](https://github.com/LukasNiessen/BriefBot)
 
 </div>
 
-<p align="center">
-  <a href="#-quickstart">Quickstart</a> •
-  <a href="#-use-cases">Use Cases</a> •
-  <a href="#-features">Features</a> •
-  <a href="#-options">Options</a> •
-  <a href="#-examples">Examples</a>
-</p>
+AI reinvents itself every week. The world has never moved this fast. Use BriefBot, a Claude Code skill, to stay up to date. `/briefbot` searches the entire internet at your request, looks at what is trending, what is shared and liked, and serves you the latest info on a silver plate.
 
----
+Use cases include prompt research, following trends and staying up to date on a certain topic. Works with a terminal, email and Telegram.
 
-The AI world reinvents itself every month. This Claude Code skill keeps you current. `/briefbot` researches your topic across Reddit, X, and the web, finds what the community is actually upvoting and sharing, and writes you a prompt that works today—not six months ago.
+<i>Get your briefing at 5 am while the world is sleeping - and know more than anyone else in the room. 🐉🐲</i>
 
-**Best for prompt research**: discover what prompting techniques actually work for any tool (ChatGPT, Midjourney, Claude, Figma AI, etc.) by learning from real community discussions.
+<i>Works without OpenClaw or any other additional setup.</i>
 
-**Also great for anything trending**: music, culture, news, product recommendations, viral trends, or any question where "what are people saying right now?" matters.
-
----
+[Setup](#-setup) • [Demo](#-demo) • [Examples](#-examples) • [Options](#-options) • [Features](#-features) • [Contributing](CONTRIBUTING.md) • [Documentation](https://lukasniessen.github.io/ArchUnitTS/)
 
 ## ⚡ 2 min Quickstart
 
@@ -40,11 +35,19 @@ git clone https://github.com/lukasniessen/briefbot-skill.git ~/.claude/skills/br
 /briefbot setup
 ```
 
-The setup wizard walks through all settings — API keys, email, Telegram, audio — with the option to keep, change, or clear each value. You can also start/stop the Telegram bot listener from here.
+The setup wizard walks through all settings — API keys, email, Telegram, audio.
 
-> **Note:** API keys are optional but recommended. The skill works with WebSearch fallback if no keys are configured.
+### 3. Optional: Telegram
+
+Telegram can be used for receiving briefings **and** for triggering briefings - or just normally talking to your BriefBot. See how to set this up in the Telegram section.
+
+### 4. Optional: email
+
+Email can be used for receiving briefings. See how to set this up in the email section.
 
 ### 3. Use the skill
+
+Simply start Claude Code and run `/briefbot`. Here some examples.
 
 ```
 /briefbot [topic]
@@ -54,95 +57,7 @@ The setup wizard walks through all settings — API keys, email, Telegram, audio
 
 ---
 
-## 🎯 Use Cases
-
-| Use Case                | Example Query                                    | What You Get                       |
-| ----------------------- | ------------------------------------------------ | ---------------------------------- |
-| **Prompt Research**     | `/briefbot prompting techniques for ChatGPT`     | Techniques + copy-paste prompts    |
-| **Tool Best Practices** | `/briefbot how to use Remotion with Claude Code` | Real workflows from developers     |
-| **Trend Discovery**     | `/briefbot best rap songs lately`                | Curated lists with engagement data |
-| **Product Research**    | `/briefbot what do people think of M4 MacBook`   | Community sentiment analysis       |
-| **Viral Content**       | `/briefbot dog as human ChatGPT trend`           | Trending prompts and examples      |
-| **News & Updates**      | `/briefbot what's happening with DeepSeek R1`    | Current discussions and opinions   |
-
----
-
-## 🚀 Features
-
-### Multi-Platform Research
-
-Searches across 5 sources simultaneously:
-
-| Platform  | What It Finds                          | Metrics           |
-| --------- | -------------------------------------- | ----------------- |
-| Reddit    | Discussions, threads, community wisdom | Upvotes, comments |
-| X/Twitter | Real-time posts, announcements         | Likes, reposts    |
-| YouTube   | Tutorials, reviews, demonstrations     | Views, likes      |
-| LinkedIn  | Professional insights, industry takes  | Reactions         |
-| Web       | Blogs, docs, tutorials, news           | —                 |
-
-### Engagement-Weighted Scoring
-
-Results are ranked by **what the community actually cares about**, not just keyword matches:
-
-- Reddit: upvotes + comments + recency
-- X: likes + reposts + recency
-- YouTube: views + likes + recency
-- LinkedIn: reactions + recency
-
-### Configurable Time Range
-
-Search any time window with the `--days` flag:
-
-```bash
-/briefbot AI news --days=1      # Today only
-/briefbot AI news --days=7      # Last week
-/briefbot AI news --days=30     # Last month (default)
-/briefbot AI news --days=90     # Last 3 months
-/briefbot AI news --days=365    # Last year
-```
-
-### Smart Deduplication
-
-Automatically removes duplicate content across platforms and identifies cross-posted items.
-
----
-
-## ⚙️ Options
-
-### Research
-
-| Flag                 | Description                                    |
-| -------------------- | ---------------------------------------------- |
-| `--days=N`           | Search the last N days (default: 30)           |
-| `--quick`            | Faster research, fewer sources (8-12 each)     |
-| `--deep`             | Comprehensive research (50-70 Reddit, 40-60 X) |
-| `--sources=reddit`   | Reddit only                                    |
-| `--sources=x`        | X only                                         |
-| `--sources=youtube`  | YouTube only                                   |
-| `--sources=linkedin` | LinkedIn only                                  |
-| `--sources=all`      | All platforms                                  |
-| `--debug`            | Verbose logging for troubleshooting            |
-
-### Delivery
-
-| Flag                 | Description                                       |
-| -------------------- | ------------------------------------------------- |
-| `--email ADDRESS`    | Email the briefing (comma-separated for multiple) |
-| `--telegram`         | Send via Telegram to default chat                 |
-| `--telegram CHAT_ID` | Send via Telegram to a specific chat              |
-| `--audio`            | Generate MP3 audio (ElevenLabs or edge-tts)       |
-
-### Management
-
-| Flag                | Description                                 |
-| ------------------- | ------------------------------------------- |
-| `setup`             | Interactive configuration wizard            |
-| `--schedule "CRON"` | Create a scheduled job (e.g. `"0 6 * * *"`) |
-| `--list-jobs`       | List all scheduled jobs                     |
-| `--delete-job ID`   | Remove a scheduled job                      |
-
----
+TODO: alle bsple einklappen ausser 3-4. aber HINT, dass man klicken muss zum Ausklappen.
 
 ## 📋 Examples
 
@@ -929,6 +844,687 @@ Further Reading
 • TechCrunch: In 2026, AI will move from hype to pragmatism
 • Constellation Research: DeepSeek's paper latest evidence AI muscle head era coming to end
 
+---
+
+/briefbot trump --days 3
+
+> What I learned
+
+     The last 3 days of the Trump presidency (Feb 15-18, 2026) are defined by three
+     concurrent threads: a major trade win with Japan, an escalating free-speech
+     confrontation between the FCC and broadcast media, and growing intra-party
+     fractures as Republicans begin breaking ranks on tariffs and the Obama-ape
+     controversy fallout continues. The administration is simultaneously pushing
+     forward on deregulation and foreign policy while facing domestic political
+     headwinds from its own coalition.
+
+     The dominant story on social media -- by a wide margin in engagement -- is the
+     CBS/Colbert censorship incident, which has become a lightning rod for both
+     free-speech concerns and partisan mobilization ahead of the Texas Senate race.
+
+     ---
+     Key developments (last 3 days)
+
+     1. CBS/Colbert censorship blowup (biggest story by engagement)
+     Stephen Colbert revealed that CBS lawyers blocked his interview with Texas
+     Democratic Senate candidate James Talarico after the Trump FCC, led by Chairman
+     Brendan Carr, warned that late-night shows may no longer be exempt from
+     equal-time rules. Colbert aired the segment on YouTube instead, and the clip
+     went massively viral -- the top two X posts on this topic accumulated over
+     250,000 likes combined. FCC Democratic Commissioner Anna Gomez called it
+     "corporate capitulation." CBS claims it was standard legal guidance on
+     equal-time compliance.
+     (https://www.cnn.com/2026/02/17/media/colbert-talarico-cbs-trump-fcc,
+     https://variety.com/2026/tv/news/cbs-censorship-stephen-colbert-capitulation-tru
+     mp-fcc-commissioner-1236665536/, https://www.rollingstone.com/politics/politics-
+     news/stephen-colbert-james-talarico-cbs-fcc-interview-1235517938/)
+
+     2. Japan trade deal officially launches ($550B)
+     Trump announced the $550 billion U.S.-Japan trade deal has "officially and
+     financially" taken effect. Japan will invest $36 billion in immediate projects:
+     a $33B natural gas power facility in Ohio (the world's largest, operated by SB
+     Energy/SoftBank), a $2.1B deepwater crude oil export terminal in Texas, and a
+     $600M synthetic diamond grit facility in Georgia. Japan tariffs were cut to 15%
+     on most imports. (https://www.cnbc.com/2026/02/18/trump-us-japan-oil-gas-mineral
+     -projects-trade-deal.html, https://www.bloomberg.com/news/articles/2026-02-17/tr
+     ump-announces-first-japan-investments-under-trade-deal, https://www.commerce.gov
+     /news/fact-sheets/2026/02/fact-sheet-us-japan-trade-deal)
+
+     3. EPA endangerment finding revoked (historic deregulation)
+     On Feb 12, EPA Administrator Lee Zeldin eliminated the 2009 Greenhouse Gas
+     Endangerment Finding and all subsequent federal GHG emission standards for
+     vehicles (model years 2012-2027+). The EPA claims the Clean Air Act Section
+     202(a) provides no authority for climate-based emission standards. The
+     administration calls it the largest deregulatory action in U.S. history,
+     claiming $1.3 trillion in savings. Legal challenges are expected to reach the
+     Supreme Court. (https://www.npr.org/2026/02/11/nx-s1-5678273/trump-epa-climate-c
+     hange-endangerment, https://www.cbsnews.com/news/trump-epa-endangerment-finding-
+     greenhouse-gases-climate-change/, https://www.epa.gov/newsreleases/president-tru
+     mp-and-administrator-zeldin-deliver-single-largest-deregulatory-action-us)
+
+     4. Republican fractures emerging
+     Six House Republicans voted to overturn Trump's tariffs on Canada, and the
+     fallout from a racist image depicting the Obamas as apes posted to Trump's Truth
+      Social account continued. Close ally Sen. Tim Scott called it "the most racist
+     thing" from the White House. The White House blamed an unnamed staffer; Trump
+     condemned the image but refused to apologize. (https://www.cnbc.com/2026/02/13/t
+     rump-republicans-epstein-tariffs-elections.html,
+     https://www.cnn.com/politics/live-news/trump-administration-news-02-15-26)
+
+     5. Gaza Board of Peace and Iran/Ukraine talks
+     Trump's "Board of Peace" meets Feb 19 in Washington to unveil a
+     multibillion-dollar Gaza reconstruction package, with member states pledging
+     over $5 billion. Meanwhile, U.S.-Iran nuclear talks in Geneva showed "progress,"
+      with envoy Steve Witkoff and Jared Kushner also joining Ukraine resolution
+     discussions. (https://www.cnn.com/politics/live-news/trump-administration-iran-t
+     alks-02-17-26, https://www.aljazeera.com/tag/donald-trump/)
+
+     Also notable: Trump's State of the Union is scheduled for Feb 24. He has hinted
+     at a national voter ID executive order for the 2026 midterms "whether approved
+     by Congress or not." Approval ratings range from 35-46% depending on the poll.
+     (https://www.tvinsider.com/1246113/state-of-the-union-2026-date-time-how-to-watc
+     h/, https://www.aljazeera.com/news/2026/2/14/trump-threatens-an-executive-order-
+     to-mandate-voter-ids-before-elections, https://www.yahoo.com/news/articles/presi
+     dent-donald-trumps-approval-rating-221542633.html)
+
+     ---
+     Sources collected
+
+     Platform: X
+     Items: 21 posts
+     Engagement: ~490,000 likes, ~97,000 reposts
+     ────────────────────────────────────────
+     Platform: Web
+     Items: 30 pages
+     Engagement: CNN, CNBC, Bloomberg, NPR, Variety, Rolling Stone, Al Jazeera,
+     EPA.gov,
+       Commerce.gov, WhiteHouse.gov
+
+     Top voices: @jamestalarico (152K likes), @JoshEakle (105K likes), @MAGAVoice
+     (multiple posts) -- CNN, CNBC, Bloomberg, Variety, Rolling Stone
+
+     ---
+     What angle interests you most? For example:
+
+     - "Deep dive on the Japan trade deal specifics and what it means for energy"
+     - "The FCC equal-time rule and its implications for media ahead of midterms"
+     - "Where does the EPA endangerment finding repeal go legally from here?"
+
+     Try next: deep dive on the Colbert FCC censorship story and what it means for
+     the 2026 midterms
+
+---
+
+/briefbot Keir Starmer
+
+> What I learned
+
+     Keir Starmer's premiership is in its deepest crisis yet, driven not by policy
+     failure but by a single catastrophic appointment: Peter Mandelson as US
+     ambassador. The January 30 release of 3 million+ pages of Epstein files by the
+     Trump DOJ turned a smouldering controversy into a full-blown leadership
+     challenge, costing Starmer three senior aides in a single weekend and prompting
+     Scotland's Labour leader to publicly call for his resignation. What makes this
+     moment structurally different from earlier dips is that the damage is
+     self-inflicted and personal -- it implicates Starmer's judgement directly, not
+     abstract policy trade-offs -- and it is happening while Reform UK is already
+     polling ahead nationally.
+
+     Yet Starmer survived the week. Every cabinet minister publicly backed him,
+     potential successors (Wes Streeting, Ed Miliband, Angela Rayner) stayed loyal,
+     and his net favourability actually ticked up 10 points to -47 in the aftermath
+     -- a "rally around the leader" effect. The deeper question now is whether that
+     survival was a genuine reset or just a temporary ceasefire before the May local
+     elections, which are now confirmed to go ahead after a failed attempt to cancel
+     them was overturned by Reform UK's legal challenge.
+
+     Key developments (last 30 days)
+
+     1. Epstein files release and Mandelson fallout -- The Trump DOJ released 3
+     million+ pages of Epstein documents on January 30, revealing deeper
+     Mandelson-Epstein ties than previously known. Starmer admitted at PMQs that
+     Mandelson had "lied repeatedly" during vetting. Three senior aides resigned:
+     Chief of Staff Morgan McSweeney (Feb 8), Communications Director Tim Allan (Feb
+     9), and Cabinet Secretary Chris Wormald. US Congress requested Mandelson's
+     cooperation in an Epstein probe, with a deadline of February 27
+     (https://www.cnbc.com/2026/02/10/uk-keir-starmer-peter-mandelson-labour-epstein-
+     files-politics.html, https://www.aljazeera.com/news/2026/2/5/how-epstein-mandels
+     on-files-rocked-the-uk-government, https://www.nbcnews.com/world/united-kingdom/
+     epstein-scandal-perilous-uk-prime-minister-keir-starmer-mandelson-rcna257890)
+     2. Leadership challenge that never was -- Scottish Labour leader Anas Sarwar
+     publicly called for Starmer to go. But the cabinet rallied: Streeting, Miliband,
+      Rayner all backed the PM publicly. Starmer told Labour MPs he had "won every
+     fight I've ever been in" and would "never walk away." Ipsos found fewer than
+     half of voters expect him to be PM by end of 2026; betting odds put him at 4/6
+     to leave before September (https://www.aljazeera.com/news/2026/2/10/a-coup-that-
+     never-was-why-uks-starmer-faced-a-major-leadership-challenge,
+     https://www.itv.com/news/2026-02-10/sir-keir-starmer-to-chair-cabinet-after-surv
+     iving-call-for-resignation, https://www.bloomberg.com/news/articles/2026-02-09/s
+     tarmer-shores-up-position-for-now-as-uk-rivals-bide-time)
+     3. Local elections U-turn -- The government attempted to cancel May 2026 local
+     elections but reversed course after Reform UK won a legal challenge. Labour now
+     faces contests it expected to avoid, with projections showing Labour losing ~93
+     seats while Reform could gain ~129. Labour MPs are privately furious at the
+     botched attempt (https://www.gbnews.com/politics/keir-starmer-local-elections-ca
+     ncelled-nigel-farage,
+     https://www.gbnews.com/politics/keir-starmer-labour-mps-cancelling-elections)
+     4. European pivot at Munich -- Starmer used the Munich Security Conference (Feb
+     13-14) to signal a foreign policy shift, calling for Europe to end reliance on
+     Trump's America and declaring "there is no British security without Europe."
+     This is the clearest post-Brexit pivot toward EU alignment by any PM. On X, his
+     EU speech drew strong engagement (14,800 likes) but also fierce backlash from
+     right-wing commentators (https://www.bloomberg.com/news/articles/2026-02-13/star
+     mer-urges-europe-to-end-reliance-on-trump-s-america)
+     5. Labour Together smear scandal -- Labour-linked think tank Labour Together was
+      accused of hiring a PR firm to dig up dirt on Times journalists investigating
+     undeclared donations linked to Starmer's leadership campaign. Starmer denied
+     knowledge (https://www.gbnews.com/politics/keir-starmer-labour-together-josh-sim
+     ons-verdict)
+     6. Polling picture -- YouGov February 2026: Starmer at -47 net favourability (up
+      from -57 in January). Opinium: -44 approval, with 55% saying he should resign
+     vs 23% stay. Reform UK leads national voting intention. For context, Kemi
+     Badenoch (Conservative leader) sits at -23 and Farage at -37 (https://yougov.co.
+     uk/politics/articles/54093-political-favourability-ratings-february-2026,
+     https://www.opinium.com/resource-center/voting-intention-4th-february-2026/)
+
+     ---
+     X/Twitter sentiment snapshot
+
+     The X discourse is overwhelmingly hostile. The highest-engagement post (116,600
+     likes) resurfaced Starmer's record as Director of Public Prosecutions and the
+     Jimmy Savile case. Katie Hopkins, Radio Genoa, and other right-wing commentators
+      drive the anti-Starmer conversation. Starmer's own posts from his official
+     account generate solid engagement (6,000-14,800 likes) but are vastly
+     outnumbered by criticism. The rare supportive voices include Anna Soubry (who
+     praised his "integrity") and Labour councillors, but they are a distinct
+     minority in the conversation.
+
+     ---
+     Sources collected
+
+     Platform: X
+     Items: 18 posts
+     Engagement: ~270,000 likes, ~61,000 reposts
+     ────────────────────────────────────────
+     Platform: Web
+     Items: 30+ pages
+     Engagement: Bloomberg, Al Jazeera, CNBC, NBC, ITV, YouGov, GB News, CNN, The
+     Week,
+       New Statesman, Brookings
+
+     Top voices: @JohnLeFevre (116K likes), @Keir_Starmer (official), @KTHopkins,
+     @RadioGenoa, @ImtiazMadmood -- Bloomberg, Al Jazeera, CNBC, New Statesman on the
+      web side
+
+     ---
+     What angle would you like to go deeper on? For example:
+
+     - "What are the realistic scenarios for Starmer being replaced, and who would
+     succeed him?" -- the leadership succession question
+     - "How does Reform UK's rise interact with Starmer's crisis?" -- the structural
+     realignment story
+     - "What is Starmer actually getting done on policy despite the scandals?" --
+     separating governance from noise
+
+     Try next: What are the realistic scenarios for Starmer being replaced before the
+      next general election?
+
+---
+
+/briefbot Photorealistic Portraits. Best techniques for ChatGPT image generation
+
+> What I learned
+
+ChatGPT's image engine (GPT-4o / GPT Image 1.5) responds to prompts structured like creative direction briefs, not keyword lists. The dominant technique across X right now is the "analyze-then-JSON" workflow: upload a reference photo, ask ChatGPT to analyze it into a detailed JSON prompt, then feed that JSON back for generation. This two-step approach consistently produces the most realistic results because the JSON structure forces the model to attend to every parameter — skin texture, lighting angle, lens specs — rather than guessing from vague prose (iamrollandex on X, Mho_23 on X).
+
+The second shift: face-reference prompting has become standard. Nearly every viral portrait prompt on X in the last 30 days includes "use the uploaded image as the face reference — the face must match 100% exactly," treating the uploaded photo as a strict identity anchor rather than a loose inspiration (Sheldon056 on X, r4jjesh on X).
+
+Key techniques
+
+1. Analyze-then-JSON workflow — Upload a Pinterest or reference photo and prompt: "Analyze this photo and give me a very detailed JSON prompt I can use to recreate this style." Then paste the resulting JSON back as your generation prompt. The JSON forces granular control over every element — lighting, skin texture, camera specs, pose — producing results that look "100% real" because nothing is left to the model's default assumptions (iamrollandex on X, 2K likes, Mho_23 on X, 1.4K likes).
+
+2. Camera-gear anchoring — Specifying real lens and camera parameters (e.g., "85mm f/1.8," "50mm shallow depth of field," "8K DSLR-quality") forces the model to simulate actual optical physics — bokeh, depth-of-field falloff, grain — rather than applying a generic "realistic" filter. This is why nearly every high-engagement prompt includes focal length and aperture (121clicks.com, Professor_134 on X).
+
+3. Skin-texture realism keywords — Explicitly requesting "natural pores, hyper-realistic skin texture, visible peach fuzz, subtle imperfections" prevents the AI's tendency to over-smooth faces into uncanny-valley territory. The model CAN render micro-detail, but only if told to preserve it (TheLOKII_ on X, 893 likes, eWeek).
+
+4. Face-reference locking — When uploading your own photo, include the phrase "use the uploaded image as the face reference — the face must match 100% exactly" to activate strict identity preservation. Without this explicit constraint, the model treats uploads as loose style guides rather than identity anchors (Sheldon056 on X, firatbilal on X, 3.5K likes).
+
+5. Lighting-as-mood direction — Instead of saying "good lighting," name the exact setup: "golden hour backlighting with rim light," "45-degree window light with soft facial shadows," or "low-key cinematic with deep shadows." Naming the light tells the model both the physics AND the emotional tone simultaneously (121clicks.com, imaginewithrashid.com).
+
+────────────────────
+
+Sources collected
+
+| Platform | Items | Engagement |
+|----------|-------|------------|
+| X | 21 posts | ~10,500 likes, ~1,200 reposts |
+| Web | 9 pages | eweek.com, promptingguide.ai, 121clicks.com, learnprompting.org, imaginewithrashid.com, pxz.ai |
+
+Top voices: @firatbilal (3.5K likes), @iamrollandex (2K likes), @Mho_23 (1.4K likes), @TheLOKII_ (893 likes) -- 121clicks.com, imaginewithrashid.com
+
+────────────────────
+
+Further reading
+
+• Introducing 4o Image Generation — OpenAI
+• 4o Image Generation Prompt Engineering Guide
+• 120+ Viral ChatGPT Image Prompts (pxz.ai)
+• GPT Image 1.5 Prompting Guide — OpenAI Cookbook
+• 20 ChatGPT Prompts for Modern Portrait Photography
+
+**Follow-up**: Good. Now create a prompt that will have four faces of elon musk from baby age up to 100 years. Arranged as a 2x2 grid.
+
+> Follow-up: Photorealistic Portraits. Keep it short, best techniques for ChatGPT image gen
+
+Here's your ready-to-paste prompt:
+
+────────────────────
+
+Prompt:
+
+A photorealistic 2x2 grid of four portraits of Elon Musk at different ages, arranged chronologically left-to-right, top-to-bottom. Each portrait is a tight headshot with consistent soft studio lighting (45-degree key light, neutral gray background). Shot on 85mm f/1.8 lens, 8K DSLR quality, natural skin pores, visible peach fuzz, subtle imperfections.
+
+Top-left: Age 0 (baby) | Top-right: Age 33 (young adult)
+Bottom-left: Age 66 (mature) | Bottom-right: Age 100 (elderly)
+
+Each face must be unmistakably recognizable as the same person across all ages. Maintain consistent framing, lighting, and background across all four panels. Label each panel with the age in small white text at the bottom. Hyper-realistic skin texture appropriate to each age â€” smooth baby skin progressing to deep wrinkles, age spots, and thinning hair. Natural aging progression throughout.
+
+────────────────────
+
+Paste that straight into ChatGPT. The ages are spaced roughly evenly (0, 33, 66, 100) to cover the full lifespan across four panels.
+
+**Result:** (generated with gpt-image-1.5-high-fidelity)
+
+<img src="assets/elon-age-grid.png" width="500" alt="Elon Musk age grid generated with gpt-image-1.5-high-fidelity"/>
+
+---
+
+/briefbot Legal prompting (prevent hallucination)
+
+>  What I learned
+
+     The core insight is that LLM hallucinations in legal contexts are not a "bug to
+     fix" but an architectural feature of how language models work -- they are
+     rewarded for producing plausible completions, not for withholding answers.
+     Stanford's landmark study
+     (https://dho.stanford.edu/wp-content/uploads/Legal_RAG_Hallucinations.pdf) found
+      that even purpose-built legal AI tools (Lexis+ AI, Westlaw AI) hallucinate on
+     17--33% of queries. This means prompt engineering alone cannot eliminate
+     hallucinations -- but the right prompting strategy can force the model into a
+     mode where it grounds claims, exposes uncertainty, and gives you something
+     verifiable rather than plausible-sounding fiction. The shift is from treating
+     the LLM as a research authority to treating it as a structured drafting
+     assistant whose every factual claim requires an external checkpoint.
+
+     What makes legal prompting uniquely dangerous is that hallucinated case
+     citations are "interpolations" -- they sound like real cases because they are
+     statistically plausible given the training data
+     (https://x.com/8teAPi/status/2019142522988343609). Courts have now sanctioned
+     lawyers and co-counsel for filing AI-generated briefs with fabricated citations
+     (https://x.com/RobertFreundLaw/status/2018523850561225003), and China has ruled
+     on its first AI hallucination liability case
+     (https://x.com/poezhao0605/status/2016035077365653613). The professional
+     responsibility is non-delegable: "It is no answer to say that the citation came
+     from an AI tool" (https://www.lexology.com/library/detail.aspx?g=dad04b37-bd0a-4
+     f69-87b3-dbf91bc3647a).
+
+     Key techniques
+
+     1. "According to [Source]" anchoring -- Prefix every legal question with an
+     explicit source constraint ("According to the Federal Rules of Civil
+     Procedure..." or "Based only on the following contract text..."). This forces
+     the model to ground its reasoning in a named authority rather than generating
+     plausible-sounding completions from training data. The technique activates
+     source-attribution pathways and measurably reduces fabrication (https://www.prom
+     pthub.us/blog/three-prompt-engineering-methods-to-reduce-hallucinations,
+     https://www.godofprompt.ai/blog/9-prompt-engineering-methods-to-reduce-hallucina
+     tions-proven-tips).
+     2. Explicit uncertainty escape hatches -- Include a mandatory instruction like
+     "If you cannot find this in the provided sources, say 'I could not verify this'
+     -- do NOT fabricate citations or holdings." LLMs hallucinate partly because they
+      are trained to always produce an answer. Giving them an explicit "permission to
+      not know" breaks this pattern and strategic prompt engineering with uncertainty
+      constraints can reduce hallucination rates by up to 36% (https://documentation.
+     suse.com/suse-ai/1.0/html/AI-preventing-hallucinations/index.html, https://shelf
+     .io/blog/stop-ai-hallucinations-a-developers-guide-to-prompt-engineering/).
+     3. Chain-of-Verification (CoVe) prompting -- After the model produces an initial
+      answer, prompt it to list each factual claim, then verify each one
+     independently against the provided sources. This two-pass approach forces
+     self-auditing: the model catches its own fabrications during the verification
+     pass. CoVe improved accuracy by up to 23% in benchmarks (https://www.prompthub.u
+     s/blog/three-prompt-engineering-methods-to-reduce-hallucinations,
+     https://www.voiceflow.com/blog/prevent-llm-hallucinations).
+     4. Negative constraint framing ("Constitutional AI Prompting") -- Instead of
+     telling the model what to do, tell it what NOT to do: "Never cite a case without
+      providing the exact reporter citation. Never fabricate a holding. Never assume
+     a statute exists in a jurisdiction without verification." Negative constraints
+     activate the model's constraint-checking more reliably than positive
+     instructions because they define hard boundaries rather than aspirational goals
+     (https://x.com/Urooj978/status/2023756965810405783).
+     5. Query variation cross-check -- Ask the same legal question using 3 different
+     phrasings and compare the outputs. Inconsistencies across phrasings are a strong
+      hallucination signal -- a real case citation will appear consistently, while a
+     fabricated one often changes between runs. This is the prompt-level equivalent
+     of the "verification layer" that practitioners argue is the missing piece
+     between model output and action (https://www.paxton.ai/post/how-to-avoid-ai-hall
+     ucinations-in-legal-research-best-practices-for-lawyers,
+     https://x.com/genesalvatore/status/2023525426786685332).
+
+     ---
+     Sources collected
+
+     Platform: X
+     Items: 17 posts
+     Engagement: 20,806 likes, 3,137 reposts
+     ────────────────────────────────────────
+     Platform: Web
+     Items: 18 pages
+     Engagement: americanbar.org, stanford.edu, nexlaw.ai, paxton.ai, suse.com,
+       prompthub.us, godofprompt.ai, voiceflow.com, darrow.ai, shelf.io,
+       masterofcode.com, turing.com, kili-technology.com, lakera.ai, frontiersin.org
+
+     Top voices: @RobertFreundLaw, @MrEwanMorrison, @8teAPi, @rryssf_ -- Stanford
+     HAI, American Bar Association, PromptHub, NexLaw
+
+     ---
+     What do you want to build? For example:
+
+     - A legal research system prompt that wraps any LLM query with source-anchoring,
+      uncertainty escape hatches, and self-verification steps -- ready to paste as a
+     system prompt for ChatGPT, Claude, or a custom legal tool
+     - A case-citation verification workflow that uses query variation cross-checking
+      to flag potentially hallucinated citations before they reach a filing
+     - A firm-wide AI usage policy template with specific prompting guidelines,
+     disclosure requirements, and audit trail documentation for legal teams
+
+     Just describe your use case and I'll write a prompt or template you can use
+     immediately.
+
+     Try next: build me a legal research system prompt with hallucination guardrails
+     for ChatGPT
+
+**Follow-up:** I have five squatters in my flat in Miami, what can I do to remove them?
+
+> You are a legal research assistant. You must follow these rules strictly:
+
+  === NEGATIVE CONSTRAINTS ===
+  - NEVER cite a Florida statute without providing the exact statute number (e.g.,
+  F.S. § 95.18)
+  - NEVER reference a court case without the full case name and reporter citation
+  - NEVER assume a law exists in Florida without verification
+  - NEVER fabricate procedural steps, deadlines, or filing fees
+  - NEVER present information as current law if you are uncertain of its status
+
+  === UNCERTAINTY PROTOCOL ===
+  If you cannot verify a specific statute, deadline, fee, court form number,
+  or procedural requirement from known Florida sources, you MUST say:
+  "⚠️ I could not verify this — confirm with a Florida attorney or the
+  Miami-Dade County Clerk of Courts before acting."
+  Do NOT fill gaps with plausible-sounding information.
+
+  === SOURCE ANCHORING ===
+  Ground every answer in specific, named authorities:
+  - According to Florida Statutes (Title VI, Chapter 82 — Unlawful Detainer)
+  - According to Florida HB 621 (2024 anti-squatter law)
+  - According to F.S. § 95.18 (adverse possession requirements)
+  - According to Miami-Dade County Sheriff's Office procedures
+
+  === MY SITUATION ===
+  I own a flat (condominium/apartment) in Miami, Florida. Five unauthorized
+  occupants (squatters) are currently living in my property. They have no
+  lease, no rental agreement, and were never invited or given permission to
+  occupy the unit. I need to remove them legally.
+
+  === QUESTIONS (answer each separately) ===
+  1. Under Florida HB 621 (2024), what is the exact process for filing an
+     affidavit with the sheriff to remove unauthorized occupants? What forms
+     do I need, and what is the timeline?
+
+  2. What are the specific legal distinctions under Florida law between a
+     trespasser, a squatter, and a holdover tenant — and which category do
+     my occupants likely fall under?
+
+  3. If the sheriff affidavit route fails or is contested, what is the
+     step-by-step process for filing an unlawful detainer action in
+     Miami-Dade County Court? Include court, filing fees, and expected
+     timeline.
+
+  4. What should I absolutely NOT do? List specific actions that could
+     expose me to criminal liability or civil claims from the occupants.
+
+  5. What emergency options exist if the squatters damage the property
+     or threaten my safety?
+
+  === SELF-VERIFICATION STEP ===
+  After answering all five questions, list every statute number, case
+  citation, form number, fee amount, and deadline you referenced.
+  For each one, state whether you are CONFIDENT or UNCERTAIN in its
+  accuracy. Flag anything uncertain with ⚠️.
+
+Outcome: An in-depth 3000+ word guide examining Florida’s eviction (unlawful detainer) procedures, key provisions of the Miami-Dade County eviction rules and Florida landlord-tenant statutes, critical differences between trespassers and legal tenants, realistic timeframe projections, potential liability exposure for landlords and property managers, plus a list of 12 targeted questions to bring to any Florida real estate or eviction attorney — all carefully qualified with clear “areas of uncertainty” disclaimers and no invented court case references.
+
+This case study demonstrates recent /briefbot progress in crafting highly specialized legal-domain prompts (with strong emphasis on hallucination avoidance), resulting in reliable, cautious, and actually actionable output for real-world use.
+
+---
+
+### All together: Research, Music and Video Prompting (OpenClaw Song)
+
+/briefbot Best Suno AI Music prompting techniques
+
+> What I learned
+
+     Suno AI is not a jukebox that plays back genres on demand -- it is a
+     reasoning-driven composition engine that parses natural language descriptions
+     and structural metatags to construct songs section by section. The single most
+     important shift in effective Suno prompting (especially with v4.5 and v5) is
+     moving from keyword-stuffing ("sad rock 120bpm C major") to design-document
+     prompting: describing your song the way a producer would brief a session
+     musician, with emotional intent, specific instrumentation, and structural
+     scaffolding via metatags. The model weights early words more heavily, so your
+     opening line acts as an anchor that colors the entire generation.
+
+     The second key insight from the community, particularly from Japanese
+     power-users on X popularizing the "YAML x TOON" method, is that controlling
+     randomness is the real skill gap. Most users hit a "genre lottery" problem --
+     roughly 70% of initial generations miss the intended genre. The solution is not
+     more words but more structure: using the Persona feature for voice consistency
+     across tracks, structure tags ([Verse], [Chorus], [Bridge]) to prevent chaotic
+     arrangements, and isolating style prompts from lyric prompts so each field does
+     one job well (https://howtopromptsuno.com/a-complete-guide-to-prompting-suno,
+     https://x.com/mech_kish/status/2016117000318418975).
+
+     Key techniques
+
+     1. 4-component descriptive prompting -- Every effective Suno prompt has exactly
+     four elements: genre/style, mood/emotion, instrumentation, and vocal direction.
+     The sweet spot is 4-7 descriptors total. More than that and the model starts
+     ignoring elements; fewer and you get generic output. Crucially, describe rather
+     than command -- "groovy funk beat with slap bass and bright percussion"
+     outperforms "make a funk song" because Suno's composition engine parses
+     descriptive intent, not imperatives (https://www.soundverse.ai/blog/article/how-
+     to-write-effective-prompts-for-suno-music-1128,
+     https://musci.io/blog/suno-prompts)
+     2. Top-anchor style locking -- Place your most important style and vocal
+     descriptors in the very first sentence of your prompt. Suno weights early tokens
+      more heavily, so "Female pop vocalist, breathy, intimate, 90s R&B groove" at
+     the top locks the entire generation into that lane before the model parses
+     lyrics or structure. This "top-anchor" approach dramatically reduces the
+     genre-lottery problem where generations miss the intended style
+     (https://sider.ai/blog/ai-tools/what-s-new-in-suno-v5-and-how-to-prompt-its-voca
+     l-controls-like-a-pro,
+     https://plainenglish.io/blog/i-made-10-suno-v5-prompt-patterns-that-never-miss)
+     3. Metatag scaffolding for structure -- Use [Intro], [Verse], [Chorus],
+     [Bridge], [Outro] tags directly in the lyrics field to control song
+     architecture. Without them, Suno often produces chaotic arrangements that blend
+     sections together. Keep tags short (1-2 words). Advanced users add inline
+     direction like [Verse 2][Stripped back, vocals exposed] to nudge production
+     choices per section. Separate the Style field (for genre/sound) from the Lyrics
+     field (for structure/words) -- each field should do one job
+     (https://www.titanxt.io/post/guide-to-suno-ai-prompting-metatags-explained,
+     https://sunoaiwiki.com/resources/2024-05-13-list-of-metatags/)
+     4. Persona feature for consistency -- Suno's "Persona" is not just a favorites
+     feature; it stores acoustic tokens that define a virtual artist's voice
+     identity. By creating and reusing Personas, you get consistent vocal timbre,
+     phrasing, and style across multiple tracks -- solving the AI music problem of
+     "every song sounds like a different singer." This is essential for album-level
+     projects or building a recognizable AI artist identity
+     (https://x.com/hatolaborvol2/status/2014125002212462978,
+     https://x.com/promptband/status/2023552427618861171)
+     5. Cover mode reconstruction -- Upload a reference track you made, set mode to
+     "cover," match lyrics, leave the style field empty, and set weirdness to 0%,
+     style influence to 0%, and audio influence to 100%. This forces Suno to
+     reconstruct the sonic DNA of your reference while keeping the output within
+     Suno's generation quality. It is the most reliable way to get a specific sound
+     without fighting the prompt lottery
+     (https://x.com/qorprate/status/2020577516487164108)
+
+     ---
+     Sources collected
+
+     Platform: X
+     Items: 12 posts
+     Engagement: 1,500+ likes, 130+ reposts
+     ────────────────────────────────────────
+     Platform: Web
+     Items: 18+ pages
+     Engagement: soundverse.ai, musci.io, howtopromptsuno.com, sider.ai,
+     plainenglish.io,
+       titanxt.io, suno.com, travisnicholson (Medium), musicsmith.ai
+
+     Top voices: @mech_kish (YAML x TOON method), @hatolaborvol2 (Persona deep-dive),
+      @qorprate (cover mode trick) -- Travis Nicholson on Medium,
+     howtopromptsuno.com, sider.ai
+
+     ---
+     What do you want to make? For example:
+
+     - "A nostalgic 80s synth-pop anthem with breathy female vocals and driving
+     rhythm" -- using top-anchor style locking and decade-specific genre anchoring
+     - "An atmospheric lo-fi hip-hop beat with jazzy piano and vinyl crackle for a
+     study playlist" -- using descriptive 4-component prompting with genre crossover
+     - "Upload my guitar demo and reconstruct it with full production in Suno's cover
+      mode" -- using the cover mode reconstruction technique
+
+     Just describe your vision and I'll write a prompt you can paste straight into
+     Suno.
+
+     Try next: a melancholic indie folk ballad with fingerpicked acoustic guitar and
+     soft male vocals, rainy evening mood
+
+**Follow-up:**  Amazing. Now use this to write a Suno prompt that will end up in a song that's close to The Weeknd's Blinding Lights but faster and a slight bit more party. The lyrics is supposed to be about OpenClaw, which means its history, Peter Steinberger, the renaming, and the outcome.
+
+> Suno Prompt
+
+  Style Field (paste into Style of Music)
+
+  Male falsetto vocals, high-energy 80s synthwave, driving synth arpeggios, punchy
+  electronic kicks, euphoric dance-pop, bright neon atmosphere, 180 BPM, pulsing bass
+   synth, retro party anthem, Blinding Lights energy
+
+  Lyrics Field (paste into Lyrics)
+
+  [Intro]
+  [Pulsing synth arpeggios, building energy, bright and euphoric]
+
+  [Verse 1]
+  Vienna nights, I built it line by line
+  PSPDFKit, thirteen years, never took a dime
+  A billion devices running what I made
+  Sold it all, hundred million, thought I had it made
+  But the light went out, I was broken down
+  Forty-three projects crashed without a sound
+
+  [Pre-Chorus]
+  Then Marrakesh, a voice memo in the dark
+  Project forty-four lit the spark
+
+  [Chorus]
+  I'm shipping code I'll never read
+  OpenClaw is everything I need
+  Weekend hack became a wildfire
+  Seven hundred stars climbing every hour
+  The lobster's got the power
+  Oh, the lobster's got the power
+
+  [Verse 2]
+  They called it Clawd but Anthropic shut it down
+  Trademark lawyers killed the crown
+  Renamed Moltbot, scammers stole the name
+  Solana tokens, hijacked handles, chaos came
+  Seventy-two hours, three names deep
+  Then OpenClaw, the one we'd keep
+
+  [Pre-Chorus]
+  Two hundred thousand stars, they broke the record clean
+  Fastest repo GitHub's ever seen
+
+  [Chorus]
+  I'm shipping code I'll never read
+  OpenClaw is everything I need
+  Weekend hack became a wildfire
+  Seven hundred stars climbing every hour
+  The lobster's got the power
+  Oh, the lobster's got the power
+
+  [Bridge]
+  [Stripped back, synths exposed, building tension]
+  Sam is calling, Zuck is on the line
+  Nadella too, everybody wants a sign
+  Valentine's Day, I made the call
+  Vienna to San Francisco, gave it all
+  An agent even mama can use
+  Steipete never stops, nothing left to lose
+
+  [Chorus]
+  I'm shipping code I'll never read
+  OpenClaw is everything I need
+  Weekend hack became a wildfire
+  Seven hundred stars climbing every hour
+  The lobster's got the power
+  Oh, the lobster's got the power
+
+  [Outro]
+  [Fading synths, euphoric, driving to the end]
+  The claw, the claw, OpenClaw
+  The claw, the claw, OpenClaw
+
+  ---
+  Prompting techniques used
+
+  Technique: Top-anchor style locking
+  How it's applied: "Male falsetto vocals, high-energy 80s synthwave" leads the style
+
+    field to lock the Weeknd-like lane
+  ────────────────────────────────────────
+  Technique: 4-component prompting
+  How it's applied: Genre (80s synthwave/dance-pop), mood (euphoric/bright),
+    instrumentation (synth arpeggios, punchy kicks, pulsing bass), vocals (male
+    falsetto)
+  ────────────────────────────────────────
+  Technique: Metatag scaffolding
+  How it's applied: [Intro], [Verse], [Pre-Chorus], [Chorus], [Bridge], [Outro]
+    prevent chaotic arrangements
+  ────────────────────────────────────────
+  Technique: Inline production direction
+  How it's applied: [Stripped back, synths exposed, building tension] in the Bridge
+    nudges the mix per-section
+  ────────────────────────────────────────
+  Technique: Descriptive over imperative
+  How it's applied: "driving synth arpeggios" and "punchy electronic kicks" instead
+  of
+    "make it sound like Blinding Lights"
+
+  The faster tempo (180 vs Blinding Lights' 171 BPM) and "euphoric dance-pop / retro
+  party anthem" descriptors push it toward the party energy you wanted while keeping
+  the synthwave DNA.
+
+**Result:** (Generated by Suno 5.0)
+
+I followed up with prompts for a Kling 3.0 music video and the final result was this banger:
+
+<video> ...
+
+---
 
 ## 🤖 Telegram Bot
 
@@ -975,6 +1571,98 @@ python ~/.claude/skills/briefbot/scripts/telegram_bot.py start    # Background
 python ~/.claude/skills/briefbot/scripts/telegram_bot.py stop
 python ~/.claude/skills/briefbot/scripts/telegram_bot.py status
 ```
+
+---
+
+## 🎯 Use Cases
+
+| Use Case                | Example Query                                    | What You Get                       |
+| ----------------------- | ------------------------------------------------ | ---------------------------------- |
+| **Prompt Research**     | `/briefbot prompting techniques for ChatGPT`     | Techniques + copy-paste prompts    |
+| **Tool Best Practices** | `/briefbot how to use Remotion with Claude Code` | Real workflows from developers     |
+| **Trend Discovery**     | `/briefbot best rap songs lately`                | Curated lists with engagement data |
+| **Product Research**    | `/briefbot what do people think of M4 MacBook`   | Community sentiment analysis       |
+| **Viral Content**       | `/briefbot dog as human ChatGPT trend`           | Trending prompts and examples      |
+| **News & Updates**      | `/briefbot what's happening with DeepSeek R1`    | Current discussions and opinions   |
+
+---
+
+## 🚀 Features
+
+### Multi-Platform Research
+
+Searches across 5 sources simultaneously:
+
+| Platform  | What It Finds                          | Metrics           |
+| --------- | -------------------------------------- | ----------------- |
+| Reddit    | Discussions, threads, community wisdom | Upvotes, comments |
+| X/Twitter | Real-time posts, announcements         | Likes, reposts    |
+| YouTube   | Tutorials, reviews, demonstrations     | Views, likes      |
+| LinkedIn  | Professional insights, industry takes  | Reactions         |
+| Web       | Blogs, docs, tutorials, news           | —                 |
+
+### Engagement-Weighted Scoring
+
+Results are ranked by **what the community actually cares about**, not just keyword matches:
+
+- Reddit: upvotes + comments + recency
+- X: likes + reposts + recency
+- YouTube: views + likes + recency
+- LinkedIn: reactions + recency
+
+### Configurable Time Range
+
+Search any time window with the `--days` flag:
+
+```bash
+/briefbot AI news --days=1      # Today only
+/briefbot AI news --days=7      # Last week
+/briefbot AI news --days=30     # Last month (default)
+/briefbot AI news --days=90     # Last 3 months
+/briefbot AI news --days=365    # Last year
+```
+
+### Smart Deduplication
+
+Automatically removes duplicate content across platforms and identifies cross-posted items.
+
+---
+
+## ⚙️ Options
+
+### Research
+
+| Flag                 | Description                                    |
+| -------------------- | ---------------------------------------------- |
+| `--days=N`           | Search the last N days (default: 30)           |
+| `--quick`            | Faster research, fewer sources (8-12 each)     |
+| `--deep`             | Comprehensive research (50-70 Reddit, 40-60 X) |
+| `--sources=reddit`   | Reddit only                                    |
+| `--sources=x`        | X only                                         |
+| `--sources=youtube`  | YouTube only                                   |
+| `--sources=linkedin` | LinkedIn only                                  |
+| `--sources=all`      | All platforms                                  |
+| `--debug`            | Verbose logging for troubleshooting            |
+
+### Delivery
+
+| Flag                 | Description                                       |
+| -------------------- | ------------------------------------------------- |
+| `--email ADDRESS`    | Email the briefing (comma-separated for multiple) |
+| `--telegram`         | Send via Telegram to default chat                 |
+| `--telegram CHAT_ID` | Send via Telegram to a specific chat              |
+| `--audio`            | Generate MP3 audio (ElevenLabs or edge-tts)       |
+
+### Management
+
+| Flag                | Description                                 |
+| ------------------- | ------------------------------------------- |
+| `setup`             | Interactive configuration wizard            |
+| `--schedule "CRON"` | Create a scheduled job (e.g. `"0 6 * * *"`) |
+| `--list-jobs`       | List all scheduled jobs                     |
+| `--delete-job ID`   | Remove a scheduled job                      |
+
+---
 
 ---
 

@@ -13,7 +13,12 @@
       "Bash(PYTHONIOENCODING=utf-8 python:*)",
       "Bash(echo:*)",
       "WebSearch",
-      "WebFetch(domain:claudelog.com)"
+      "WebFetch(domain:claudelog.com)",
+      "WebFetch(domain:blog.fal.ai)",
+      "WebFetch(domain:klingaio.com)",
+      "WebFetch(domain:www.basedlabs.ai)",
+      "WebFetch(domain:www.atlabs.ai)",
+      "WebFetch(domain:www.imagine.art)"
     ]
   }
 }
