@@ -859,6 +859,77 @@ and the "cultivation vs programming" framing for AI safety.
 
 ---
 
+### Hot new AI Papers
+
+**1. Prompt:** Hot new AI Papers
+
+**Answer:** > ALPHADRAGON:
+BriefBot: Hot New AI Papers (2026-02-18)
+
+Hot New AI Papers -- February 2026
+
+What I learned
+
+The AI research landscape in early 2026 has decisively pivoted from "scale bigger" to "build smarter." The hottest papers are no longer about training the largest model -- they are about agentic systems, efficient architectures, and multimodal unification. DeepSeek's Manifold-Constrained Hyper-Connections (mHC) paper crystallizes this shift: stable training of 27B+ parameter models with just 6.7% overhead, signaling the end of the brute-force scaling era (SCMP). Meanwhile, the most-discussed papers on Hugging Face and arXiv focus on giving AI agents memory, skills, and multi-step reasoning -- not just larger context windows.
+
+Standout Papers (January--February 2026)
+
+1. DeepSeek mHC -- Manifold-Constrained Hyper-Connections
+
+DeepSeek co-founder Liang Wenfeng co-authored a rethink of fundamental transformer training architecture. The mHC framework constrains hyper-connections (originally proposed by ByteDance) onto a specific manifold, solving a decade-old scaling instability problem. Result: stable training of 27B+ parameter models with just 6.7% compute overhead, dramatically lowering the cost of pretraining and making large model training accessible to smaller organizations (IBM, Introl).
+
+2. LTX-2 -- Joint Audio-Visual Foundation Model
+
+Lightricks released LTX-2, the first open-source model generating synchronized video and audio in a single pass. A 14B-parameter video stream and 5B-parameter audio stream are coupled through bidirectional cross-attention. It produces native 4K at 50fps with lip sync and ambient audio, generating up to 20 seconds of continuous content -- exceeding proprietary models like Veo 3 (12s) and Sora 2 (16s) (arXiv 2601.03233, Hugging Face).
+
+3. SkillsBench & SkillRL -- Benchmarking and Training Agent Skills
+
+Two complementary papers tackle the emerging "agent skills" paradigm. SkillsBench introduces the first benchmark for evaluating structured procedural knowledge packages that augment LLM agents. SkillRL enables agents to improve through hierarchical skill discovery and recursive policy evolution, achieving superior performance while reducing computational overhead (Hugging Face Trending Papers).
+
+4. MemSkill -- Learnable Memory for LLM Agents
+
+MemSkill introduces a dynamic memory system where LLM agents learn to select and refine their own memory operations through controller-executor-designer components. This moves beyond static context windows toward agents that evolve their information retrieval strategies over time (Hugging Face Trending Papers).
+
+5. Stanford's Execution-Grounded Automated Research
+
+A Stanford paper proposes an automated executor that turns LLM research ideas into runnable code experiments, pushing toward AI systems that can autonomously conduct research. Garnered 300+ likes and significant discussion on X (arXiv 2601.14525, @rohanpaul_ai).
+
+6. A-RAG, InfMem, xMemory, TinyLoRA
+
+> ALPHADRAGON:
+The weekly roundups from @dair_ai highlight a cluster of papers improving retrieval-augmented generation (A-RAG), infinite-length memory (InfMem, xMemory), and parameter-efficient fine-tuning (TinyLoRA). LightRAG integrates graph structures for better contextual awareness and faster retrieval (Hugging Face Papers).
+
+7. International AI Safety Report 2026
+
+Published February 2026, authored by 100+ experts led by Yoshua Bengio and backed by 30+ countries. Key findings: leading models now pass professional licensing exams in medicine and law, attackers increasingly use AI in cyber operations, and current systems show early signs of oversight-evasion behaviors. A landmark policy document shaping regulation (internationalaisafetyreport.org).
+
+Key Themes Across the Papers
+
+1. Post-scaling efficiency -- DeepSeek mHC, TinyLoRA, and the broader trend show the field moving from "train bigger" to "train smarter" with architectural innovations that cut cost and stabilize training.
+
+2. Agentic AI maturation -- SkillsBench, SkillRL, MemSkill, and Stanford's automated research executor all point to agents gaining genuine procedural skills and memory, not just longer context.
+
+3. Multimodal unification -- LTX-2's joint audio-video generation, FireRed-Image-Edit for instruction-based editing, and MinerU2.5 for document parsing show models increasingly handling multiple modalities in a single architecture.
+
+4. Safety and governance urgency -- The International AI Safety Report 2026 and papers on clinical AI governance reflect growing institutional attention to real-world risks as capabilities accelerate.
+
+5. Open-source competitiveness -- LTX-2 exceeding proprietary video models, DeepSeek's open architecture research, and the Hugging Face trending ecosystem show open-source closing the gap with proprietary labs.
+
+Where to Track These Papers
+
+• Hugging Face Daily Papers -- community-upvoted daily feed
+• alphaXiv -- discussion layer on top of arXiv
+• Deep Learning Monitor -- aggregates arXiv, tweets, and Reddit
+• @dair_ai weekly roundups -- curated top papers each week (593 likes on latest)
+• arXiv cs.AI -- the canonical source
+
+Further Reading
+
+• 6 AI breakthroughs that will define 2026 (InfoWorld)
+• TechCrunch: In 2026, AI will move from hype to pragmatism
+• Constellation Research: DeepSeek's paper latest evidence AI muscle head era coming to end
+
+
 ## 🤖 Telegram Bot
 
 BriefBot includes a Telegram bot listener that receives research requests via Telegram messages and sends results back.
