@@ -1,7 +1,4 @@
-#
-# Persistence Layer: Caching subsystem for the BriefBot skill
-# Manages disk-based storage of API responses and model selections
-#
+"""Disk-based caching for API responses and model preferences."""
 
 import hashlib
 import json
@@ -10,205 +7,143 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-# Storage location for cached artifacts
-STORAGE_DIRECTORY = Path.home() / ".cache" / "briefbot"
-
-# Time-to-live settings for different cache types
-STANDARD_TTL_HOURS = 24
-MODEL_SELECTION_TTL_DAYS = 7
+CACHE_DIR = Path.home() / ".cache" / "briefbot"
+DEFAULT_TTL = 24
+MODEL_TTL_DAYS = 7
 
 
-def initialize_storage():
-    """
-    Creates the cache directory if it doesn't already exist.
-
-    This is called automatically before any write operations to ensure
-    the storage location is available.
-    """
-    STORAGE_DIRECTORY.mkdir(parents=True, exist_ok=True)
+def _ensure_dir():
+    """Create the cache directory if it doesn't exist."""
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def compute_cache_identifier(
-    subject_matter: str,
-    start_date: str,
-    end_date: str,
-    platform_selection: str
-) -> str:
-    """
-    Generates a deterministic cache key from query parameters.
-
-    The key is a truncated SHA-256 hash ensuring unique identification
-    of each distinct query combination.
-    """
-    composite_data = "{}|{}|{}|{}".format(subject_matter, start_date, end_date, platform_selection)
-    full_hash = hashlib.sha256(composite_data.encode()).hexdigest()
-    return full_hash[:16]
+def cache_key(topic: str, start: str, end: str, platform: str) -> str:
+    """Generate a deterministic 16-char hash key from query parameters."""
+    raw = f"{topic}|{start}|{end}|{platform}"
+    return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 
-def resolve_cache_filepath(cache_identifier: str) -> Path:
-    """Determines the filesystem path for a given cache identifier."""
-    return STORAGE_DIRECTORY / "{}.json".format(cache_identifier)
+def cache_path(key: str) -> Path:
+    """Return the filesystem path for a cache key."""
+    return CACHE_DIR / f"{key}.json"
 
 
-def verify_cache_validity(cache_filepath: Path, ttl_hours: int = STANDARD_TTL_HOURS) -> bool:
-    """
-    Checks whether a cached file exists and is within its time-to-live window.
-
-    Returns False if the file doesn't exist, can't be accessed, or has expired.
-    """
-    if not cache_filepath.exists():
+def is_valid(filepath: Path, ttl_hours: int = DEFAULT_TTL) -> bool:
+    """Check whether a cache file exists and hasn't expired."""
+    if not filepath.exists():
         return False
 
     try:
-        file_stats = cache_filepath.stat()
-        modification_time = datetime.fromtimestamp(file_stats.st_mtime, tz=timezone.utc)
-        current_time = datetime.now(timezone.utc)
-        elapsed_hours = (current_time - modification_time).total_seconds() / 3600
-        return elapsed_hours < ttl_hours
+        mtime = datetime.fromtimestamp(filepath.stat().st_mtime, tz=timezone.utc)
+        elapsed = (datetime.now(timezone.utc) - mtime).total_seconds() / 3600
+        return elapsed < ttl_hours
     except OSError:
         return False
 
 
-def retrieve_cached_data(cache_identifier: str, ttl_hours: int = STANDARD_TTL_HOURS) -> Optional[dict]:
-    """
-    Loads previously cached data if it exists and hasn't expired.
+def load(key: str, ttl_hours: int = DEFAULT_TTL) -> Optional[dict]:
+    """Load cached data if it exists and is fresh, else None."""
+    fp = cache_path(key)
 
-    Returns None if the cache miss occurs or data is corrupted.
-    """
-    cache_filepath = resolve_cache_filepath(cache_identifier)
-
-    if not verify_cache_validity(cache_filepath, ttl_hours):
+    if not is_valid(fp, ttl_hours):
         return None
 
     try:
-        with open(cache_filepath, 'r') as file_handle:
-            return json.load(file_handle)
+        with open(fp, 'r') as f:
+            return json.load(f)
     except (json.JSONDecodeError, OSError):
         return None
 
 
-def compute_cache_age(cache_filepath: Path) -> Optional[float]:
-    """
-    Calculates how many hours have elapsed since the cache file was written.
-
-    Returns None if the file doesn't exist or can't be read.
-    """
-    if not cache_filepath.exists():
+def age_hours(filepath: Path) -> Optional[float]:
+    """Return hours since the cache file was last written, or None."""
+    if not filepath.exists():
         return None
 
     try:
-        file_stats = cache_filepath.stat()
-        modification_time = datetime.fromtimestamp(file_stats.st_mtime, tz=timezone.utc)
-        current_time = datetime.now(timezone.utc)
-        return (current_time - modification_time).total_seconds() / 3600
+        mtime = datetime.fromtimestamp(filepath.stat().st_mtime, tz=timezone.utc)
+        return (datetime.now(timezone.utc) - mtime).total_seconds() / 3600
     except OSError:
         return None
 
 
-def retrieve_cached_data_with_metadata(
-    cache_identifier: str,
-    ttl_hours: int = STANDARD_TTL_HOURS
-) -> tuple:
-    """
-    Retrieves cached data along with its age in hours.
+def load_with_age(key: str, ttl_hours: int = DEFAULT_TTL) -> tuple:
+    """Return (data, age_hours) tuple; both None on cache miss."""
+    fp = cache_path(key)
 
-    Returns a tuple of (data, age_hours). Both values are None on cache miss.
-    """
-    cache_filepath = resolve_cache_filepath(cache_identifier)
-
-    if not verify_cache_validity(cache_filepath, ttl_hours):
+    if not is_valid(fp, ttl_hours):
         return None, None
 
-    age_hours = compute_cache_age(cache_filepath)
+    hours = age_hours(fp)
 
     try:
-        with open(cache_filepath, 'r') as file_handle:
-            return json.load(file_handle), age_hours
+        with open(fp, 'r') as f:
+            return json.load(f), hours
     except (json.JSONDecodeError, OSError):
         return None, None
 
 
-def persist_to_cache(cache_identifier: str, payload: dict):
-    """
-    Writes data to the cache storage.
-
-    Failures are silently ignored to prevent cache issues from
-    disrupting the main application flow.
-    """
-    initialize_storage()
-    cache_filepath = resolve_cache_filepath(cache_identifier)
+def save(key: str, data: dict):
+    """Write data to cache. Failures are silently ignored."""
+    _ensure_dir()
+    fp = cache_path(key)
 
     try:
-        with open(cache_filepath, 'w') as file_handle:
-            json.dump(payload, file_handle)
+        with open(fp, 'w') as f:
+            json.dump(data, f)
     except OSError:
         pass
 
 
-def purge_all_caches():
-    """
-    Removes all cached JSON files from the storage directory.
-
-    Individual file deletion failures are ignored to ensure
-    the operation completes for as many files as possible.
-    """
-    if not STORAGE_DIRECTORY.exists():
+def clear_all():
+    """Remove all cached JSON files."""
+    if not CACHE_DIR.exists():
         return
 
-    json_files = STORAGE_DIRECTORY.glob("*.json")
-    for cached_file in json_files:
+    for f in CACHE_DIR.glob("*.json"):
         try:
-            cached_file.unlink()
+            f.unlink()
         except OSError:
             pass
 
 
-# Model selection persistence (uses extended TTL)
-MODEL_SELECTION_FILEPATH = STORAGE_DIRECTORY / "model_selection.json"
+# Model preference persistence (extended TTL)
+_MODEL_FILE = CACHE_DIR / "model_selection.json"
 
 
-def retrieve_model_selections() -> dict:
-    """
-    Loads the cached model selection preferences.
+def _load_model_prefs() -> dict:
+    """Load cached model preferences, or empty dict if stale/missing."""
+    ttl_hours = MODEL_TTL_DAYS * 24
 
-    Returns an empty dict if no valid cache exists.
-    """
-    ttl_hours = MODEL_SELECTION_TTL_DAYS * 24
-
-    if not verify_cache_validity(MODEL_SELECTION_FILEPATH, ttl_hours):
+    if not is_valid(_MODEL_FILE, ttl_hours):
         return {}
 
     try:
-        with open(MODEL_SELECTION_FILEPATH, 'r') as file_handle:
-            return json.load(file_handle)
+        with open(_MODEL_FILE, 'r') as f:
+            return json.load(f)
     except (json.JSONDecodeError, OSError):
         return {}
 
 
-def persist_model_selections(selection_data: dict):
-    """Saves model selection preferences to disk."""
-    initialize_storage()
+def _save_model_prefs(data: dict):
+    """Save model preferences to disk."""
+    _ensure_dir()
 
     try:
-        with open(MODEL_SELECTION_FILEPATH, 'w') as file_handle:
-            json.dump(selection_data, file_handle)
+        with open(_MODEL_FILE, 'w') as f:
+            json.dump(data, f)
     except OSError:
         pass
 
 
 def get_cached_model(provider_name: str) -> Optional[str]:
-    """Retrieves the cached model identifier for a specific provider."""
-    selections = retrieve_model_selections()
-    return selections.get(provider_name)
+    """Retrieve the cached model identifier for a provider."""
+    return _load_model_prefs().get(provider_name)
 
 
 def set_cached_model(provider_name: str, model_identifier: str):
-    """
-    Stores a model selection for a provider.
-
-    Also records the timestamp of the update for cache management.
-    """
-    selections = retrieve_model_selections()
-    selections[provider_name] = model_identifier
-    selections['updated_at'] = datetime.now(timezone.utc).isoformat()
-    persist_model_selections(selections)
+    """Store a model selection for a provider with a timestamp."""
+    prefs = _load_model_prefs()
+    prefs[provider_name] = model_identifier
+    prefs['updated_at'] = datetime.now(timezone.utc).isoformat()
+    _save_model_prefs(prefs)

@@ -1,7 +1,4 @@
-#
-# Network Layer: HTTP client implementation for the BriefBot skill
-# Uses only standard library modules for maximum compatibility
-#
+"""HTTP client with retry logic using only stdlib."""
 
 import json
 import os
@@ -12,215 +9,146 @@ import urllib.request
 from typing import Any, Dict, Optional
 from urllib.parse import urlencode
 
-# Request configuration constants
-REQUEST_TIMEOUT_SECONDS = 30
-MAXIMUM_RETRY_ATTEMPTS = 3
-RETRY_BACKOFF_SECONDS = 1.0
-CLIENT_IDENTIFIER = "briefbot-skill/1.0 (Claude Code Skill)"
+TIMEOUT = 30
+MAX_RETRIES = 3
+BACKOFF = 1.0
+USER_AGENT = "briefbot-skill/1.0 (Claude Code Skill)"
 
-# Debug mode flag (controlled by environment variable)
 DEBUG = os.environ.get("BRIEFBOT_DEBUG", "").lower() in ("1", "true", "yes")
 
 
-def emit_debug_message(message_text: str):
-    """
-    Writes a diagnostic message to stderr when debug mode is enabled.
-
-    Debug output is prefixed with [DEBUG] for easy identification.
-    """
+def _debug(msg: str):
+    """Write a debug message to stderr if debug mode is on."""
     if DEBUG:
-        sys.stderr.write("[DEBUG] {}\n".format(message_text))
+        sys.stderr.write(f"[DEBUG] {msg}\n")
         sys.stderr.flush()
 
 
 class HTTPError(Exception):
-    """
-    Custom exception for HTTP request failures.
-
-    Captures the HTTP status code and response body when available,
-    enabling more informative error handling upstream.
-    """
+    """HTTP request failure with optional status code and response body."""
 
     def __init__(
         self,
         description: str,
         status_code: Optional[int] = None,
-        response_body: Optional[str] = None
+        response_body: Optional[str] = None,
     ):
         super().__init__(description)
         self.status_code = status_code
         self.body = response_body
 
 
-def execute_http_request(
-    http_method: str,
-    target_url: str,
-    request_headers: Optional[Dict[str, str]] = None,
-    json_payload: Optional[Dict[str, Any]] = None,
-    timeout_seconds: int = REQUEST_TIMEOUT_SECONDS,
-    retry_limit: int = MAXIMUM_RETRY_ATTEMPTS,
+def request(
+    method: str,
+    url: str,
+    headers: Optional[Dict[str, str]] = None,
+    json_body: Optional[Dict[str, Any]] = None,
+    timeout: int = TIMEOUT,
+    retries: int = MAX_RETRIES,
 ) -> Dict[str, Any]:
-    """
-    Executes an HTTP request and returns the parsed JSON response.
+    """Execute an HTTP request with automatic retry and return parsed JSON."""
+    headers = headers or {}
+    headers.setdefault("User-Agent", USER_AGENT)
 
-    Features:
-    - Automatic retry with exponential backoff
-    - JSON request/response handling
-    - Comprehensive error capture
+    encoded = None
+    if json_body is not None:
+        encoded = json.dumps(json_body).encode('utf-8')
+        headers.setdefault("Content-Type", "application/json")
 
-    Args:
-        http_method: HTTP verb (GET, POST, etc.)
-        target_url: Full request URL
-        request_headers: Optional header dictionary
-        json_payload: Optional JSON body for POST requests
-        timeout_seconds: Request timeout
-        retry_limit: Maximum retry attempts
+    req = urllib.request.Request(url, data=encoded, headers=headers, method=method)
 
-    Returns:
-        Parsed JSON response as dictionary
+    _debug(f"{method} {url}")
+    if json_body:
+        _debug(f"Payload keys: {list(json_body.keys())}")
 
-    Raises:
-        HTTPError: On request failure after all retries
-    """
-    request_headers = request_headers or {}
-    request_headers.setdefault("User-Agent", CLIENT_IDENTIFIER)
+    last_err = None
 
-    encoded_body = None
-    if json_payload is not None:
-        encoded_body = json.dumps(json_payload).encode('utf-8')
-        request_headers.setdefault("Content-Type", "application/json")
-
-    http_request = urllib.request.Request(
-        target_url,
-        data=encoded_body,
-        headers=request_headers,
-        method=http_method
-    )
-
-    emit_debug_message("{} {}".format(http_method, target_url))
-    if json_payload:
-        emit_debug_message("Payload keys: {}".format(list(json_payload.keys())))
-
-    most_recent_error = None
-    attempt_number = 0
-
-    while attempt_number < retry_limit:
+    for attempt in range(retries):
         try:
-            with urllib.request.urlopen(http_request, timeout=timeout_seconds) as http_response:
-                response_content = http_response.read().decode('utf-8')
-                emit_debug_message("Response: {} ({} bytes)".format(
-                    http_response.status, len(response_content)
-                ))
-                return json.loads(response_content) if response_content else {}
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                body = resp.read().decode('utf-8')
+                _debug(f"Response: {resp.status} ({len(body)} bytes)")
+                return json.loads(body) if body else {}
 
-        except urllib.error.HTTPError as http_err:
-            error_body = None
+        except urllib.error.HTTPError as e:
+            err_body = None
             try:
-                error_body = http_err.read().decode('utf-8')
+                err_body = e.read().decode('utf-8')
             except:
                 pass
 
-            emit_debug_message("HTTP Error {}: {}".format(http_err.code, http_err.reason))
-            if error_body:
-                emit_debug_message("Error body: {}".format(error_body[:500]))
+            _debug(f"HTTP Error {e.code}: {e.reason}")
+            if err_body:
+                _debug(f"Error body: {err_body[:500]}")
 
-            most_recent_error = HTTPError(
-                "HTTP {}: {}".format(http_err.code, http_err.reason),
-                http_err.code,
-                error_body
-            )
+            last_err = HTTPError(f"HTTP {e.code}: {e.reason}", e.code, err_body)
 
             # Don't retry client errors (4xx) except rate limits
-            is_client_error = 400 <= http_err.code < 500
-            is_rate_limit = http_err.code == 429
-            if is_client_error and not is_rate_limit:
-                raise most_recent_error
+            if 400 <= e.code < 500 and e.code != 429:
+                raise last_err
 
-            # Apply backoff before retry
-            if attempt_number < retry_limit - 1:
-                backoff_duration = RETRY_BACKOFF_SECONDS * (attempt_number + 1)
-                time.sleep(backoff_duration)
+            if attempt < retries - 1:
+                time.sleep(BACKOFF * (attempt + 1))
 
-        except urllib.error.URLError as url_err:
-            emit_debug_message("URL Error: {}".format(url_err.reason))
-            most_recent_error = HTTPError("URL Error: {}".format(url_err.reason))
+        except urllib.error.URLError as e:
+            _debug(f"URL Error: {e.reason}")
+            last_err = HTTPError(f"URL Error: {e.reason}")
 
-            if attempt_number < retry_limit - 1:
-                backoff_duration = RETRY_BACKOFF_SECONDS * (attempt_number + 1)
-                time.sleep(backoff_duration)
+            if attempt < retries - 1:
+                time.sleep(BACKOFF * (attempt + 1))
 
-        except json.JSONDecodeError as parse_err:
-            emit_debug_message("JSON decode error: {}".format(parse_err))
-            most_recent_error = HTTPError("Invalid JSON response: {}".format(parse_err))
-            raise most_recent_error
+        except json.JSONDecodeError as e:
+            _debug(f"JSON decode error: {e}")
+            last_err = HTTPError(f"Invalid JSON response: {e}")
+            raise last_err
 
-        except (OSError, TimeoutError, ConnectionResetError) as connection_err:
-            error_type = type(connection_err).__name__
-            emit_debug_message("Connection error: {}: {}".format(error_type, connection_err))
-            most_recent_error = HTTPError(
-                "Connection error: {}: {}".format(error_type, connection_err)
-            )
+        except (OSError, TimeoutError, ConnectionResetError) as e:
+            etype = type(e).__name__
+            _debug(f"Connection error: {etype}: {e}")
+            last_err = HTTPError(f"Connection error: {etype}: {e}")
 
-            if attempt_number < retry_limit - 1:
-                backoff_duration = RETRY_BACKOFF_SECONDS * (attempt_number + 1)
-                time.sleep(backoff_duration)
+            if attempt < retries - 1:
+                time.sleep(BACKOFF * (attempt + 1))
 
-        attempt_number += 1
-
-    if most_recent_error:
-        raise most_recent_error
+    if last_err:
+        raise last_err
 
     raise HTTPError("Request failed with no error details")
 
 
-def perform_get_request(
-    target_url: str,
-    request_headers: Optional[Dict[str, str]] = None,
-    **additional_options
-) -> Dict[str, Any]:
+def get(url: str, headers: Optional[Dict[str, str]] = None, **kwargs) -> Dict[str, Any]:
     """Convenience wrapper for GET requests."""
-    return execute_http_request("GET", target_url, request_headers=request_headers, **additional_options)
+    return request("GET", url, headers=headers, **kwargs)
 
 
-def perform_post_request(
-    target_url: str,
-    json_payload: Dict[str, Any],
-    request_headers: Optional[Dict[str, str]] = None,
-    **additional_options
+def post(
+    url: str,
+    json_body: Dict[str, Any],
+    headers: Optional[Dict[str, str]] = None,
+    **kwargs,
 ) -> Dict[str, Any]:
     """Convenience wrapper for POST requests with JSON body."""
-    return execute_http_request(
-        "POST", target_url,
-        request_headers=request_headers,
-        json_payload=json_payload,
-        **additional_options
-    )
+    return request("POST", url, headers=headers, json_body=json_body, **kwargs)
 
 
-def fetch_reddit_thread_data(thread_path: str) -> Dict[str, Any]:
-    """
-    Retrieves JSON data for a Reddit thread.
+def reddit_json(path: str) -> Dict[str, Any]:
+    """Fetch JSON data for a Reddit thread path."""
+    if not path.startswith('/'):
+        path = f"/{path}"
 
-    Args:
-        thread_path: Reddit path (e.g., /r/subreddit/comments/id/title)
+    path = path.rstrip('/')
+    if not path.endswith('.json'):
+        path = f"{path}.json"
 
-    Returns:
-        Parsed thread data
-    """
-    # Ensure path has leading slash
-    if not thread_path.startswith('/'):
-        thread_path = '/' + thread_path
+    url = f"https://www.reddit.com{path}?raw_json=1"
+    return get(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
 
-    # Remove trailing slash and append .json extension
-    thread_path = thread_path.rstrip('/')
-    if not thread_path.endswith('.json'):
-        thread_path = thread_path + '.json'
 
-    full_url = "https://www.reddit.com{}?raw_json=1".format(thread_path)
+# Backward compat aliases for out-of-scope callers (models.py etc.)
+def perform_get_request(url, request_headers=None, **kw):
+    return get(url, headers=request_headers, **kw)
 
-    custom_headers = {
-        "User-Agent": CLIENT_IDENTIFIER,
-        "Accept": "application/json",
-    }
+def perform_post_request(url, json_payload=None, request_headers=None, **kw):
+    return post(url, json_payload, headers=request_headers, **kw)
 
-    return perform_get_request(full_url, request_headers=custom_headers)
+fetch_reddit_thread_data = reddit_json

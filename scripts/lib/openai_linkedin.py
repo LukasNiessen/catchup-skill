@@ -1,7 +1,4 @@
-#
-# LinkedIn Discovery Client: OpenAI Responses API integration for LinkedIn content
-# Searches for professional posts and articles using web search capabilities
-#
+"""LinkedIn discovery via OpenAI Responses API with web search."""
 
 import json
 import re
@@ -10,316 +7,251 @@ from typing import Any, Dict, List, Optional
 
 from . import http
 
-# Alternative models when primary selection is unavailable
-FALLBACK_MODEL_SEQUENCE = ["gpt-4o", "gpt-4o-mini"]
+# Fallback chain when the primary model is inaccessible
+FALLBACK_MODELS = ["gpt-4o", "gpt-4o-mini"]
 
 
-def _emit_error_log(message_content: str):
-    """Writes error diagnostic to stderr."""
-    sys.stderr.write("[LINKEDIN ERROR] {}\n".format(message_content))
+def _err(msg: str):
+    """Log an error to stderr."""
+    sys.stderr.write(f"[LINKEDIN ERROR] {msg}\n")
     sys.stderr.flush()
 
 
-def _emit_info_log(message_content: str):
-    """Writes informational diagnostic to stderr."""
-    sys.stderr.write("[LINKEDIN] {}\n".format(message_content))
+def _info(msg: str):
+    """Log informational output to stderr."""
+    sys.stderr.write(f"[LINKEDIN] {msg}\n")
     sys.stderr.flush()
 
 
-def _is_model_access_error(error_instance: http.HTTPError) -> bool:
-    """
-    Determines if the error indicates model access or verification issues.
-
-    These errors warrant trying fallback models rather than failing entirely.
-    """
-    if error_instance.status_code != 400:
+def _is_access_err(err: http.HTTPError) -> bool:
+    """Check whether the error signals a model-access or verification problem."""
+    if err.status_code != 400 or not err.body:
         return False
 
-    if not error_instance.body:
-        return False
-
-    body_content = error_instance.body.lower()
-    access_indicators = [
+    lowered = err.body.lower()
+    indicators = [
         "verified",
         "organization must be",
         "does not have access",
         "not available",
         "not found",
     ]
-
-    for indicator in access_indicators:
-        if indicator in body_content:
-            return True
-
-    return False
+    return any(term in lowered for term in indicators)
 
 
-# API endpoint for OpenAI Responses
-OPENAI_API_ENDPOINT = "https://api.openai.com/v1/responses"
+API_URL = "https://api.openai.com/v1/responses"
 
-# Result quantity settings by research depth
-QUANTITY_SETTINGS = {
+# How many results to request per depth level
+DEPTH_SIZES = {
     "quick": (8, 12),
     "default": (15, 25),
     "deep": (30, 50),
 }
 
-LINKEDIN_DISCOVERY_PROMPT = """Find LinkedIn posts about: {topic}
+LINKEDIN_DISCOVERY_PROMPT = """Find LinkedIn posts and articles about: {topic}
 
-STEP 1: EXTRACT THE CORE SUBJECT
-Get the MAIN NOUN/PRODUCT/TOPIC:
-- "best AI practices for enterprise" → "AI enterprise"
-- "Claude Code workflows" → "Claude Code"
-DO NOT include "best", "top", "tips" in your search.
-
-STEP 2: SEARCH BROADLY
-Search for the core subject on LinkedIn:
-1. "[core subject] site:linkedin.com/posts"
-2. "[core subject] site:linkedin.com/pulse"
-3. "linkedin [core subject]"
+Extract the core subject, dropping generic words.
+Search linkedin.com/posts and linkedin.com/pulse for relevant content.
 
 Focus on:
-- Individual posts from professionals
-- Pulse articles (LinkedIn's blog platform)
-- Company updates with substantial content
+- Professional posts with meaningful commentary
+- Pulse articles with original analysis
+- Company updates with substance
 
-AVOID:
-- Job postings
-- Profile pages without specific posts
-- Company "About" pages
+Skip job listings, profile-only pages, and "About" sections.
 
-Return as many relevant posts as you find. We filter by date server-side.
+Date format YYYY-MM-DD if determinable, null otherwise.
+We handle date verification server-side.
 
-STEP 3: INCLUDE ALL MATCHES
-- Include ALL posts about the core subject
-- Set date to "YYYY-MM-DD" if you can determine when posted, otherwise null
-- We verify dates and filter old content server-side
-- DO NOT pre-filter aggressively - include anything relevant
+Target {min_items}-{max_items} posts. Over-include rather than miss relevant ones.
 
-Find {min_items}-{max_items} posts. Return MORE rather than fewer.
-
-Return JSON:
+JSON format:
 {{
   "items": [
     {{
-      "text": "Post text content (truncated if long)",
+      "text": "Post content (truncated)",
       "url": "https://www.linkedin.com/posts/...",
-      "author_name": "Author Full Name",
-      "author_title": "Job Title at Company",
+      "author_name": "Full Name",
+      "author_title": "Title at Company",
       "date": "YYYY-MM-DD or null",
       "reactions": 150,
       "comments": 25,
-      "why_relevant": "Why relevant to the topic",
+      "why_relevant": "Why this is relevant",
       "relevance": 0.85
     }}
   ]
 }}"""
 
 
-def _extract_core_subject(verbose_query: str) -> str:
-    """
-    Distills a verbose search query down to its essential subject.
-
-    Removes common filler words to improve search effectiveness.
-    """
-    filler_words = [
+def _core_subject(verbose_query: str) -> str:
+    """Strip filler words from a query, returning the essential subject."""
+    filler = {
         'best', 'top', 'how to', 'tips for', 'practices', 'features',
         'killer', 'guide', 'tutorial', 'recommendations', 'advice',
-        'using', 'for', 'with', 'the', 'of', 'in', 'on', 'posts'
-    ]
-    query_tokens = verbose_query.lower().split()
-    essential_tokens = [token for token in query_tokens if token not in filler_words]
-    return ' '.join(essential_tokens[:3]) or verbose_query
+        'using', 'for', 'with', 'the', 'of', 'in', 'on', 'posts',
+    }
+    tokens = verbose_query.lower().split()
+    kept = [t for t in tokens if t not in filler]
+    return ' '.join(kept[:3]) or verbose_query
 
 
-def search_linkedin(
-    api_credential: str,
-    model_identifier: str,
-    search_subject: str,
-    range_start: str,
-    range_end: str,
-    thoroughness: str = "default",
-    mock_api_response: Optional[Dict] = None,
+def search(
+    key: str,
+    model: str,
+    topic: str,
+    start: str,
+    end: str,
+    depth: str = "default",
+    mock_response: Optional[Dict] = None,
     _is_retry: bool = False,
 ) -> Dict[str, Any]:
-    """
-    Searches LinkedIn for relevant posts using OpenAI's Responses API.
+    """Query LinkedIn posts via OpenAI Responses API web search."""
+    if mock_response is not None:
+        return mock_response
 
-    Args:
-        api_credential: OpenAI API key
-        model_identifier: Model to use for search
-        search_subject: Topic to search for
-        range_start: Start date (YYYY-MM-DD)
-        range_end: End date (YYYY-MM-DD)
-        thoroughness: Research depth - "quick", "default", or "deep"
-        mock_api_response: Mock response for testing
+    min_items, max_items = DEPTH_SIZES.get(depth, DEPTH_SIZES["default"])
 
-    Returns:
-        Raw API response dictionary
-    """
-    if mock_api_response is not None:
-        return mock_api_response
-
-    min_results, max_results = QUANTITY_SETTINGS.get(thoroughness, QUANTITY_SETTINGS["default"])
-
-    request_headers = {
-        "Authorization": "Bearer {}".format(api_credential),
+    headers = {
+        "Authorization": f"Bearer {key}",
         "Content-Type": "application/json",
     }
 
-    # Adjust timeout based on search depth
-    timeout_mapping = {"quick": 90, "default": 120, "deep": 180}
-    request_timeout = timeout_mapping.get(thoroughness, 120)
+    timeout_map = {"quick": 90, "default": 120, "deep": 180}
+    timeout = timeout_map.get(depth, 120)
 
-    # Build model fallback chain
-    models_to_attempt = [model_identifier] + [m for m in FALLBACK_MODEL_SEQUENCE if m != model_identifier]
+    models_chain = [model] + [m for m in FALLBACK_MODELS if m != model]
 
-    search_instruction = LINKEDIN_DISCOVERY_PROMPT.format(
-        topic=search_subject,
-        from_date=range_start,
-        to_date=range_end,
-        min_items=min_results,
-        max_items=max_results,
+    prompt = LINKEDIN_DISCOVERY_PROMPT.format(
+        topic=topic,
+        from_date=start,
+        to_date=end,
+        min_items=min_items,
+        max_items=max_items,
     )
 
-    most_recent_error = None
+    last_err = None
 
-    for current_model in models_to_attempt:
-        request_payload = {
+    for current_model in models_chain:
+        payload = {
             "model": current_model,
             "tools": [
                 {
                     "type": "web_search",
                     "filters": {
-                        "allowed_domains": ["linkedin.com"]
-                    }
+                        "allowed_domains": ["linkedin.com"],
+                    },
                 }
             ],
             "include": ["web_search_call.action.sources"],
-            "input": search_instruction,
+            "input": prompt,
         }
 
         try:
-            return http.perform_post_request(OPENAI_API_ENDPOINT, request_payload, request_headers=request_headers, timeout_seconds=request_timeout)
-        except http.HTTPError as api_error:
-            most_recent_error = api_error
-            if _is_model_access_error(api_error):
-                _emit_info_log("Model {} not accessible, trying fallback...".format(current_model))
+            return http.post(API_URL, payload, headers=headers, timeout=timeout)
+        except http.HTTPError as api_err:
+            last_err = api_err
+            if _is_access_err(api_err):
+                _info(f"Model {current_model} not accessible, trying fallback...")
                 continue
             raise
 
-    if most_recent_error:
-        _emit_error_log("All models failed. Last error: {}".format(most_recent_error))
-        raise most_recent_error
+    if last_err:
+        _err(f"All models failed. Last error: {last_err}")
+        raise last_err
 
     raise http.HTTPError("No models available")
 
 
 def parse_linkedin_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """
-    Extracts LinkedIn item data from the OpenAI API response.
+    """Parse LinkedIn items from an OpenAI API response."""
+    extracted = []
 
-    Handles various response formats and performs data validation.
-    """
-    extracted_items = []
-
-    # Check for API-level errors
-    if "error" in api_response and api_response["error"]:
-        error_data = api_response["error"]
-        error_message = error_data.get("message", str(error_data)) if isinstance(error_data, dict) else str(error_data)
-        _emit_error_log("OpenAI API error: {}".format(error_message))
+    # API-level error check
+    if api_response.get("error"):
+        err_data = api_response["error"]
+        err_msg = err_data.get("message", str(err_data)) if isinstance(err_data, dict) else str(err_data)
+        _err(f"OpenAI API error: {err_msg}")
         if http.DEBUG:
-            _emit_error_log("Full error response: {}".format(json.dumps(api_response, indent=2)[:1000]))
-        return extracted_items
+            _err(f"Full error response: {json.dumps(api_response, indent=2)[:1000]}")
+        return extracted
 
-    # Locate the output text within the response structure
-    output_content = ""
+    # Find output text in the response
+    output_text = ""
 
     if "output" in api_response:
         output_data = api_response["output"]
 
         if isinstance(output_data, str):
-            output_content = output_data
+            output_text = output_data
         elif isinstance(output_data, list):
-            for output_element in output_data:
-                if isinstance(output_element, dict):
-                    if output_element.get("type") == "message":
-                        message_content = output_element.get("content", [])
-                        for content_block in message_content:
-                            if isinstance(content_block, dict) and content_block.get("type") == "output_text":
-                                output_content = content_block.get("text", "")
+            for elem in output_data:
+                if isinstance(elem, dict):
+                    if elem.get("type") == "message":
+                        for block in elem.get("content", []):
+                            if isinstance(block, dict) and block.get("type") == "output_text":
+                                output_text = block.get("text", "")
                                 break
-                    elif "text" in output_element:
-                        output_content = output_element["text"]
-                elif isinstance(output_element, str):
-                    output_content = output_element
+                    elif "text" in elem:
+                        output_text = elem["text"]
+                elif isinstance(elem, str):
+                    output_text = elem
 
-                if output_content:
+                if output_text:
                     break
 
-    # Check legacy response format
-    if not output_content and "choices" in api_response:
+    # Legacy format fallback
+    if not output_text and "choices" in api_response:
         for choice in api_response["choices"]:
             if "message" in choice:
-                output_content = choice["message"].get("content", "")
+                output_text = choice["message"].get("content", "")
                 break
 
-    if not output_content:
-        print("[LINKEDIN WARNING] No output text found in response. Keys: {}".format(list(api_response.keys())), flush=True)
-        return extracted_items
+    if not output_text:
+        print(f"[LINKEDIN WARNING] No output text found in response. Keys: {list(api_response.keys())}", flush=True)
+        return extracted
 
-    # Extract JSON from the text response
-    json_pattern = re.search(r'\{[\s\S]*"items"[\s\S]*\}', output_content)
+    # Pull JSON from the text
+    match = re.search(r'\{[\s\S]*"items"[\s\S]*\}', output_text)
 
-    if json_pattern:
+    if match:
         try:
-            parsed_data = json.loads(json_pattern.group())
-            extracted_items = parsed_data.get("items", [])
+            parsed = json.loads(match.group())
+            extracted = parsed.get("items", [])
         except json.JSONDecodeError:
             pass
 
-    # Validate and clean extracted items
-    validated_items = []
-    item_counter = 0
+    # Validate and normalise each item
+    validated = []
 
-    while item_counter < len(extracted_items):
-        raw_item = extracted_items[item_counter]
-
-        if not isinstance(raw_item, dict):
-            item_counter += 1
+    for idx, raw in enumerate(extracted):
+        if not isinstance(raw, dict):
             continue
 
-        item_url = raw_item.get("url", "")
-
-        if not item_url or "linkedin.com" not in item_url:
-            item_counter += 1
+        url = raw.get("url", "")
+        if not url or "linkedin.com" not in url:
             continue
 
-        # Skip job postings and profile-only pages
-        if "/jobs/" in item_url or "/job/" in item_url:
-            item_counter += 1
+        # Reject job postings
+        if "/jobs/" in url or "/job/" in url:
             continue
 
-        cleaned_item = {
-            "id": "LI{}".format(item_counter + 1),
-            "text": str(raw_item.get("text", "")).strip()[:500],
-            "url": item_url,
-            "author_name": str(raw_item.get("author_name", "")).strip(),
-            "author_title": str(raw_item.get("author_title", "")).strip(),
-            "date": raw_item.get("date"),
-            "reactions": int(raw_item.get("reactions", 0)) if raw_item.get("reactions") else None,
-            "comments": int(raw_item.get("comments", 0)) if raw_item.get("comments") else None,
-            "why_relevant": str(raw_item.get("why_relevant", "")).strip(),
-            "relevance": min(1.0, max(0.0, float(raw_item.get("relevance", 0.5)))),
+        item = {
+            "id": f"LI{idx + 1}",
+            "text": str(raw.get("text", "")).strip()[:500],
+            "url": url,
+            "author_name": str(raw.get("author_name", "")).strip(),
+            "author_title": str(raw.get("author_title", "")).strip(),
+            "date": raw.get("date"),
+            "reactions": int(raw.get("reactions", 0)) if raw.get("reactions") else None,
+            "comments": int(raw.get("comments", 0)) if raw.get("comments") else None,
+            "why_relevant": str(raw.get("why_relevant", "")).strip(),
+            "relevance": min(1.0, max(0.0, float(raw.get("relevance", 0.5)))),
         }
 
-        # Validate date format
-        if cleaned_item["date"]:
-            date_pattern = re.match(r'^\d{4}-\d{2}-\d{2}$', str(cleaned_item["date"]))
-            if not date_pattern:
-                cleaned_item["date"] = None
+        if item["date"]:
+            if not re.match(r'^\d{4}-\d{2}-\d{2}$', str(item["date"])):
+                item["date"] = None
 
-        validated_items.append(cleaned_item)
-        item_counter += 1
+        validated.append(item)
 
-    return validated_items
+    return validated

@@ -1,261 +1,196 @@
-#
-# Data Transformation: Normalizes raw API responses into canonical schema format
-# Handles cross-platform data format differences and date validation
-#
+"""Normalize raw API responses into canonical schema objects."""
 
-from typing import Any, Dict, List, TypeVar, Union
+from typing import Any, Dict, List, TypeVar
 
 from . import dates, schema
 
 ContentItem = TypeVar("ContentItem", schema.RedditItem, schema.XItem, schema.YouTubeItem, schema.LinkedInItem, schema.WebSearchItem)
 
 
-def filter_by_date_range(
-    content_items: List[ContentItem],
-    range_start: str,
-    range_end: str,
+def filter_dates(
+    items: List[ContentItem],
+    start: str,
+    end: str,
     exclude_undated: bool = False,
 ) -> List[ContentItem]:
-    """
-    Removes items with verified dates outside the acceptable range.
+    """Remove items with verified dates outside the acceptable range."""
+    filtered = []
 
-    This serves as a safety net to ensure no outdated content survives
-    even if the upstream API returns items outside the requested window.
-
-    Args:
-        content_items: Items to filter
-        range_start: Earliest acceptable date (YYYY-MM-DD)
-        range_end: Latest acceptable date (YYYY-MM-DD)
-        exclude_undated: If True, also removes items without dates
-
-    Returns:
-        Filtered list containing only in-range items
-    """
-    filtered_items = []
-
-    for item in content_items:
-        # Handle items without dates
+    for item in items:
         if item.date is None:
             if not exclude_undated:
-                filtered_items.append(item)
+                filtered.append(item)
             continue
 
-        # Exclude items dated before the range start
-        if item.date < range_start:
+        if item.date < start:
+            continue
+        if item.date > end:
             continue
 
-        # Exclude items dated after the range end (likely parsing errors)
-        if item.date > range_end:
-            continue
+        filtered.append(item)
 
-        filtered_items.append(item)
-
-    return filtered_items
+    return filtered
 
 
-def normalize_reddit_items(
+def to_reddit(
     raw_items: List[Dict[str, Any]],
-    range_start: str,
-    range_end: str,
+    start: str,
+    end: str,
 ) -> List[schema.RedditItem]:
-    """
-    Transforms raw Reddit API data into normalized RedditItem objects.
+    """Transform raw Reddit API data into RedditItem objects."""
+    result = []
 
-    Processes engagement metrics, comment data, and date confidence levels.
-    """
-    transformed_items = []
-
-    for raw_item in raw_items:
-        # Extract and transform engagement metrics
-        engagement_metrics = None
-        raw_engagement = raw_item.get("engagement")
-
-        if isinstance(raw_engagement, dict):
-            engagement_metrics = schema.Engagement(
-                score=raw_engagement.get("score"),
-                num_comments=raw_engagement.get("num_comments"),
-                upvote_ratio=raw_engagement.get("upvote_ratio"),
+    for raw in raw_items:
+        eng = None
+        raw_eng = raw.get("engagement")
+        if isinstance(raw_eng, dict):
+            eng = schema.Engagement(
+                score=raw_eng.get("score"),
+                num_comments=raw_eng.get("num_comments"),
+                upvote_ratio=raw_eng.get("upvote_ratio"),
             )
 
-        # Extract and transform comment data
-        comment_list = []
-        raw_comments = raw_item.get("top_comments", [])
+        comments = []
+        for rc in raw.get("top_comments", []):
+            comments.append(schema.Comment(
+                score=rc.get("score", 0),
+                date=rc.get("date"),
+                author=rc.get("author", ""),
+                excerpt=rc.get("excerpt", ""),
+                url=rc.get("url", ""),
+            ))
 
-        for raw_comment in raw_comments:
-            transformed_comment = schema.Comment(
-                score=raw_comment.get("score", 0),
-                date=raw_comment.get("date"),
-                author=raw_comment.get("author", ""),
-                excerpt=raw_comment.get("excerpt", ""),
-                url=raw_comment.get("url", ""),
-            )
-            comment_list.append(transformed_comment)
+        item_date = raw.get("date")
+        confidence = dates.date_confidence(item_date, start, end)
 
-        # Assess date reliability
-        item_date = raw_item.get("date")
-        date_reliability = dates.assess_date_reliability(item_date, range_start, range_end)
-
-        # Construct normalized item
-        normalized_item = schema.RedditItem(
-            id=raw_item.get("id", ""),
-            title=raw_item.get("title", ""),
-            url=raw_item.get("url", ""),
-            subreddit=raw_item.get("subreddit", ""),
+        result.append(schema.RedditItem(
+            id=raw.get("id", ""),
+            title=raw.get("title", ""),
+            url=raw.get("url", ""),
+            subreddit=raw.get("subreddit", ""),
             date=item_date,
-            date_confidence=date_reliability,
-            engagement=engagement_metrics,
-            top_comments=comment_list,
-            comment_insights=raw_item.get("comment_insights", []),
-            relevance=raw_item.get("relevance", 0.5),
-            why_relevant=raw_item.get("why_relevant", ""),
-        )
+            date_confidence=confidence,
+            engagement=eng,
+            top_comments=comments,
+            comment_insights=raw.get("comment_insights", []),
+            relevance=raw.get("relevance", 0.5),
+            why_relevant=raw.get("why_relevant", ""),
+        ))
 
-        transformed_items.append(normalized_item)
-
-    return transformed_items
+    return result
 
 
-def normalize_x_items(
+def to_x(
     raw_items: List[Dict[str, Any]],
-    range_start: str,
-    range_end: str,
+    start: str,
+    end: str,
 ) -> List[schema.XItem]:
-    """
-    Transforms raw X/Twitter API data into normalized XItem objects.
+    """Transform raw X/Twitter API data into XItem objects."""
+    result = []
 
-    Processes engagement metrics and date confidence levels.
-    """
-    transformed_items = []
-
-    for raw_item in raw_items:
-        # Extract and transform engagement metrics
-        engagement_metrics = None
-        raw_engagement = raw_item.get("engagement")
-
-        if isinstance(raw_engagement, dict):
-            engagement_metrics = schema.Engagement(
-                likes=raw_engagement.get("likes"),
-                reposts=raw_engagement.get("reposts"),
-                replies=raw_engagement.get("replies"),
-                quotes=raw_engagement.get("quotes"),
+    for raw in raw_items:
+        eng = None
+        raw_eng = raw.get("engagement")
+        if isinstance(raw_eng, dict):
+            eng = schema.Engagement(
+                likes=raw_eng.get("likes"),
+                reposts=raw_eng.get("reposts"),
+                replies=raw_eng.get("replies"),
+                quotes=raw_eng.get("quotes"),
             )
 
-        # Assess date reliability
-        item_date = raw_item.get("date")
-        date_reliability = dates.assess_date_reliability(item_date, range_start, range_end)
+        item_date = raw.get("date")
+        confidence = dates.date_confidence(item_date, start, end)
 
-        # Construct normalized item
-        normalized_item = schema.XItem(
-            id=raw_item.get("id", ""),
-            text=raw_item.get("text", ""),
-            url=raw_item.get("url", ""),
-            author_handle=raw_item.get("author_handle", ""),
+        result.append(schema.XItem(
+            id=raw.get("id", ""),
+            text=raw.get("text", ""),
+            url=raw.get("url", ""),
+            author_handle=raw.get("author_handle", ""),
             date=item_date,
-            date_confidence=date_reliability,
-            engagement=engagement_metrics,
-            relevance=raw_item.get("relevance", 0.5),
-            why_relevant=raw_item.get("why_relevant", ""),
-        )
+            date_confidence=confidence,
+            engagement=eng,
+            relevance=raw.get("relevance", 0.5),
+            why_relevant=raw.get("why_relevant", ""),
+        ))
 
-        transformed_items.append(normalized_item)
-
-    return transformed_items
+    return result
 
 
-def normalize_youtube_items(
+def to_youtube(
     raw_items: List[Dict[str, Any]],
-    range_start: str,
-    range_end: str,
+    start: str,
+    end: str,
 ) -> List[schema.YouTubeItem]:
-    """
-    Transforms raw YouTube API data into normalized YouTubeItem objects.
+    """Transform raw YouTube API data into YouTubeItem objects."""
+    result = []
 
-    Processes view counts, likes, and date confidence levels.
-    """
-    transformed_items = []
-
-    for raw_item in raw_items:
-        # Extract and transform engagement metrics
-        engagement_metrics = None
-        view_count = raw_item.get("views")
-        like_count = raw_item.get("likes")
-
+    for raw in raw_items:
+        eng = None
+        view_count = raw.get("views")
+        like_count = raw.get("likes")
         if view_count is not None or like_count is not None:
-            engagement_metrics = schema.Engagement(
+            eng = schema.Engagement(
                 views=view_count,
                 likes=like_count,
             )
 
-        # Assess date reliability
-        item_date = raw_item.get("date")
-        date_reliability = dates.assess_date_reliability(item_date, range_start, range_end)
+        item_date = raw.get("date")
+        confidence = dates.date_confidence(item_date, start, end)
 
-        # Construct normalized item
-        normalized_item = schema.YouTubeItem(
-            id=raw_item.get("id", ""),
-            title=raw_item.get("title", ""),
-            url=raw_item.get("url", ""),
-            channel_name=raw_item.get("channel_name", ""),
+        result.append(schema.YouTubeItem(
+            id=raw.get("id", ""),
+            title=raw.get("title", ""),
+            url=raw.get("url", ""),
+            channel_name=raw.get("channel_name", ""),
             date=item_date,
-            date_confidence=date_reliability,
-            engagement=engagement_metrics,
-            description=raw_item.get("description"),
-            relevance=raw_item.get("relevance", 0.5),
-            why_relevant=raw_item.get("why_relevant", ""),
-        )
+            date_confidence=confidence,
+            engagement=eng,
+            description=raw.get("description"),
+            relevance=raw.get("relevance", 0.5),
+            why_relevant=raw.get("why_relevant", ""),
+        ))
 
-        transformed_items.append(normalized_item)
-
-    return transformed_items
+    return result
 
 
-def normalize_linkedin_items(
+def to_linkedin(
     raw_items: List[Dict[str, Any]],
-    range_start: str,
-    range_end: str,
+    start: str,
+    end: str,
 ) -> List[schema.LinkedInItem]:
-    """
-    Transforms raw LinkedIn API data into normalized LinkedInItem objects.
+    """Transform raw LinkedIn API data into LinkedInItem objects."""
+    result = []
 
-    Processes reaction counts, comments, and date confidence levels.
-    """
-    transformed_items = []
-
-    for raw_item in raw_items:
-        # Extract and transform engagement metrics
-        engagement_metrics = None
-        reaction_count = raw_item.get("reactions")
-        comment_count = raw_item.get("comments")
-
+    for raw in raw_items:
+        eng = None
+        reaction_count = raw.get("reactions")
+        comment_count = raw.get("comments")
         if reaction_count is not None or comment_count is not None:
-            engagement_metrics = schema.Engagement(
+            eng = schema.Engagement(
                 reactions=reaction_count,
                 comments=comment_count,
             )
 
-        # Assess date reliability
-        item_date = raw_item.get("date")
-        date_reliability = dates.assess_date_reliability(item_date, range_start, range_end)
+        item_date = raw.get("date")
+        confidence = dates.date_confidence(item_date, start, end)
 
-        # Construct normalized item
-        normalized_item = schema.LinkedInItem(
-            id=raw_item.get("id", ""),
-            text=raw_item.get("text", ""),
-            url=raw_item.get("url", ""),
-            author_name=raw_item.get("author_name", ""),
-            author_title=raw_item.get("author_title"),
+        result.append(schema.LinkedInItem(
+            id=raw.get("id", ""),
+            text=raw.get("text", ""),
+            url=raw.get("url", ""),
+            author_name=raw.get("author_name", ""),
+            author_title=raw.get("author_title"),
             date=item_date,
-            date_confidence=date_reliability,
-            engagement=engagement_metrics,
-            relevance=raw_item.get("relevance", 0.5),
-            why_relevant=raw_item.get("why_relevant", ""),
-        )
+            date_confidence=confidence,
+            engagement=eng,
+            relevance=raw.get("relevance", 0.5),
+            why_relevant=raw.get("why_relevant", ""),
+        ))
 
-        transformed_items.append(normalized_item)
-
-    return transformed_items
+    return result
 
 
-def items_to_dicts(content_items: List) -> List[Dict[str, Any]]:
-    """Converts schema objects to dictionaries for JSON serialization."""
-    return [item.to_dict() for item in content_items]
+def as_dicts(items: List) -> List[Dict[str, Any]]:
+    """Convert schema objects to dicts for JSON serialization."""
+    return [item.to_dict() for item in items]

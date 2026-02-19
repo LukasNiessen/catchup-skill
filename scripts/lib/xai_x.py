@@ -1,7 +1,4 @@
-#
-# X Discovery Client: xAI API integration for X/Twitter content
-# Searches for posts using xAI's live X search capabilities
-#
+"""X/Twitter discovery via the xAI API with live search."""
 
 import json
 import os
@@ -12,318 +9,335 @@ from typing import Any, Dict, List, Optional
 from . import http
 
 
-def _emit_error_log(message_content: str):
-    """Writes error diagnostic to stderr."""
-    sys.stderr.write("[X ERROR] {}\n".format(message_content))
+def _err(msg: str):
+    """Log an error to stderr."""
+    sys.stderr.write(f"[X ERROR] {msg}\n")
     sys.stderr.flush()
 
 
 def _log(message: str):
-    """Emit a debug log line to stderr, gated by BRIEFBOT_DEBUG."""
+    """Emit a debug line to stderr when BRIEFBOT_DEBUG is set."""
     if os.environ.get("BRIEFBOT_DEBUG", "").lower() in ("1", "true", "yes"):
-        sys.stderr.write("[XAI_X] {}\n".format(message))
+        sys.stderr.write(f"[XAI_X] {message}\n")
         sys.stderr.flush()
 
 
-# xAI uses the responses endpoint with Agent Tools API
-XAI_API_ENDPOINT = "https://api.x.ai/v1/responses"
+API_URL = "https://api.x.ai/v1/responses"
 
-# Result quantity settings by research depth
-QUANTITY_SETTINGS = {
+# How many results to request per depth level
+DEPTH_SIZES = {
     "quick": (8, 12),
     "default": (20, 30),
     "deep": (40, 60),
 }
 
-X_DISCOVERY_PROMPT = """You have access to real-time X (Twitter) data. Search for posts about: {topic}
+X_DISCOVERY_PROMPT = """Use your X search capability to find posts about: {topic}
 
-Focus on posts from {from_date} to {to_date}. Find {min_items}-{max_items} high-quality, relevant posts.
+Date range: {from_date} through {to_date}. Aim for {min_items}-{max_items} quality posts.
 
-IMPORTANT: Return ONLY valid JSON in this exact format, no other text:
+Return ONLY valid JSON -- no surrounding text:
 {{
   "items": [
     {{
-      "text": "Post text content (truncated if long)",
-      "url": "https://x.com/user/status/...",
-      "author_handle": "username",
-      "date": "YYYY-MM-DD or null if unknown",
+      "text": "Post content (trim if lengthy)",
+      "url": "https://x.com/handle/status/...",
+      "author_handle": "handle_without_at",
+      "date": "YYYY-MM-DD or null",
       "engagement": {{
         "likes": 100,
         "reposts": 25,
         "replies": 15,
         "quotes": 5
       }},
-      "why_relevant": "Brief explanation of relevance",
+      "why_relevant": "Short relevance note",
       "relevance": 0.85
     }}
   ]
 }}
 
-Rules:
-- relevance is 0.0 to 1.0 (1.0 = highly relevant)
-- date must be YYYY-MM-DD format or null
-- engagement can be null if unknown
-- Include diverse voices/accounts if applicable
-- Prefer posts with substantive content, not just links"""
+Guidelines:
+- relevance: 0.0-1.0, higher means more on-topic
+- Dates must be YYYY-MM-DD or null
+- engagement may be null if unavailable
+- Favor substantive posts over link-only shares
+- Seek varied perspectives where possible"""
 
 
-def search_x(
-    api_credential: str,
-    model_identifier: str,
-    search_subject: str,
-    range_start: str,
-    range_end: str,
-    thoroughness: str = "default",
-    mock_api_response: Optional[Dict] = None,
+def _make_request(
+    key: str,
+    model: str,
+    prompt_content: str,
+    headers: Dict[str, str],
+    timeout: int,
 ) -> Dict[str, Any]:
-    """
-    Searches X for relevant posts using xAI's API with live search.
-
-    Args:
-        api_credential: xAI API key
-        model_identifier: Model to use (must support x_search tool)
-        search_subject: Topic to search for
-        range_start: Start date (YYYY-MM-DD)
-        range_end: End date (YYYY-MM-DD)
-        thoroughness: Research depth - "quick", "default", or "deep"
-        mock_api_response: Mock response for testing
-
-    Returns:
-        Raw API response dictionary
-    """
-    _log("=== search_x START ===")
-    _log("  API credential: {}...{} ({} chars)".format(
-        api_credential[:8], api_credential[-4:], len(api_credential)))
-    _log("  Model: {}".format(model_identifier))
-    _log("  Subject: '{}'".format(search_subject))
-    _log("  Date range: {} to {}".format(range_start, range_end))
-    _log("  Thoroughness: {}".format(thoroughness))
-
-    if mock_api_response is not None:
-        _log("  Using MOCK response")
-        return mock_api_response
-
-    min_results, max_results = QUANTITY_SETTINGS.get(thoroughness, QUANTITY_SETTINGS["default"])
-    _log("  Requesting {}-{} results".format(min_results, max_results))
-
-    request_headers = {
-        "Authorization": "Bearer {}".format(api_credential),
-        "Content-Type": "application/json",
-    }
-
-    # Adjust timeout based on search depth
-    timeout_mapping = {"quick": 90, "default": 120, "deep": 180}
-    request_timeout = timeout_mapping.get(thoroughness, 120)
-    _log("  Timeout: {}s".format(request_timeout))
-
-    # Construct request using Agent Tools API with x_search tool
-    request_payload = {
-        "model": model_identifier,
+    """Send a single xAI API request and return the response dict."""
+    payload = {
+        "model": model,
         "tools": [
-            {"type": "x_search"}
+            {"type": "x_search"},
         ],
         "input": [
             {
                 "role": "user",
-                "content": X_DISCOVERY_PROMPT.format(
-                    topic=search_subject,
-                    from_date=range_start,
-                    to_date=range_end,
-                    min_items=min_results,
-                    max_items=max_results,
-                ),
+                "content": prompt_content,
             }
         ],
     }
 
-    _log("  Endpoint: {}".format(XAI_API_ENDPOINT))
-    _log("  Payload model: {}, tools: {}, input_length: {} chars".format(
-        request_payload["model"],
-        [t["type"] for t in request_payload["tools"]],
-        len(request_payload["input"][0]["content"]),
-    ))
+    _log(f"  Endpoint: {API_URL}")
+    _log(f"  Payload model: {payload['model']}, tools: {[t['type'] for t in payload['tools']]}, input_length: {len(payload['input'][0]['content'])} chars")
     _log("  Sending POST request...")
 
-    response = http.perform_post_request(XAI_API_ENDPOINT, request_payload, request_headers=request_headers, timeout_seconds=request_timeout)
+    response = http.post(API_URL, payload, headers=headers, timeout=timeout)
 
-    _log("  Response received, type: {}, keys: {}".format(
-        type(response).__name__,
-        list(response.keys()) if isinstance(response, dict) else "N/A"))
+    _log(f"  Response received, type: {type(response).__name__}, keys: {list(response.keys()) if isinstance(response, dict) else 'N/A'}")
     if isinstance(response, dict):
         if "error" in response:
-            _log("  Response contains ERROR: {}".format(
-                str(response["error"])[:300]))
+            _log(f"  Response contains ERROR: {str(response['error'])[:300]}")
         if "output" in response:
             output = response["output"]
             if isinstance(output, list):
-                _log("  Response output: list with {} elements".format(len(output)))
+                _log(f"  Response output: list with {len(output)} elements")
                 for i, elem in enumerate(output):
                     if isinstance(elem, dict):
-                        _log("    output[{}]: type='{}', keys={}".format(
-                            i, elem.get("type", "?"), list(elem.keys())))
+                        _log(f"    output[{i}]: type='{elem.get('type', '?')}', keys={list(elem.keys())}")
             elif isinstance(output, str):
-                _log("  Response output: string ({} chars)".format(len(output)))
+                _log(f"  Response output: string ({len(output)} chars)")
         if "id" in response:
-            _log("  Response id: {}".format(response["id"]))
+            _log(f"  Response id: {response['id']}")
         if "model" in response:
-            _log("  Response model: {}".format(response["model"]))
+            _log(f"  Response model: {response['model']}")
 
-    _log("=== search_x END ===")
     return response
 
 
-def parse_x_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """
-    Extracts X post data from the xAI API response.
+# Fallback models to try when the primary model returns 403 (permission denied).
+# Ordered by preference: fast non-reasoning variants first, then full models.
+MODEL_FALLBACKS = [
+    "grok-4-1-fast",
+    "grok-4-1-fast-non-reasoning",
+    "grok-4-fast",
+    "grok-4-1",
+    "grok-4",
+    "grok-3",
+    "grok-3-fast",
+    "grok-3-mini",
+]
 
-    Handles various response formats and performs data validation.
+
+def search(
+    key: str,
+    model: str,
+    topic: str,
+    start: str,
+    end: str,
+    depth: str = "default",
+    mock_response: Optional[Dict] = None,
+) -> Dict[str, Any]:
+    """Query X posts via xAI's Agent Tools API with live search.
+
+    If the primary model returns a 403 (permission denied), automatically
+    retries with fallback models until one succeeds or all are exhausted.
     """
-    extracted_items = []
+    _log("=== search START ===")
+    _log(f"  API credential: {key[:8]}...{key[-4:]} ({len(key)} chars)")
+    _log(f"  Model: {model}")
+    _log(f"  Subject: '{topic}'")
+    _log(f"  Date range: {start} to {end}")
+    _log(f"  Depth: {depth}")
+
+    if mock_response is not None:
+        _log("  Using MOCK response")
+        return mock_response
+
+    min_items, max_items = DEPTH_SIZES.get(depth, DEPTH_SIZES["default"])
+    _log(f"  Requesting {min_items}-{max_items} results")
+
+    headers = {
+        "Authorization": f"Bearer {key}",
+        "Content-Type": "application/json",
+    }
+
+    timeout_map = {"quick": 90, "default": 120, "deep": 180}
+    timeout = timeout_map.get(depth, 120)
+    _log(f"  Timeout: {timeout}s")
+
+    prompt_content = X_DISCOVERY_PROMPT.format(
+        topic=topic,
+        from_date=start,
+        to_date=end,
+        min_items=min_items,
+        max_items=max_items,
+    )
+
+    # Try the primary model first
+    try:
+        response = _make_request(key, model, prompt_content, headers, timeout)
+        _log("=== search END ===")
+        return response
+    except http.HTTPError as e:
+        if e.status_code != 403:
+            raise
+        _err(f"Model '{model}' returned 403 (permission denied), trying fallbacks...")
+        _log(f"  Primary model '{model}' returned 403, entering fallback loop")
+
+    # Build fallback list: MODEL_FALLBACKS minus the model we already tried
+    fallbacks = [m for m in MODEL_FALLBACKS if m != model]
+    last_err = None
+
+    for fallback_model in fallbacks:
+        _log(f"  Trying fallback model: {fallback_model}")
+        try:
+            response = _make_request(key, fallback_model, prompt_content, headers, timeout)
+            _err(f"Fallback succeeded with model '{fallback_model}'")
+            _log(f"  Fallback model '{fallback_model}' succeeded!")
+            _log("=== search END (via fallback) ===")
+            return response
+        except http.HTTPError as e:
+            if e.status_code == 403:
+                _log(f"  Fallback model '{fallback_model}' also returned 403, skipping")
+                last_err = e
+                continue
+            # Non-permission errors propagate immediately
+            raise
+
+    # All models exhausted
+    _err(f"All {len(fallbacks) + 1} models returned 403 — API key lacks x_search permission")
+    _log("=== search END (all fallbacks exhausted) ===")
+    if last_err:
+        raise last_err
+    raise http.HTTPError("All models returned 403 — API key lacks x_search permission", 403)
+
+
+def parse_x_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Parse X post items from an xAI API response."""
+    extracted = []
 
     _log("=== parse_x_response START ===")
-    _log("  Response type: {}, keys: {}".format(
-        type(api_response).__name__,
-        list(api_response.keys()) if isinstance(api_response, dict) else "N/A"))
+    _log(f"  Response type: {type(api_response).__name__}, keys: {list(api_response.keys()) if isinstance(api_response, dict) else 'N/A'}")
 
-    # Check for API-level errors
-    if "error" in api_response and api_response["error"]:
-        error_data = api_response["error"]
-        error_message = error_data.get("message", str(error_data)) if isinstance(error_data, dict) else str(error_data)
-        _emit_error_log("xAI API error: {}".format(error_message))
-        _log("  API ERROR detected: {}".format(error_message))
+    # API-level error check
+    if api_response.get("error"):
+        err_data = api_response["error"]
+        err_msg = err_data.get("message", str(err_data)) if isinstance(err_data, dict) else str(err_data)
+        _err(f"xAI API error: {err_msg}")
+        _log(f"  API ERROR detected: {err_msg}")
         if http.DEBUG:
-            _emit_error_log("Full error response: {}".format(json.dumps(api_response, indent=2)[:1000]))
+            _err(f"Full error response: {json.dumps(api_response, indent=2)[:1000]}")
         _log("=== parse_x_response END (error, 0 items) ===")
-        return extracted_items
+        return extracted
 
-    # Locate the output text within the response structure
-    output_content = ""
+    # Find output text in the response
+    output_text = ""
 
     if "output" in api_response:
         output_data = api_response["output"]
-        _log("  'output' key found, type: {}".format(type(output_data).__name__))
+        _log(f"  'output' key found, type: {type(output_data).__name__}")
 
         if isinstance(output_data, str):
-            output_content = output_data
-            _log("  output is string, {} chars".format(len(output_content)))
+            output_text = output_data
+            _log(f"  output is string, {len(output_text)} chars")
         elif isinstance(output_data, list):
-            _log("  output is list with {} elements".format(len(output_data)))
-            for idx, output_element in enumerate(output_data):
-                if isinstance(output_element, dict):
-                    _log("    output[{}]: type='{}', keys={}".format(
-                        idx, output_element.get("type", "?"), list(output_element.keys())))
-                    if output_element.get("type") == "message":
-                        message_content = output_element.get("content", [])
-                        _log("    message has {} content blocks".format(len(message_content)))
-                        for block_idx, content_block in enumerate(message_content):
-                            if isinstance(content_block, dict):
-                                _log("      content[{}]: type='{}'".format(
-                                    block_idx, content_block.get("type", "?")))
-                                if content_block.get("type") == "output_text":
-                                    output_content = content_block.get("text", "")
-                                    _log("      Found output_text: {} chars".format(len(output_content)))
+            _log(f"  output is list with {len(output_data)} elements")
+            for idx, elem in enumerate(output_data):
+                if isinstance(elem, dict):
+                    _log(f"    output[{idx}]: type='{elem.get('type', '?')}', keys={list(elem.keys())}")
+                    if elem.get("type") == "message":
+                        msg_content = elem.get("content", [])
+                        _log(f"    message has {len(msg_content)} content blocks")
+                        for block_idx, block in enumerate(msg_content):
+                            if isinstance(block, dict):
+                                _log(f"      content[{block_idx}]: type='{block.get('type', '?')}'")
+                                if block.get("type") == "output_text":
+                                    output_text = block.get("text", "")
+                                    _log(f"      Found output_text: {len(output_text)} chars")
                                     break
-                    elif "text" in output_element:
-                        output_content = output_element["text"]
-                        _log("    Found text field: {} chars".format(len(output_content)))
-                elif isinstance(output_element, str):
-                    output_content = output_element
-                    _log("    output[{}] is string: {} chars".format(idx, len(output_content)))
+                    elif "text" in elem:
+                        output_text = elem["text"]
+                        _log(f"    Found text field: {len(output_text)} chars")
+                elif isinstance(elem, str):
+                    output_text = elem
+                    _log(f"    output[{idx}] is string: {len(output_text)} chars")
 
-                if output_content:
+                if output_text:
                     break
     else:
         _log("  No 'output' key in response")
 
-    # Check legacy response format
-    if not output_content and "choices" in api_response:
+    # Legacy format fallback
+    if not output_text and "choices" in api_response:
         _log("  Trying legacy 'choices' format...")
         for choice in api_response["choices"]:
             if "message" in choice:
-                output_content = choice["message"].get("content", "")
-                _log("  Found content in choices: {} chars".format(len(output_content)))
+                output_text = choice["message"].get("content", "")
+                _log(f"  Found content in choices: {len(output_text)} chars")
                 break
 
-    if not output_content:
+    if not output_text:
         _log("  NO output content found in response, returning 0 items")
-        _log("  Full response preview: {}".format(
-            json.dumps(api_response, indent=2)[:500] if isinstance(api_response, dict) else str(api_response)[:500]))
+        _log(f"  Full response preview: {json.dumps(api_response, indent=2)[:500] if isinstance(api_response, dict) else str(api_response)[:500]}")
         _log("=== parse_x_response END (no content, 0 items) ===")
-        return extracted_items
+        return extracted
 
-    _log("  Output content: {} chars, preview: '{}'".format(
-        len(output_content), output_content[:200].replace('\n', '\\n')))
+    _log(f"  Output content: {len(output_text)} chars, preview: '{output_text[:200].replace(chr(10), chr(92) + 'n')}'")
 
-    # Extract JSON from the text response
-    json_pattern = re.search(r'\{[\s\S]*"items"[\s\S]*\}', output_content)
+    # Pull JSON from the text
+    match = re.search(r'\{[\s\S]*"items"[\s\S]*\}', output_text)
 
-    if json_pattern:
-        _log("  JSON pattern found ({} chars)".format(len(json_pattern.group())))
+    if match:
+        _log(f"  JSON pattern found ({len(match.group())} chars)")
         try:
-            parsed_data = json.loads(json_pattern.group())
-            extracted_items = parsed_data.get("items", [])
-            _log("  Parsed {} items from JSON".format(len(extracted_items)))
-        except json.JSONDecodeError as jde:
-            _log("  JSON PARSE ERROR: {}".format(jde))
-            _emit_error_log("JSON parse error: {}".format(jde))
+            parsed = json.loads(match.group())
+            extracted = parsed.get("items", [])
+            _log(f"  Parsed {len(extracted)} items from JSON")
+        except json.JSONDecodeError as exc:
+            _log(f"  JSON PARSE ERROR: {exc}")
+            _err(f"JSON parse error: {exc}")
     else:
         _log("  NO JSON pattern with 'items' found in output")
-        _log("  Output preview for debugging: '{}'".format(output_content[:500].replace('\n', '\\n')))
+        _log(f"  Output preview for debugging: '{output_text[:500].replace(chr(10), chr(92) + 'n')}'")
 
-    # Validate and clean extracted items
-    validated_items = []
-    item_counter = 0
+    # Validate and normalise each item
+    validated = []
 
-    while item_counter < len(extracted_items):
-        raw_item = extracted_items[item_counter]
-
-        if not isinstance(raw_item, dict):
-            item_counter += 1
+    for idx, raw in enumerate(extracted):
+        if not isinstance(raw, dict):
             continue
 
-        item_url = raw_item.get("url", "")
-
-        if not item_url:
-            item_counter += 1
+        url = raw.get("url", "")
+        if not url:
             continue
 
         # Parse engagement metrics
-        engagement_data = None
-        raw_engagement = raw_item.get("engagement")
-
-        if isinstance(raw_engagement, dict):
-            engagement_data = {
-                "likes": int(raw_engagement.get("likes", 0)) if raw_engagement.get("likes") else None,
-                "reposts": int(raw_engagement.get("reposts", 0)) if raw_engagement.get("reposts") else None,
-                "replies": int(raw_engagement.get("replies", 0)) if raw_engagement.get("replies") else None,
-                "quotes": int(raw_engagement.get("quotes", 0)) if raw_engagement.get("quotes") else None,
+        engagement = None
+        raw_eng = raw.get("engagement")
+        if isinstance(raw_eng, dict):
+            engagement = {
+                "likes": int(raw_eng.get("likes", 0)) if raw_eng.get("likes") else None,
+                "reposts": int(raw_eng.get("reposts", 0)) if raw_eng.get("reposts") else None,
+                "replies": int(raw_eng.get("replies", 0)) if raw_eng.get("replies") else None,
+                "quotes": int(raw_eng.get("quotes", 0)) if raw_eng.get("quotes") else None,
             }
 
-        cleaned_item = {
-            "id": "X{}".format(item_counter + 1),
-            "text": str(raw_item.get("text", "")).strip()[:500],
-            "url": item_url,
-            "author_handle": str(raw_item.get("author_handle", "")).strip().lstrip("@"),
-            "date": raw_item.get("date"),
-            "engagement": engagement_data,
-            "why_relevant": str(raw_item.get("why_relevant", "")).strip(),
-            "relevance": min(1.0, max(0.0, float(raw_item.get("relevance", 0.5)))),
+        item = {
+            "id": f"X{idx + 1}",
+            "text": str(raw.get("text", "")).strip()[:500],
+            "url": url,
+            "author_handle": str(raw.get("author_handle", "")).strip().lstrip("@"),
+            "date": raw.get("date"),
+            "engagement": engagement,
+            "why_relevant": str(raw.get("why_relevant", "")).strip(),
+            "relevance": min(1.0, max(0.0, float(raw.get("relevance", 0.5)))),
         }
 
-        # Validate date format
-        if cleaned_item["date"]:
-            date_pattern = re.match(r'^\d{4}-\d{2}-\d{2}$', str(cleaned_item["date"]))
-            if not date_pattern:
-                cleaned_item["date"] = None
+        if item["date"]:
+            if not re.match(r'^\d{4}-\d{2}-\d{2}$', str(item["date"])):
+                item["date"] = None
 
-        validated_items.append(cleaned_item)
-        item_counter += 1
+        validated.append(item)
 
-    _log("  Validated {} of {} raw items".format(len(validated_items), len(extracted_items)))
-    if validated_items:
-        _log("  First item: author={}, url={}, date={}".format(
-            validated_items[0].get("author_handle", "?"),
-            validated_items[0].get("url", "?")[:60],
-            validated_items[0].get("date", "?")))
-    _log("=== parse_x_response END ({} items) ===".format(len(validated_items)))
-    return validated_items
+    _log(f"  Validated {len(validated)} of {len(extracted)} raw items")
+    if validated:
+        _log(f"  First item: author={validated[0].get('author_handle', '?')}, url={validated[0].get('url', '?')[:60]}, date={validated[0].get('date', '?')}")
+    _log(f"=== parse_x_response END ({len(validated)} items) ===")
+    return validated

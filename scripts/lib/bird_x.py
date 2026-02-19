@@ -51,8 +51,8 @@ def _get_x_cookie_env() -> Dict[str, str]:
 
     # Try loading from briefbot config (.env file, populated by cookie-bridge)
     try:
-        from lib.env import SETTINGS_FILEPATH, parse_environment_file
-        settings = parse_environment_file(SETTINGS_FILEPATH)
+        from lib.env import CONFIG_FILE, parse_dotenv
+        settings = parse_dotenv(CONFIG_FILE)
         if settings.get("AUTH_TOKEN") and settings.get("CT0"):
             extra_env["AUTH_TOKEN"] = settings["AUTH_TOKEN"]
             extra_env["CT0"] = settings["CT0"]

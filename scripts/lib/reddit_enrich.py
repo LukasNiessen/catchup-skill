@@ -1,7 +1,4 @@
-#
-# Thread Enrichment: Fetches real engagement metrics from Reddit's JSON API
-# Augments discovered threads with upvotes, comments, and community insights
-#
+"""Enrich Reddit items with real engagement data from thread JSON."""
 
 import re
 from typing import Any, Dict, List, Optional
@@ -10,265 +7,178 @@ from urllib.parse import urlparse
 from . import http, dates
 
 
-def parse_reddit_url_path(thread_url: str) -> Optional[str]:
-    """
-    Extracts the path component from a Reddit URL.
-
-    Returns None if the URL is not from reddit.com.
-    """
+def _parse_url(url: str) -> Optional[str]:
+    """Extract the path from a Reddit URL, or None if not reddit.com."""
     try:
-        parsed_components = urlparse(thread_url)
-
-        if "reddit.com" not in parsed_components.netloc:
+        parsed = urlparse(url)
+        if "reddit.com" not in parsed.netloc:
             return None
-
-        return parsed_components.path
+        return parsed.path
     except:
         return None
 
 
-def retrieve_thread_json(thread_url: str, mock_data: Optional[Dict] = None) -> Optional[Dict[str, Any]]:
-    """
-    Fetches the JSON representation of a Reddit thread.
-
-    Args:
-        thread_url: Full Reddit thread URL
-        mock_data: Optional mock data for testing
-
-    Returns:
-        Parsed JSON data or None on failure
-    """
+def _fetch_thread(url: str, mock_data: Optional[Dict] = None) -> Optional[Dict[str, Any]]:
+    """Fetch the JSON representation of a Reddit thread."""
     if mock_data is not None:
         return mock_data
 
-    url_path = parse_reddit_url_path(thread_url)
-
-    if url_path is None:
+    path = _parse_url(url)
+    if path is None:
         return None
 
     try:
-        response_data = http.fetch_reddit_thread_data(url_path)
-        return response_data
+        return http.reddit_json(path)
     except http.HTTPError:
         return None
 
 
-def extract_thread_components(raw_data: Any) -> Dict[str, Any]:
-    """
-    Parses Reddit's JSON structure into a structured representation.
-
-    Reddit returns an array where:
-    - Element 0: The submission (post) listing
-    - Element 1: The comments listing
-    """
+def _parse_thread(raw_data: Any) -> Dict[str, Any]:
+    """Parse Reddit's JSON array into submission + comments."""
     components = {
         "submission": None,
         "comments": [],
     }
 
-    # Validate input structure
-    if not isinstance(raw_data, list):
+    if not isinstance(raw_data, list) or len(raw_data) < 1:
         return components
 
-    if len(raw_data) < 1:
-        return components
-
-    # Extract submission from first element
-    submission_listing = raw_data[0]
-
-    if isinstance(submission_listing, dict):
-        child_elements = submission_listing.get("data", {}).get("children", [])
-
-        if len(child_elements) > 0:
-            submission_data = child_elements[0].get("data", {})
-
+    # Submission lives in the first listing
+    listing = raw_data[0]
+    if isinstance(listing, dict):
+        children = listing.get("data", {}).get("children", [])
+        if children:
+            sub = children[0].get("data", {})
             components["submission"] = {
-                "score": submission_data.get("score"),
-                "num_comments": submission_data.get("num_comments"),
-                "upvote_ratio": submission_data.get("upvote_ratio"),
-                "created_utc": submission_data.get("created_utc"),
-                "permalink": submission_data.get("permalink"),
-                "title": submission_data.get("title"),
-                "selftext": submission_data.get("selftext", "")[:500],
+                "score": sub.get("score"),
+                "num_comments": sub.get("num_comments"),
+                "upvote_ratio": sub.get("upvote_ratio"),
+                "created_utc": sub.get("created_utc"),
+                "permalink": sub.get("permalink"),
+                "title": sub.get("title"),
+                "selftext": sub.get("selftext", "")[:500],
             }
 
-    # Extract comments from second element
+    # Comments live in the second listing
     if len(raw_data) >= 2:
-        comments_listing = raw_data[1]
-
-        if isinstance(comments_listing, dict):
-            child_elements = comments_listing.get("data", {}).get("children", [])
-
-            for child_element in child_elements:
-                # Filter to actual comments (kind = t1)
-                if child_element.get("kind") != "t1":
+        comment_listing = raw_data[1]
+        if isinstance(comment_listing, dict):
+            for child in comment_listing.get("data", {}).get("children", []):
+                if child.get("kind") != "t1":
                     continue
 
-                comment_data = child_element.get("data", {})
-
-                # Skip comments without body text
-                comment_body = comment_data.get("body")
-                if not comment_body:
+                cdata = child.get("data", {})
+                body = cdata.get("body")
+                if not body:
                     continue
 
-                comment_record = {
-                    "score": comment_data.get("score", 0),
-                    "created_utc": comment_data.get("created_utc"),
-                    "author": comment_data.get("author", "[deleted]"),
-                    "body": comment_data.get("body", "")[:300],
-                    "permalink": comment_data.get("permalink"),
-                }
-
-                components["comments"].append(comment_record)
+                components["comments"].append({
+                    "score": cdata.get("score", 0),
+                    "created_utc": cdata.get("created_utc"),
+                    "author": cdata.get("author", "[deleted]"),
+                    "body": cdata.get("body", "")[:300],
+                    "permalink": cdata.get("permalink"),
+                })
 
     return components
 
 
-def select_top_comments(comment_list: List[Dict], maximum_count: int = 10) -> List[Dict[str, Any]]:
-    """
-    Selects the highest-scored comments from a thread.
+def _top_comments(comments: List[Dict], limit: int = 10) -> List[Dict[str, Any]]:
+    """Return the highest-scoring comments, excluding deleted authors."""
+    excluded = {"[deleted]", "[removed]"}
+    valid = [c for c in comments if c.get("author") not in excluded]
+    ranked = sorted(valid, key=lambda c: c.get("score", 0), reverse=True)
+    return ranked[:limit]
 
-    Filters out deleted/removed comments before sorting.
-    """
-    # Exclude deleted or removed authors
-    excluded_authors = {"[deleted]", "[removed]"}
-    valid_comments = [
-        comment for comment in comment_list
-        if comment.get("author") not in excluded_authors
+
+def _extract_insights(comments: List[Dict], limit: int = 7) -> List[str]:
+    """Pull substantive insights from top comments, skipping low-value noise."""
+    insights = []
+    candidates = comments[:limit * 2]
+
+    low_value_patterns = [
+        r'^(this|same|agreed|exactly|yep|nope|yes|no|thanks|thank you)\.?$',
+        r'^lol|lmao|haha',
+        r'^\[deleted\]',
+        r'^\[removed\]',
     ]
 
-    # Sort by score in descending order
-    sorted_comments = sorted(
-        valid_comments,
-        key=lambda c: c.get("score", 0),
-        reverse=True
-    )
+    for comment in candidates:
+        body = comment.get("body", "").strip()
 
-    return sorted_comments[:maximum_count]
-
-
-def distill_comment_insights(comment_list: List[Dict], maximum_count: int = 7) -> List[str]:
-    """
-    Extracts key insights from the top comments.
-
-    Uses heuristics to identify substantive, actionable comments
-    rather than simple agreement/disagreement responses.
-    """
-    insights_collected = []
-
-    # Process more comments than needed to account for filtering
-    comments_to_examine = comment_list[:maximum_count * 2]
-
-    for comment in comments_to_examine:
-        comment_body = comment.get("body", "").strip()
-
-        # Skip short comments
-        if len(comment_body) < 30:
+        if len(body) < 30:
             continue
 
-        # Skip low-value response patterns
-        low_value_patterns = [
-            r'^(this|same|agreed|exactly|yep|nope|yes|no|thanks|thank you)\.?$',
-            r'^lol|lmao|haha',
-            r'^\[deleted\]',
-            r'^\[removed\]',
-        ]
-
-        body_lower = comment_body.lower()
-        is_low_value = any(re.match(pattern, body_lower) for pattern in low_value_patterns)
-
-        if is_low_value:
+        body_lower = body.lower()
+        if any(re.match(pat, body_lower) for pat in low_value_patterns):
             continue
 
         # Truncate to a meaningful excerpt
-        insight_text = comment_body[:150]
+        excerpt = body[:150]
 
-        if len(comment_body) > 150:
-            # Attempt to find a natural sentence boundary
-            boundary_found = False
-            char_index = 0
-
-            while char_index < len(insight_text):
-                current_char = insight_text[char_index]
-
-                if current_char in '.!?' and char_index > 50:
-                    insight_text = insight_text[:char_index + 1]
-                    boundary_found = True
+        if len(body) > 150:
+            found_boundary = False
+            for i, ch in enumerate(excerpt):
+                if ch in '.!?' and i > 50:
+                    excerpt = excerpt[:i + 1]
+                    found_boundary = True
                     break
 
-                char_index += 1
+            if not found_boundary:
+                excerpt = excerpt.rstrip() + "..."
 
-            if not boundary_found:
-                insight_text = insight_text.rstrip() + "..."
+        insights.append(excerpt)
 
-        insights_collected.append(insight_text)
-
-        if len(insights_collected) >= maximum_count:
+        if len(insights) >= limit:
             break
 
-    return insights_collected
+    return insights
 
 
-def enrich_reddit_item(
-    item_data: Dict[str, Any],
-    mock_thread_json: Optional[Dict] = None,
+def enrich(
+    item: Dict[str, Any],
+    mock_json: Optional[Dict] = None,
 ) -> Dict[str, Any]:
-    """
-    Augments a Reddit item with real engagement metrics from the thread.
+    """Augment a Reddit item with real engagement data from the thread."""
+    thread_url = item.get("url", "")
 
-    Fetches the actual thread data and extracts:
-    - Upvote score
-    - Comment count
-    - Upvote ratio
-    - Top comments with excerpts
-    - Distilled insights from discussion
-    """
-    thread_url = item_data.get("url", "")
+    thread_data = _fetch_thread(thread_url, mock_json)
+    if thread_data is None:
+        return item
 
-    # Retrieve thread JSON
-    thread_json = retrieve_thread_json(thread_url, mock_thread_json)
+    parsed = _parse_thread(thread_data)
+    submission = parsed.get("submission")
+    comment_list = parsed.get("comments", [])
 
-    if thread_json is None:
-        return item_data
-
-    # Parse the JSON structure
-    parsed_components = extract_thread_components(thread_json)
-    submission_data = parsed_components.get("submission")
-    comment_data = parsed_components.get("comments", [])
-
-    # Update engagement metrics from actual data
-    if submission_data is not None:
-        item_data["engagement"] = {
-            "score": submission_data.get("score"),
-            "num_comments": submission_data.get("num_comments"),
-            "upvote_ratio": submission_data.get("upvote_ratio"),
+    # Populate engagement from the actual submission
+    if submission is not None:
+        item["engagement"] = {
+            "score": submission.get("score"),
+            "num_comments": submission.get("num_comments"),
+            "upvote_ratio": submission.get("upvote_ratio"),
         }
 
-        # Update date from actual creation timestamp
-        creation_timestamp = submission_data.get("created_utc")
+        created = submission.get("created_utc")
+        if created is not None:
+            item["date"] = dates.timestamp_to_date(created)
 
-        if creation_timestamp is not None:
-            item_data["date"] = dates.convert_timestamp_to_date(creation_timestamp)
+    # Attach top comments
+    best = _top_comments(comment_list)
+    item["top_comments"] = []
 
-    # Extract top comments
-    top_comments = select_top_comments(comment_data)
-    item_data["top_comments"] = []
+    for comment in best:
+        permalink = comment.get("permalink", "")
+        comment_url = f"https://reddit.com{permalink}" if permalink else ""
 
-    for comment in top_comments:
-        comment_permalink = comment.get("permalink", "")
-        comment_url = "https://reddit.com{}".format(comment_permalink) if comment_permalink else ""
-
-        formatted_comment = {
+        item["top_comments"].append({
             "score": comment.get("score", 0),
-            "date": dates.convert_timestamp_to_date(comment.get("created_utc")),
+            "date": dates.timestamp_to_date(comment.get("created_utc")),
             "author": comment.get("author", ""),
             "excerpt": comment.get("body", "")[:200],
             "url": comment_url,
-        }
+        })
 
-        item_data["top_comments"].append(formatted_comment)
+    # Distil discussion insights
+    item["comment_insights"] = _extract_insights(best)
 
-    # Extract discussion insights
-    item_data["comment_insights"] = distill_comment_insights(top_comments)
-
-    return item_data
+    return item

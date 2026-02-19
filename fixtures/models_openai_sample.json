@@ -4,37 +4,37 @@
     {
       "id": "gpt-5.2",
       "object": "model",
-      "created": 1704067200,
+      "created": 1704153600,
       "owned_by": "openai"
     },
     {
       "id": "gpt-5.1",
       "object": "model",
-      "created": 1701388800,
+      "created": 1701475200,
       "owned_by": "openai"
     },
     {
       "id": "gpt-5",
       "object": "model",
-      "created": 1698710400,
+      "created": 1698796800,
       "owned_by": "openai"
     },
     {
       "id": "gpt-5-mini",
       "object": "model",
-      "created": 1704067200,
+      "created": 1704153600,
       "owned_by": "openai"
     },
     {
       "id": "gpt-4o",
       "object": "model",
-      "created": 1683158400,
+      "created": 1683244800,
       "owned_by": "openai"
     },
     {
       "id": "gpt-4-turbo",
       "object": "model",
-      "created": 1680566400,
+      "created": 1680652800,
       "owned_by": "openai"
     }
   ]

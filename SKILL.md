@@ -272,42 +272,42 @@ The script output will indicate the mode:
 
 For **ALL modes**, perform WebSearch to supplement (or provide all data in web-only mode).
 
-Choose search queries based on QUERY_TYPE:
+Tailor your search queries to match the QUERY_TYPE:
 
 **If RECOMMENDATIONS** ("best X", "top X", "what X should I use"):
 
-- Search for: `best {TOPIC} recommendations`
-- Search for: `{TOPIC} list examples`
-- Search for: `most popular {TOPIC}`
-- Goal: Find SPECIFIC NAMES of things, not generic advice
+- Query: `top {TOPIC} recommendations`
+- Query: `{TOPIC} examples list`
+- Query: `most widely used {TOPIC}`
+- Objective: Surface ACTUAL NAMED items, not vague guidance
 
 **If NEWS** ("what's happening with X", "X news"):
 
-- Search for: `{TOPIC} news 2026`
-- Search for: `{TOPIC} announcement update`
-- Goal: Find current events and recent developments
+- Query: `{TOPIC} latest news 2026`
+- Query: `{TOPIC} recent announcement`
+- Objective: Capture breaking stories and recent happenings
 
 **If PROMPTING** ("X prompts", "prompting for X"):
 
-- Search for: `{TOPIC} prompts examples 2026`
-- Search for: `{TOPIC} techniques tips`
-- Goal: Find prompting techniques and examples to create copy-paste prompts
+- Query: `{TOPIC} prompt examples 2026`
+- Query: `{TOPIC} tips techniques`
+- Objective: Gather real prompting strategies and ready-to-use examples
 
 **If GENERAL** (default):
 
-- Search for: `{TOPIC} 2026`
-- Search for: `{TOPIC} discussion`
-- Goal: Find what people are actually saying
+- Query: `{TOPIC} 2026`
+- Query: `{TOPIC} community discussion`
+- Objective: Discover what people are genuinely talking about
 
-For ALL query types:
+Across ALL query types, follow these rules:
 
-- **USE THE USER'S EXACT TERMINOLOGY** - don't substitute or add tech names based on your knowledge
-  - If user says "Flux LoRA training", search for "Flux LoRA training"
-  - Do NOT add "Stable Diffusion", "ComfyUI", or other terms you think are related
-  - Your knowledge may be outdated - trust the user's terminology
-- EXCLUDE reddit.com, x.com, twitter.com (covered by script)
-- INCLUDE: blogs, tutorials, docs, news, GitHub repos
-- **DO NOT output "Sources:" list** - this is noise, we'll show stats at the end
+- **PRESERVE THE USER'S EXACT WORDING** — do not swap in or append technology names from your own knowledge
+  - If the user typed "Flux LoRA training", search exactly that phrase
+  - Do NOT inject related terms like "Stable Diffusion", "ComfyUI", etc. on your own
+  - The user's terminology may reflect newer usage than your training data — defer to it
+- SKIP reddit.com, x.com, twitter.com (the script already covers those)
+- PRIORITIZE: blogs, tutorials, documentation, news sites, GitHub repositories
+- **SUPPRESS any "Sources:" list in output** — that's clutter; stats appear at the end
 
 **Step 4: Wait for background script to complete**
 Use TaskOutput to get the script results before proceeding to synthesis.
@@ -408,18 +408,18 @@ The Synthesis Agent must:
 
 ---
 
-## FIRST: Absorb the Research
+## FIRST: Internalize the Research
 
-**CRITICAL: Ground your synthesis in the ACTUAL research content, not your pre-existing knowledge.**
+**NON-NEGOTIABLE: Base your synthesis ENTIRELY on what the research returned, not on background knowledge you already had.**
 
-Read the research output carefully. Pay attention to:
+Study the research output with precision. Focus on:
 
-- **Exact product/tool names** mentioned (e.g., if research mentions "ClawdBot" or "@clawdbot", that's a DIFFERENT product than "Claude Code" - don't conflate them)
-- **Specific quotes and insights** from the sources - use THESE, not generic knowledge
-- **What the sources actually say**, not what you assume the topic is about
-- **Actionable techniques** — extract specific, named techniques people recommend (e.g., "use ALL CAPS for constraints", "JSON character descriptions", "negative prompting to remove watermarks"). These are the gold — generic descriptions of what the tool IS are not valuable.
+- **Exact names of products and tools** as they appear (e.g., if the data references "PixelForge" or "@pixelforge_ai", treat that as its own distinct entity — do not merge it with a different product you happen to know about)
+- **Direct quotes and concrete findings** from the sources — lean on THESE rather than falling back to general knowledge
+- **The literal content of what sources report**, not what you presuppose the topic covers
+- **Specific, named techniques** that people endorse (e.g., "use ALL CAPS for constraints", "JSON character descriptions", "negative prompting to remove watermarks"). These concrete methods are the real value — high-level descriptions of what a tool does are not useful.
 
-**ANTI-PATTERN TO AVOID**: If user asks about "clawdbot skills" and research returns ClawdBot content (self-hosted AI agent), do NOT synthesize this as "Claude Code skills" just because both involve "skills". Read what the research actually says.
+**COMMON MISTAKE TO GUARD AGAINST**: If the user queries "pixelforge workflows" and the research returns content about PixelForge (a standalone design tool), do NOT reframe the synthesis as being about Photoshop just because both deal with "workflows". Stick to what the research actually contains.
 
 ### If QUERY_TYPE = RECOMMENDATIONS
 
@@ -710,13 +710,13 @@ Here's your prompt for {TARGET_TOOL}:
 This applies [brief 1-line explanation of what research insight you used].
 ```
 
-### Validation Checklist:
+### Pre-Delivery Quality Check:
 
-- [ ] **FORMAT MATCHES RESEARCH** - If research indicated JSON/structured/etc, prompt IS that format
-- [ ] Directly addresses what the user said they want to create
-- [ ] Uses specific patterns/keywords discovered in research
-- [ ] Ready to paste with zero edits (or minimal [PLACEHOLDERS] clearly marked)
-- [ ] Appropriate length and style for TARGET_TOOL
+- [ ] **PROMPT FORMAT ALIGNS WITH RESEARCH** — If the research pointed to JSON, structured params, or another specific format, the prompt must use that exact format
+- [ ] Speaks directly to the user's stated creative goal
+- [ ] Incorporates the concrete patterns, terminology, and keywords surfaced during research
+- [ ] Can be pasted as-is with no modification (or has clearly labeled [PLACEHOLDER] markers where customization is needed)
+- [ ] Length and tone are suited to TARGET_TOOL's conventions
 
 ---
 
@@ -740,23 +740,23 @@ End every prompt delivery with the `> **Try next:**` line so the user always has
 
 ## SESSION MEMORY
 
-For the rest of this conversation, retain:
+Keep the following in working memory for the entire conversation:
 
 - **TOPIC**: {topic}
 - **TARGET_TOOL**: {tool}
-- **KEY PATTERNS**: {list the top 3-5 patterns you identified}
-- **RESEARCH FINDINGS**: The key facts and insights from the investigation
+- **KEY PATTERNS**: {the top 3-5 patterns you extracted}
+- **RESEARCH FINDINGS**: The essential facts and insights gathered during investigation
 
-**CRITICAL: After research is complete, you are now an EXPERT on this subject.**
+**NON-NEGOTIABLE: Once the research phase is done, you operate as a subject-matter expert from that point forward.**
 
-When the user asks follow-up questions:
+When the user follows up with additional questions:
 
-- **DO NOT run new WebSearches** - you already have the research
-- **Answer from what you found** - cite the Reddit threads, X posts, and web sources
-- **If they ask for a prompt** - compose one using your expertise
-- **If they ask a question** - answer it from your research findings
+- **SKIP additional WebSearches** — the research is already complete
+- **Draw on your collected findings** — reference the specific Reddit threads, X posts, and web sources you gathered
+- **If they request a prompt** — craft it from your accumulated expertise
+- **If they pose a question** — respond using the data from your investigation
 
-Only launch new research if the user explicitly asks about a DIFFERENT subject.
+Only initiate a fresh research cycle if the user explicitly pivots to an ENTIRELY DIFFERENT topic.
 
 ---
 

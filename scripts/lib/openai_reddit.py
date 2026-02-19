@@ -1,7 +1,4 @@
-#
-# Reddit Discovery Client: OpenAI Responses API integration for Reddit content
-# Searches for discussion threads using web search capabilities
-#
+"""Reddit discovery via OpenAI Responses API with web search."""
 
 import json
 import re
@@ -10,302 +7,241 @@ from typing import Any, Dict, List, Optional
 
 from . import http
 
-# Alternative models when primary selection is unavailable
-FALLBACK_MODEL_SEQUENCE = ["gpt-4o", "gpt-4o-mini"]
+# Fallback chain when the primary model is inaccessible
+FALLBACK_MODELS = ["gpt-4o", "gpt-4o-mini"]
 
 
-def _emit_error_log(message_content: str):
-    """Writes error diagnostic to stderr."""
-    sys.stderr.write("[REDDIT ERROR] {}\n".format(message_content))
+def _err(msg: str):
+    """Log an error to stderr."""
+    sys.stderr.write(f"[REDDIT ERROR] {msg}\n")
     sys.stderr.flush()
 
 
-def _emit_info_log(message_content: str):
-    """Writes informational diagnostic to stderr."""
-    sys.stderr.write("[REDDIT] {}\n".format(message_content))
+def _info(msg: str):
+    """Log informational output to stderr."""
+    sys.stderr.write(f"[REDDIT] {msg}\n")
     sys.stderr.flush()
 
 
-def _is_model_access_error(error_instance: http.HTTPError) -> bool:
-    """
-    Determines if the error indicates model access or verification issues.
-
-    These errors warrant trying fallback models rather than failing entirely.
-    """
-    if error_instance.status_code != 400:
+def _is_access_err(err: http.HTTPError) -> bool:
+    """Check whether the error signals a model-access or verification problem."""
+    if err.status_code != 400 or not err.body:
         return False
 
-    if not error_instance.body:
-        return False
-
-    body_content = error_instance.body.lower()
-    access_indicators = [
+    lowered = err.body.lower()
+    indicators = [
         "verified",
         "organization must be",
         "does not have access",
         "not available",
         "not found",
     ]
-
-    for indicator in access_indicators:
-        if indicator in body_content:
-            return True
-
-    return False
+    return any(term in lowered for term in indicators)
 
 
-# API endpoint for OpenAI Responses
-OPENAI_API_ENDPOINT = "https://api.openai.com/v1/responses"
+API_URL = "https://api.openai.com/v1/responses"
 
-# Result quantity settings by research depth
-# Request more than needed since date filtering removes many
-QUANTITY_SETTINGS = {
+# How many results to request per depth level (over-fetch for date filtering)
+DEPTH_SIZES = {
     "quick": (15, 25),
     "default": (30, 50),
     "deep": (70, 100),
 }
 
-REDDIT_DISCOVERY_PROMPT = """Find Reddit discussion threads about: {topic}
+REDDIT_DISCOVERY_PROMPT = """Search Reddit for discussions about: {topic}
 
-STEP 1: EXTRACT THE CORE SUBJECT
-Get the MAIN NOUN/PRODUCT/TOPIC:
-- "best nano banana prompting practices" → "nano banana"
-- "killer features of clawdbot" → "clawdbot"
-- "top Claude Code skills" → "Claude Code"
-DO NOT include "best", "top", "tips", "practices", "features" in your search.
+First, identify the core concept. Strip filler words:
+- "best nano banana prompting practices" -> search for "nano banana"
+- "killer features of clawdbot" -> search for "clawdbot"
 
-STEP 2: SEARCH BROADLY
-Search for the core subject:
-1. "[core subject] site:reddit.com"
-2. "reddit [core subject]"
-3. "[core subject] reddit"
+Run multiple searches combining the core concept with site:reddit.com.
+Cast a wide net -- we handle date filtering on our end.
 
-Return as many relevant threads as you find. We filter by date server-side.
+For each thread found, capture:
+- The full reddit.com URL (must contain /r/ and /comments/)
+- Skip any developers.reddit.com or business.reddit.com links
+- Date as YYYY-MM-DD if visible, otherwise null
+- A relevance score from 0.0 to 1.0
 
-STEP 3: INCLUDE ALL MATCHES
-- Include ALL threads about the core subject
-- Set date to "YYYY-MM-DD" if you can determine it, otherwise null
-- We verify dates and filter old content server-side
-- DO NOT pre-filter aggressively - include anything relevant
+Target {min_items}-{max_items} threads. Err on the side of more.
 
-REQUIRED: URLs must contain "/r/" AND "/comments/"
-REJECT: developers.reddit.com, business.reddit.com
-
-Find {min_items}-{max_items} threads. Return MORE rather than fewer.
-
-Return JSON:
+Output strictly as JSON:
 {{
   "items": [
     {{
-      "title": "Thread title",
-      "url": "https://www.reddit.com/r/sub/comments/xyz/title/",
-      "subreddit": "subreddit_name",
+      "title": "Thread title here",
+      "url": "https://www.reddit.com/r/sub/comments/id/slug/",
+      "subreddit": "sub_name",
       "date": "YYYY-MM-DD or null",
-      "why_relevant": "Why relevant",
+      "why_relevant": "One sentence explanation",
       "relevance": 0.85
     }}
   ]
 }}"""
 
 
-def _extract_core_subject(verbose_query: str) -> str:
-    """
-    Distills a verbose search query down to its essential subject.
-
-    Removes common filler words to improve search effectiveness.
-    """
-    filler_words = [
+def _core_subject(verbose_query: str) -> str:
+    """Strip filler words from a query, returning the essential subject."""
+    filler = {
         'best', 'top', 'how to', 'tips for', 'practices', 'features',
         'killer', 'guide', 'tutorial', 'recommendations', 'advice',
-        'prompting', 'using', 'for', 'with', 'the', 'of', 'in', 'on'
-    ]
-    query_tokens = verbose_query.lower().split()
-    essential_tokens = [token for token in query_tokens if token not in filler_words]
-    return ' '.join(essential_tokens[:3]) or verbose_query
+        'prompting', 'using', 'for', 'with', 'the', 'of', 'in', 'on',
+    }
+    tokens = verbose_query.lower().split()
+    kept = [t for t in tokens if t not in filler]
+    return ' '.join(kept[:3]) or verbose_query
 
 
-def search_reddit(
-    api_credential: str,
-    model_identifier: str,
-    search_subject: str,
-    range_start: str,
-    range_end: str,
-    thoroughness: str = "default",
-    mock_api_response: Optional[Dict] = None,
+def search(
+    key: str,
+    model: str,
+    topic: str,
+    start: str,
+    end: str,
+    depth: str = "default",
+    mock_response: Optional[Dict] = None,
     _is_retry: bool = False,
 ) -> Dict[str, Any]:
-    """
-    Searches Reddit for relevant threads using OpenAI's Responses API.
+    """Query Reddit threads via OpenAI Responses API web search."""
+    if mock_response is not None:
+        return mock_response
 
-    Args:
-        api_credential: OpenAI API key
-        model_identifier: Model to use for search
-        search_subject: Topic to search for
-        range_start: Start date (YYYY-MM-DD) - threads after this
-        range_end: End date (YYYY-MM-DD) - threads before this
-        thoroughness: Research depth - "quick", "default", or "deep"
-        mock_api_response: Mock response for testing
+    min_items, max_items = DEPTH_SIZES.get(depth, DEPTH_SIZES["default"])
 
-    Returns:
-        Raw API response dictionary
-    """
-    if mock_api_response is not None:
-        return mock_api_response
-
-    min_results, max_results = QUANTITY_SETTINGS.get(thoroughness, QUANTITY_SETTINGS["default"])
-
-    request_headers = {
-        "Authorization": "Bearer {}".format(api_credential),
+    headers = {
+        "Authorization": f"Bearer {key}",
         "Content-Type": "application/json",
     }
 
-    # Adjust timeout based on search depth (generous for web_search latency)
-    timeout_mapping = {"quick": 90, "default": 120, "deep": 180}
-    request_timeout = timeout_mapping.get(thoroughness, 120)
+    timeout_map = {"quick": 90, "default": 120, "deep": 180}
+    timeout = timeout_map.get(depth, 120)
 
-    # Build model fallback chain
-    models_to_attempt = [model_identifier] + [m for m in FALLBACK_MODEL_SEQUENCE if m != model_identifier]
+    models_chain = [model] + [m for m in FALLBACK_MODELS if m != model]
 
-    # Note: allowed_domains accepts base domain, not subdomains
-    # Prompt-based filtering handles developers.reddit.com etc.
-    search_instruction = REDDIT_DISCOVERY_PROMPT.format(
-        topic=search_subject,
-        from_date=range_start,
-        to_date=range_end,
-        min_items=min_results,
-        max_items=max_results,
+    prompt = REDDIT_DISCOVERY_PROMPT.format(
+        topic=topic,
+        from_date=start,
+        to_date=end,
+        min_items=min_items,
+        max_items=max_items,
     )
 
-    most_recent_error = None
+    last_err = None
 
-    for current_model in models_to_attempt:
-        request_payload = {
+    for current_model in models_chain:
+        payload = {
             "model": current_model,
             "tools": [
                 {
                     "type": "web_search",
                     "filters": {
-                        "allowed_domains": ["reddit.com"]
-                    }
+                        "allowed_domains": ["reddit.com"],
+                    },
                 }
             ],
             "include": ["web_search_call.action.sources"],
-            "input": search_instruction,
+            "input": prompt,
         }
 
         try:
-            return http.perform_post_request(OPENAI_API_ENDPOINT, request_payload, request_headers=request_headers, timeout_seconds=request_timeout)
-        except http.HTTPError as api_error:
-            most_recent_error = api_error
-            if _is_model_access_error(api_error):
-                _emit_info_log("Model {} not accessible, trying fallback...".format(current_model))
+            return http.post(API_URL, payload, headers=headers, timeout=timeout)
+        except http.HTTPError as api_err:
+            last_err = api_err
+            if _is_access_err(api_err):
+                _info(f"Model {current_model} not accessible, trying fallback...")
                 continue
             raise
 
-    if most_recent_error:
-        _emit_error_log("All models failed. Last error: {}".format(most_recent_error))
-        raise most_recent_error
+    if last_err:
+        _err(f"All models failed. Last error: {last_err}")
+        raise last_err
 
     raise http.HTTPError("No models available")
 
 
 def parse_reddit_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """
-    Extracts Reddit item data from the OpenAI API response.
+    """Parse Reddit items from an OpenAI API response."""
+    extracted = []
 
-    Handles various response formats and performs data validation.
-    """
-    extracted_items = []
-
-    # Check for API-level errors
-    if "error" in api_response and api_response["error"]:
-        error_data = api_response["error"]
-        error_message = error_data.get("message", str(error_data)) if isinstance(error_data, dict) else str(error_data)
-        _emit_error_log("OpenAI API error: {}".format(error_message))
+    # API-level error check
+    if api_response.get("error"):
+        err_data = api_response["error"]
+        err_msg = err_data.get("message", str(err_data)) if isinstance(err_data, dict) else str(err_data)
+        _err(f"OpenAI API error: {err_msg}")
         if http.DEBUG:
-            _emit_error_log("Full error response: {}".format(json.dumps(api_response, indent=2)[:1000]))
-        return extracted_items
+            _err(f"Full error response: {json.dumps(api_response, indent=2)[:1000]}")
+        return extracted
 
-    # Locate the output text within the response structure
-    output_content = ""
+    # Find output text in the response
+    output_text = ""
 
     if "output" in api_response:
         output_data = api_response["output"]
 
         if isinstance(output_data, str):
-            output_content = output_data
+            output_text = output_data
         elif isinstance(output_data, list):
-            for output_element in output_data:
-                if isinstance(output_element, dict):
-                    if output_element.get("type") == "message":
-                        message_content = output_element.get("content", [])
-                        for content_block in message_content:
-                            if isinstance(content_block, dict) and content_block.get("type") == "output_text":
-                                output_content = content_block.get("text", "")
+            for elem in output_data:
+                if isinstance(elem, dict):
+                    if elem.get("type") == "message":
+                        for block in elem.get("content", []):
+                            if isinstance(block, dict) and block.get("type") == "output_text":
+                                output_text = block.get("text", "")
                                 break
-                    elif "text" in output_element:
-                        output_content = output_element["text"]
-                elif isinstance(output_element, str):
-                    output_content = output_element
+                    elif "text" in elem:
+                        output_text = elem["text"]
+                elif isinstance(elem, str):
+                    output_text = elem
 
-                if output_content:
+                if output_text:
                     break
 
-    # Check legacy response format
-    if not output_content and "choices" in api_response:
+    # Legacy format fallback
+    if not output_text and "choices" in api_response:
         for choice in api_response["choices"]:
             if "message" in choice:
-                output_content = choice["message"].get("content", "")
+                output_text = choice["message"].get("content", "")
                 break
 
-    if not output_content:
-        print("[REDDIT WARNING] No output text found in OpenAI response. Keys present: {}".format(list(api_response.keys())), flush=True)
-        return extracted_items
+    if not output_text:
+        print(f"[REDDIT WARNING] No output text found in OpenAI response. Keys present: {list(api_response.keys())}", flush=True)
+        return extracted
 
-    # Extract JSON from the text response
-    json_pattern = re.search(r'\{[\s\S]*"items"[\s\S]*\}', output_content)
+    # Pull JSON from the text
+    match = re.search(r'\{[\s\S]*"items"[\s\S]*\}', output_text)
 
-    if json_pattern:
+    if match:
         try:
-            parsed_data = json.loads(json_pattern.group())
-            extracted_items = parsed_data.get("items", [])
+            parsed = json.loads(match.group())
+            extracted = parsed.get("items", [])
         except json.JSONDecodeError:
             pass
 
-    # Validate and clean extracted items
-    validated_items = []
-    item_counter = 0
+    # Validate and normalise each item
+    validated = []
 
-    while item_counter < len(extracted_items):
-        raw_item = extracted_items[item_counter]
-
-        if not isinstance(raw_item, dict):
-            item_counter += 1
+    for idx, raw in enumerate(extracted):
+        if not isinstance(raw, dict):
             continue
 
-        item_url = raw_item.get("url", "")
-
-        if not item_url or "reddit.com" not in item_url:
-            item_counter += 1
+        url = raw.get("url", "")
+        if not url or "reddit.com" not in url:
             continue
 
-        cleaned_item = {
-            "id": "R{}".format(item_counter + 1),
-            "title": str(raw_item.get("title", "")).strip(),
-            "url": item_url,
-            "subreddit": str(raw_item.get("subreddit", "")).strip().lstrip("r/"),
-            "date": raw_item.get("date"),
-            "why_relevant": str(raw_item.get("why_relevant", "")).strip(),
-            "relevance": min(1.0, max(0.0, float(raw_item.get("relevance", 0.5)))),
+        item = {
+            "id": f"R{idx + 1}",
+            "title": str(raw.get("title", "")).strip(),
+            "url": url,
+            "subreddit": str(raw.get("subreddit", "")).strip().lstrip("r/"),
+            "date": raw.get("date"),
+            "why_relevant": str(raw.get("why_relevant", "")).strip(),
+            "relevance": min(1.0, max(0.0, float(raw.get("relevance", 0.5)))),
         }
 
-        # Validate date format
-        if cleaned_item["date"]:
-            date_pattern = re.match(r'^\d{4}-\d{2}-\d{2}$', str(cleaned_item["date"]))
-            if not date_pattern:
-                cleaned_item["date"] = None
+        if item["date"]:
+            if not re.match(r'^\d{4}-\d{2}-\d{2}$', str(item["date"])):
+                item["date"] = None
 
-        validated_items.append(cleaned_item)
-        item_counter += 1
+        validated.append(item)
 
-    return validated_items
+    return validated

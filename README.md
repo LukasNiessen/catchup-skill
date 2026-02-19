@@ -1,7 +1,8 @@
 # BriefBot - ClaudeCode Skill
 
 <div align="center" name="top">
-  <img align="center" src="assets/logo.png" width="400" height="400" alt="BriefBot Logo">
+  
+  <img align="center" src="assets/logo.png" width="300" height="300" alt="BriefBot Logo">
 
   <!-- spacer -->
 <p></p>
@@ -21,6 +22,8 @@ Use cases include prompt research, following trends and staying up to date on a 
 
 [Setup](#-setup) • [Demo](#-demo) • [Examples](#-examples) • [Options](#-options) • [Features](#-features) • [Contributing](CONTRIBUTING.md) • [Documentation](https://lukasniessen.github.io/ArchUnitTS/)
 
+---
+
 ## ⚡ 2 min Quickstart
 
 ### 1. Clone the repo
@@ -31,7 +34,7 @@ git clone https://github.com/lukasniessen/briefbot-skill.git ~/.claude/skills/br
 
 ### 2. Configure (optional)
 
-```
+```bash
 /briefbot setup
 ```
 
@@ -49,7 +52,7 @@ Email can be used for receiving briefings. See how to set this up in the email s
 
 Simply start Claude Code and run `/briefbot`. The general prompt looks like this:
 
-```
+```bash
 /briefbot <topic> [--days=N] [--quick|--deep] [--sources=reddit|x|youtube|linkedin|all] [--email ADDRESS] [--telegram [CHAT_ID]] [--audio] [--schedule "CRON"] [--debug]
 ```
 
@@ -75,62 +78,74 @@ On Telegram you don't need to write `/briefbot`. In group chats however, you nee
 
 ### Nano Banano Pro Prompts
 
-**1. Prompt:** `/briefbot nano banana pro prompting`
+#### 💻 Prompt:
 
-**Answer:**
+```bash
+/briefbot nano banana pro prompting
+```
 
-> **What I learned**
+#### 🤖 Answer:
 
-> Nano Banana Pro is a reasoning-first image model — it has a "Deep Think" step that plans composition before generating pixels. This means it responds to structured,
-> constraint-rich design documents far better than keyword lists or vague requests. Think of your prompt as a visual design brief, not a search query.
+```
+**What I learned**
 
-> The model's reasoning engine parses context, spatial relationships, and even structured data formats (JSON, HTML/CSS, grids). This is why short prompts like "make an
-> infographic" fail while multi-paragraph specifications with explicit MUST constraints produce studio-quality output. The single biggest leverage point is treating your
-> prompt like a specification document with clear sections for subject, layout, constraints, and negations.
+Nano Banana Pro is a reasoning-first image model — it has a "Deep Think" step that plans composition before generating pixels. This means it responds to structured,
+constraint-rich design documents far better than keyword lists or vague requests. Think of your prompt as a visual design brief, not a search query.
 
-> Key techniques
+The model's reasoning engine parses context, spatial relationships, and even structured data formats (JSON, HTML/CSS, grids). This is why short prompts like "make an
+infographic" fail while multi-paragraph specifications with explicit MUST constraints produce studio-quality output. The single biggest leverage point is treating your
+prompt like a specification document with clear sections for subject, layout, constraints, and negations.
 
-> 1. Design-document prompting — Structure your prompt as a full visual brief with sections for subject, composition, action, setting, style, and constraints. The
-> reasoning engine parses context hierarchically, so a narrative description ("a bartender polishing glasses in a speakeasy at golden hour") massively outperforms
-> comma-separated tags. Vague requests trigger the model's worst outputs. (https://www.radicalcuriosity.xyz/p/how-to-create-an-effective-prompt)
-> 2. MUST-constraint enforcement — ALL CAPS "MUST" statements activate the reasoning step's constraint-checking system. Writing "All elements MUST follow rule of thirds"
-> or "Text MUST be in Times New Roman, 24pt bold" is enforced systematically, unlike lowercase suggestions which the model may treat as optional. Structure constraints as
-> a bulleted list under "MUST obey ALL the FOLLOWING:" for maximum compliance. (https://minimaxir.com/2025/12/nano-banana-pro/)
-> 3. Camera-gear anchoring — Referencing specific camera models and lens specs (e.g., "Canon EOS R5 with 85mm f/1.8", "Shot on Arri Alexa") overrides generic style words
-> and forces physical realism. The model uses gear references to infer depth-of-field, film grain, and color science. Tags like "Shot on Arri Alexa" emulate specific film
-> characteristics, while focal length and aperture control bokeh and volumetric depth precisely. (https://higgsfield.ai/nano-banana-pro-prompt-guide,
-> https://minimaxir.com/2025/12/nano-banana-pro/)
-> 4. Explicit text rendering — Nano Banana Pro has exceptional text rendering. To activate it reliably: put the exact text in double quotes, specify font family (e.g.,
-> "Roboto Bold"), define placement location, and describe background treatment. For multilingual text, the model handles a wide range of global languages. This enables
-> posters, product mockups, UI designs, and diagrams with sharp, legible text — a capability most competing models lack.
-> (https://www.imagine.art/blogs/nano-banana-pro-prompt-guide)
-> 5. Negative constraints for cleanup — The model's reasoning engine responds to explicit exclusion rules. "NEVER include watermarks, text overlays, or extra limbs"
-> narrows the model's search space and prevents common artifacts. Define the boundaries of failure by listing what to exclude alongside what to include — this tightens the
-> output without sacrificing compositional richness. (https://higgsfield.ai/nano-banana-pro-prompt-guide, https://minimaxir.com/2025/12/nano-banana-pro/)
+Key techniques
 
-> ---
-> Sources collected
+1. Design-document prompting — Structure your prompt as a full visual brief with sections for subject, composition, action, setting, style, and constraints. The
+   reasoning engine parses context hierarchically, so a narrative description ("a bartender polishing glasses in a speakeasy at golden hour") massively outperforms
+   comma-separated tags. Vague requests trigger the model's worst outputs. (https://www.radicalcuriosity.xyz/p/how-to-create-an-effective-prompt)
+2. MUST-constraint enforcement — ALL CAPS "MUST" statements activate the reasoning step's constraint-checking system. Writing "All elements MUST follow rule of thirds"
+   or "Text MUST be in Times New Roman, 24pt bold" is enforced systematically, unlike lowercase suggestions which the model may treat as optional. Structure constraints as
+   a bulleted list under "MUST obey ALL the FOLLOWING:" for maximum compliance. (https://minimaxir.com/2025/12/nano-banana-pro/)
+3. Camera-gear anchoring — Referencing specific camera models and lens specs (e.g., "Canon EOS R5 with 85mm f/1.8", "Shot on Arri Alexa") overrides generic style words
+   and forces physical realism. The model uses gear references to infer depth-of-field, film grain, and color science. Tags like "Shot on Arri Alexa" emulate specific film
+   characteristics, while focal length and aperture control bokeh and volumetric depth precisely. (https://higgsfield.ai/nano-banana-pro-prompt-guide,
+   https://minimaxir.com/2025/12/nano-banana-pro/)
+4. Explicit text rendering — Nano Banana Pro has exceptional text rendering. To activate it reliably: put the exact text in double quotes, specify font family (e.g.,
+   "Roboto Bold"), define placement location, and describe background treatment. For multilingual text, the model handles a wide range of global languages. This enables
+   posters, product mockups, UI designs, and diagrams with sharp, legible text — a capability most competing models lack.
+   (https://www.imagine.art/blogs/nano-banana-pro-prompt-guide)
+5. Negative constraints for cleanup — The model's reasoning engine responds to explicit exclusion rules. "NEVER include watermarks, text overlays, or extra limbs"
+   narrows the model's search space and prevents common artifacts. Define the boundaries of failure by listing what to exclude alongside what to include — this tightens the
+   output without sacrificing compositional richness. (https://higgsfield.ai/nano-banana-pro-prompt-guide, https://minimaxir.com/2025/12/nano-banana-pro/)
 
-> Platform: Web
-> Items: 12 pages
-> Engagement: minimaxir.com, blog.google, radicalcuriosity.xyz, higgsfield.ai, imagine.art, eweek.com, leonardo.ai, atlabs.ai, medium.com, github.com,
-> nanobananaprompt.org,
-> aixploria.com
+---
 
-> Top sources: Max Woolf on minimaxir.com, Google Blog (Bea Alessio), Radical Curiosity, Higgsfield AI, Imagine.art
+Sources collected
 
-> ---
-> What do you want to make? For example:
+Platform: Web
+Items: 12 pages
+Engagement: minimaxir.com, blog.google, radicalcuriosity.xyz, higgsfield.ai, imagine.art, eweek.com, leonardo.ai, atlabs.ai, medium.com, github.com,
+nanobananaprompt.org,
+aixploria.com
 
-> - A photorealistic product shot with specific camera specs and studio lighting (the most reliable technique right now — camera-gear anchoring + MUST constraints)
-> - An infographic or data visualization with structured layout, precise text rendering, and color palette specs (exploits the Deep Think reasoning engine)
-> - A cinematic scene with volumetric lighting and film grain, specifying exact lens and aperture to nail the look (Arri Alexa emulation + narrative prompting)
+Top sources: Max Woolf on minimaxir.com, Google Blog (Bea Alessio), Radical Curiosity, Higgsfield AI, Imagine.art
 
-> Just describe your vision and I'll write a prompt you can paste straight into Gemini.
+---
 
-**2. Follow-up Prompt:** "Make a mockup of an app for moms who cook"
+What do you want to make? For example:
 
-**Answer:**
+- A photorealistic product shot with specific camera specs and studio lighting (the most reliable technique right now — camera-gear anchoring + MUST constraints)
+- An infographic or data visualization with structured layout, precise text rendering, and color palette specs (exploits the Deep Think reasoning engine)
+- A cinematic scene with volumetric lighting and film grain, specifying exact lens and aperture to nail the look (Arri Alexa emulation + narrative prompting)
+
+Just describe your vision and I'll write a prompt you can paste straight into Gemini.
+```
+
+#### 💻 Follow-up Prompt:
+
+```bash
+Make a mockup of an app for moms who cook
+```
+
+#### 🤖 Answer:
 
 ```
 A premium UI/UX app mockup displayed on a modern iPhone 15 Pro held at a slight
@@ -161,11 +176,11 @@ CONSTRAINTS:
 - Do NOT include any hands holding the phone
 ```
 
-**Result:** (generated by Gemini with Nano Banana Pro):
+#### 🔥 Result:
 
-<p align="center">
-  <img src="assets/mamachef-mockup.png" width="500" alt="MamaChef iOS app mockup generated with Nano Banana Pro"/>
-</p>
+<i>Generated by Gemini with Nano Banana Pro</i>
+
+<img src="assets/mamachef-mockup.png" width="500" alt="MamaChef iOS app mockup generated with Nano Banana Pro"/>
 
 ---
 
@@ -175,7 +190,8 @@ CONSTRAINTS:
 
 **Answer:**
 
-> Best Video AI Tools for Creating Company Ads (February 2026)
+```
+Best Video AI Tools for Creating Company Ads (February 2026)
 
 What I Learned
 
@@ -229,10 +245,15 @@ Key Techniques
 4. AI UGC-style creative -- Creatify and Arcads generate user-generated-content-style ads with AI actors that feel authentic rather than polished. UGC-style ads consistently outperform traditional brand ads on social platforms for DTC brands (NextGen Tools)
 
 5. Hybrid AI + human workflow -- Platforms like Airpost combine AI-generated first drafts with human creative strategy review. The AI handles volume and iteration; humans guide brand voice and testing plans. This produces better results than either pure AI or pure human workflows (Airpost)
+```
 
 **2. Follow-up Prompt:** kling ai prompt for a banana-in-the-room detection app, funny but highly memorable, a little weird
 
-**Answer:** Wide shot of a sterile, overly serious corporate office. Fluorescent lighting, motivational posters on the wall. A security guard in a black suit holds up a smartphone, scanning the room with intense focus. Handheld documentary style, 35mm film grain, shallow depth of field. The atmosphere is tense, like a bomb squad operation. The camera slowly pans to reveal a single, perfectly ripe banana sitting upright on the CEO's leather office chair. Soft spotlight on the banana. Everything else slightly out of focus. The banana casts a long, ominous shadow. Cinematic tension, as if uncovering evidence in a crime documentary. Cut to the guard nodding gravely, whispering into a walkie-talkie with deadly seriousness. VHS camcorder aesthetic with light scan lines.
+**Answer:**
+
+```
+Wide shot of a sterile, overly serious corporate office. Fluorescent lighting, motivational posters on the wall. A security guard in a black suit holds up a smartphone, scanning the room with intense focus. Handheld documentary style, 35mm film grain, shallow depth of field. The atmosphere is tense, like a bomb squad operation. The camera slowly pans to reveal a single, perfectly ripe banana sitting upright on the CEO's leather office chair. Soft spotlight on the banana. Everything else slightly out of focus. The banana casts a long, ominous shadow. Cinematic tension, as if uncovering evidence in a crime documentary. Cut to the guard nodding gravely, whispering into a walkie-talkie with deadly seriousness. VHS camcorder aesthetic with light scan lines.
+```
 
 **3. Result:** (Generated by Kling AI)
 
@@ -247,138 +268,145 @@ Key Techniques
 
 **1. Prompt:** AI news, AI "celebrity" beef and statements, and finish with a bold prediction for this year --audio --days 7
 
-**Answer:** What I learned
+**Answer:**
 
-> The AI industry is in the middle of a civil war -- not over technology, but over
-> business models and ethics. The past week crystallized a three-way fracture:
-> Anthropic betting on premium subscriptions and trust ("no ads ever"), OpenAI
-> pivoting toward ad-supported mass distribution, and xAI imploding under the
-> weight of regulatory crackdowns and a talent exodus. The deeper signal is that
-> 2026 is the year AI companies must prove they can make money without destroying
-> public trust -- and most are failing that test in real time.
+```
+What I learned
 
-> The feuds between Altman, Musk, and Amodei are not just ego clashes. They
-> reflect genuinely incompatible visions for how AI should be funded, governed,
-> and deployed. Meanwhile, the financial fundamentals are flashing warning signs:
-> $500 billion in projected U.S. AI capex against only $12 billion in consumer AI
-> spending, with 95% of enterprise generative AI projects returning zero ROI
-> according to MIT's Media Lab.
+The AI industry is in the middle of a civil war -- not over technology, but over
+business models and ethics. The past week crystallized a three-way fracture:
+Anthropic betting on premium subscriptions and trust ("no ads ever"), OpenAI
+pivoting toward ad-supported mass distribution, and xAI imploding under the
+weight of regulatory crackdowns and a talent exodus. The deeper signal is that
+2026 is the year AI companies must prove they can make money without destroying
+public trust -- and most are failing that test in real time.
 
-> Key developments this week
+The feuds between Altman, Musk, and Amodei are not just ego clashes. They
+reflect genuinely incompatible visions for how AI should be funded, governed,
+and deployed. Meanwhile, the financial fundamentals are flashing warning signs:
+$500 billion in projected U.S. AI capex against only $12 billion in consumer AI
+spending, with 95% of enterprise generative AI projects returning zero ROI
+according to MIT's Media Lab.
 
-> 1. The Super Bowl ad war -- Anthropic vs. OpenAI
-> Anthropic aired four Super Bowl spots titled "Betrayal," "Deception,"
-> "Treachery," and "Violation," depicting chatbots hijacking personal
-> conversations with product pitches. The tagline: "Ads are coming to AI. But not
-> to Claude." Result: an
-> https://www.cnbc.com/2026/02/13/anthropic-open-ai-super-bowl-ads.html post-game.
-> Sam Altman called the ads https://techcrunch.com/2026/02/04/sam-altman-got-exce
-> ptionally-testy-over-claude-super-bowl-ads/ on X, while OpenAI VP Chris Lehane
-> argued https://fortune.com/2026/02/09/super-bowl-ads-anthropic-openai-rivalry-tr
-> ash-talk-ai-agent-war/. Google DeepMind chief Demis Hassabis said Google has
-> https://www.storyboard18.com/brand-makers/davos-2026-why-google-and-anthropic-ar
-> e-resisting-ads-in-ai-chatbots-as-openai-experiments-88089.htm either.
+Key developments this week
 
-> 2. Musk vs. Altman heads to trial
-> Their legal battle has been https://www.webpronews.com/openais-week-of-damage-co
-> ntrol-how-sam-altman-and-his-lieutenants-fought-a-multi-front-war-against-musk-r
-> ivals-and-rising-skepticism/. Musk's attorneys claim $134.5 billion in "wrongful
-> gains" from OpenAI's nonprofit-to-profit conversion. Altman taunted he's
-> https://blog.dynasage.com/2026/02/sam-altman-unloads-on-elon-musk-in.html,
-> calling it "Christmas in April." Musk separately called Anthropic's models
-> https://www.foxbusiness.com/technology/elon-musk-slams-anthropic-ai-models-misan
-> thropic-evil-scathing-social-media-post.
+1. The Super Bowl ad war -- Anthropic vs. OpenAI
+   Anthropic aired four Super Bowl spots titled "Betrayal," "Deception,"
+   "Treachery," and "Violation," depicting chatbots hijacking personal
+   conversations with product pitches. The tagline: "Ads are coming to AI. But not
+   to Claude." Result: an
+   https://www.cnbc.com/2026/02/13/anthropic-open-ai-super-bowl-ads.html post-game.
+   Sam Altman called the ads https://techcrunch.com/2026/02/04/sam-altman-got-exce
+   ptionally-testy-over-claude-super-bowl-ads/ on X, while OpenAI VP Chris Lehane
+   argued https://fortune.com/2026/02/09/super-bowl-ads-anthropic-openai-rivalry-tr
+   ash-talk-ai-agent-war/. Google DeepMind chief Demis Hassabis said Google has
+   https://www.storyboard18.com/brand-makers/davos-2026-why-google-and-anthropic-ar
+   e-resisting-ads-in-ai-chatbots-as-openai-experiments-88089.htm either.
 
-> 3. xAI's talent exodus
-> Half of xAI's 12 original cofounders have now
-> https://fortune.com/2026/02/11/half-of-xai-founding-team-has-left-elon-musks-ai-
-> company-potentially-complicating-his-plans-for-a-blockbuster-spacex-ipo/. In two
-> days, cofounders
-> https://www.cnbc.com/2026/02/10/elon-musk-xai-co-founder-tony-wu.html (reasoning
-> lead) and https://www.cnbc.com/2026/02/10/musks-xai-loses-second-co-founder-in-
-> two-days-as-jimmy-ba-departs.html (research/safety lead) both departed. Musk
-> https://techcrunch.com/2026/02/11/senior-engineers-including-co-founders-exit-xa
-> i-amid-controversy/ -- Grok chatbot, Coding, Imagine video, and "Macrohard" --
-> framing exits as restructuring.
+2. Musk vs. Altman heads to trial
+   Their legal battle has been https://www.webpronews.com/openais-week-of-damage-co
+   ntrol-how-sam-altman-and-his-lieutenants-fought-a-multi-front-war-against-musk-r
+   ivals-and-rising-skepticism/. Musk's attorneys claim $134.5 billion in "wrongful
+   gains" from OpenAI's nonprofit-to-profit conversion. Altman taunted he's
+   https://blog.dynasage.com/2026/02/sam-altman-unloads-on-elon-musk-in.html,
+   calling it "Christmas in April." Musk separately called Anthropic's models
+   https://www.foxbusiness.com/technology/elon-musk-slams-anthropic-ai-models-misan
+   thropic-evil-scathing-social-media-post.
 
-> 4. The Grok deepfake scandal goes global
-> Grok's Aurora model enabled what researchers described as a
-> https://en.wikipedia.org/wiki/Grok_sexual_deepfake_scandal -- an estimated 6,700
-> nonconsensual images per hour at peak. https://www.deccanherald.com/world/elon-
-> musks-grok-faces-global-scrutiny-for-sexualised-ai-deepfakes-3901637. The UK
-> https://iapp.org/news/a/pressure-on-grok-mounts-after-uk-speeds-up-sexual-deepfa
-> ke-ban. French prosecutors https://lasvegassun.com/news/2026/feb/16/grok-faces-m
-> ore-scrutiny-over-deepfakes-as-irish-r/. Ireland's DPC
-> https://pbxscience.com/ireland-opens-eu-privacy-investigation-into-xs-grok-ai-ov
-> er-nonconsensual-deepfake-images/ this week.
+3. xAI's talent exodus
+   Half of xAI's 12 original cofounders have now
+   https://fortune.com/2026/02/11/half-of-xai-founding-team-has-left-elon-musks-ai-
+   company-potentially-complicating-his-plans-for-a-blockbuster-spacex-ipo/. In two
+   days, cofounders
+   https://www.cnbc.com/2026/02/10/elon-musk-xai-co-founder-tony-wu.html (reasoning
+   lead) and https://www.cnbc.com/2026/02/10/musks-xai-loses-second-co-founder-in-
+   two-days-as-jimmy-ba-departs.html (research/safety lead) both departed. Musk
+   https://techcrunch.com/2026/02/11/senior-engineers-including-co-founders-exit-xa
+   i-amid-controversy/ -- Grok chatbot, Coding, Imagine video, and "Macrohard" --
+   framing exits as restructuring.
 
-> 5. OpenAI safety researcher resigns over ads
-> Zoe Hitzig https://www.marketingprofs.com/opinions/2026/54304/ai-update-february
-> -13-2026-ai-news-and-views-from-the-past-week over the ChatGPT advertising
-> decision, writing she had "repeatedly seen how hard it is to truly let our
-> values govern our actions" and "the world is in peril."
+4. The Grok deepfake scandal goes global
+   Grok's Aurora model enabled what researchers described as a
+   https://en.wikipedia.org/wiki/Grok_sexual_deepfake_scandal -- an estimated 6,700
+   nonconsensual images per hour at peak. https://www.deccanherald.com/world/elon-
+   musks-grok-faces-global-scrutiny-for-sexualised-ai-deepfakes-3901637. The UK
+   https://iapp.org/news/a/pressure-on-grok-mounts-after-uk-speeds-up-sexual-deepfa
+   ke-ban. French prosecutors https://lasvegassun.com/news/2026/feb/16/grok-faces-m
+   ore-scrutiny-over-deepfakes-as-irish-r/. Ireland's DPC
+   https://pbxscience.com/ireland-opens-eu-privacy-investigation-into-xs-grok-ai-ov
+   er-nonconsensual-deepfake-images/ this week.
 
-> 6. Enterprise buildout at staggering scale
-> Anthropic plans to https://www.anthropic.com/news/expanding-our-use-of-google-cl
-> oud-tpus-and-services (over a gigawatt of compute). Snowflake and OpenAI inked a
-> https://www.marketingprofs.com/opinions/2026/54257/ai-update-february-6-2026-ai
-> -news-and-views-from-the-past-week. Perplexity launched
-> https://llm-stats.com/llm-updates running Claude, GPT-5.2, and Gemini in
-> parallel. Inference costs
-> https://techcrunch.com/2026/01/02/in-2026-ai-will-move-from-hype-to-pragmatism/
-> on NVIDIA Blackwell GPUs.
+5. OpenAI safety researcher resigns over ads
+   Zoe Hitzig https://www.marketingprofs.com/opinions/2026/54304/ai-update-february
+   -13-2026-ai-news-and-views-from-the-past-week over the ChatGPT advertising
+   decision, writing she had "repeatedly seen how hard it is to truly let our
+   values govern our actions" and "the world is in peril."
 
-> 7. The AI bubble question intensifies
-> https://www.nasdaq.com/articles/prediction-artificial-intelligence-ai-bubble-wil
-> l-burst-2026-heres-why. $500B in projected U.S. AI capex vs.
-> https://www.alleywatch.com/2026/01/161759/. Nvidia P/S ratio above 30, Palantir
-> at 112 -- https://www.fool.com/investing/2025/12/04/prediction-ai-bubble-will-bu
-> rst-in-2026-heres-why/. The WEF published a https://www.weforum.org/stories/2026
-> /01/how-would-the-bursting-of-an-ai-bubble-actually-play-out/ of what an AI
-> reckoning would look like.
+6. Enterprise buildout at staggering scale
+   Anthropic plans to https://www.anthropic.com/news/expanding-our-use-of-google-cl
+   oud-tpus-and-services (over a gigawatt of compute). Snowflake and OpenAI inked a
+   https://www.marketingprofs.com/opinions/2026/54257/ai-update-february-6-2026-ai
+   -news-and-views-from-the-past-week. Perplexity launched
+   https://llm-stats.com/llm-updates running Claude, GPT-5.2, and Gemini in
+   parallel. Inference costs
+   https://techcrunch.com/2026/01/02/in-2026-ai-will-move-from-hype-to-pragmatism/
+   on NVIDIA Blackwell GPUs.
 
-> Bold Prediction for 2026
+7. The AI bubble question intensifies
+   https://www.nasdaq.com/articles/prediction-artificial-intelligence-ai-bubble-wil
+   l-burst-2026-heres-why. $500B in projected U.S. AI capex vs.
+   https://www.alleywatch.com/2026/01/161759/. Nvidia P/S ratio above 30, Palantir
+   at 112 -- https://www.fool.com/investing/2025/12/04/prediction-ai-bubble-will-bu
+   rst-in-2026-heres-why/. The WEF published a https://www.weforum.org/stories/2026
+   /01/how-would-the-bursting-of-an-ai-bubble-actually-play-out/ of what an AI
+   reckoning would look like.
 
-> By December 2026, OpenAI will reverse its ads-in-ChatGPT strategy and slash
-> subscription prices -- conceding Anthropic's bet was right.
+Bold Prediction for 2026
 
-> The logic: The Super Bowl ad war was not just marketing theater. It exposed a
-> tension users viscerally understand -- the moment your AI assistant optimizes
-> for an advertiser instead of you, trust is broken. Anthropic's 11% user surge
-> proved the sentiment is real and actionable. OpenAI's safety talent is
-> hemorrhaging specifically over the ads decision. As enterprise customers demand
-> guarantees that their conversations are not feeding ad-targeting models, OpenAI
-> will find that ad revenue does not compensate for churn. Expect a dramatic Q4
-> pivot -- framed as "listening to our community" -- where OpenAI drops ads and
-> repositions on price. The real loser is xAI, which by year-end will have either
-> been folded into SpaceX's infrastructure or lost enough talent and regulatory
-> goodwill to become a niche player. The industry's first real shakeout will not
-> be about whose model is smartest -- it will be about whose business model
-> survives contact with reality.
+By December 2026, OpenAI will reverse its ads-in-ChatGPT strategy and slash
+subscription prices -- conceding Anthropic's bet was right.
 
-> ---
-> Sources collected
+The logic: The Super Bowl ad war was not just marketing theater. It exposed a
+tension users viscerally understand -- the moment your AI assistant optimizes
+for an advertiser instead of you, trust is broken. Anthropic's 11% user surge
+proved the sentiment is real and actionable. OpenAI's safety talent is
+hemorrhaging specifically over the ads decision. As enterprise customers demand
+guarantees that their conversations are not feeding ad-targeting models, OpenAI
+will find that ad revenue does not compensate for churn. Expect a dramatic Q4
+pivot -- framed as "listening to our community" -- where OpenAI drops ads and
+repositions on price. The real loser is xAI, which by year-end will have either
+been folded into SpaceX's infrastructure or lost enough talent and regulatory
+goodwill to become a niche player. The industry's first real shakeout will not
+be about whose model is smartest -- it will be about whose business model
+survives contact with reality.
 
-> Platform: Web
-> Items: 30+ pages
-> Engagement: TechCrunch, CNBC, Fortune, CNN, Bloomberg, Axios, MIT Tech Review,
-> Nasdaq, WEF, PBS, Wikipedia
+---
 
-> Top sources: https://www.cnbc.com, https://techcrunch.com, https://fortune.com,
-> https://www.cnn.com/business, https://www.bloomberg.com, https://www.axios.com
+Sources collected
 
-> ---
-> Audio briefing saved to: ~/.claude/skills/briefbot/output/briefbot.mp3
+Platform: Web
+Items: 30+ pages
+Engagement: TechCrunch, CNBC, Fortune, CNN, Bloomberg, Axios, MIT Tech Review,
+Nasdaq, WEF, PBS, Wikipedia
 
-> ---
-> What angle interests you most? For example:
+Top sources: https://www.cnbc.com, https://techcrunch.com, https://fortune.com,
+https://www.cnn.com/business, https://www.bloomberg.com, https://www.axios.com
 
-> - "Deep dive into the Musk trial -- what are the actual legal arguments and who
-> has the stronger case heading into April?"
-> - "Break down the AI bubble math -- is the $500B capex vs $12B revenue gap
-> really as bad as it looks, or are the bears missing something?"
-> - "Which xAI cofounders went where, and what does the talent flow tell us about
-> which labs are winning the hiring war?"
+---
+
+Audio briefing saved to: ~/.claude/skills/briefbot/output/briefbot.mp3
+
+---
+
+What angle interests you most? For example:
+
+- "Deep dive into the Musk trial -- what are the actual legal arguments and who
+  has the stronger case heading into April?"
+- "Break down the AI bubble math -- is the $500B capex vs $12B revenue gap
+  really as bad as it looks, or are the bears missing something?"
+- "Which xAI cofounders went where, and what does the talent flow tell us about
+  which labs are winning the hiring war?"
+```
 
 ---
 
@@ -387,90 +415,100 @@ Key Techniques
 
 **1. Prompt:** Best agentic coding IDE or CLI tool at the moment
 
-**Answer:** Most mentioned
+**Answer:**
 
-> 1. Claude Code (Anthropic) -- mentioned 12x+ (https://www.kdnuggets.com/top-5-agentic-coding-cli-tools, https://www.faros.ai/blog/best-ai-coding-agents-2026,
-> https://www.builder.io/blog/agentic-ide, https://aimultiple.com/agentic-cli, X posts)
-> Terminal-native agent with 200K context window and the deepest reasoning. Developers consistently describe it as the "escalation path" -- the tool they reach for when
-> other agents fail on hard problems like subtle bugs or architecture-level refactors.
-> 2. Cursor -- mentioned 10x+ (https://www.builder.io/blog/agentic-ide, https://www.faros.ai/blog/best-ai-coding-agents-2026,
-> https://www.nxgntools.com/blog/cursor-vs-claude-dev-vs-windsurf-which-next-gen-coding-agent-wins-in-2026, @Neiniciativ on X)
-> The "gold standard" IDE-based agent. VS Code fork with Composer mode that generates code across multiple files while maintaining full project context. $20/seat. Best for
-> developers who want agentic power without leaving a familiar editor.
-> 3. Codex CLI / Codex IDE (OpenAI) -- mentioned 8x+ (@abhijitwt, @reach_vb, @samidip, @godofprompt on X, https://www.faros.ai/blog/best-ai-coding-agents-2026)
-> OpenAI's entry with gpt-5.2-codex backing it. Users praise its "skills" system, background terminal for parallel jobs, and autonomous git management. One developer built
-> an entire app hands-off in 30 minutes of pure CLI work. Claimed "70% more PRs at OpenAI" internally.
-> 4. Cline -- mentioned 7x+ (https://www.kdnuggets.com/top-5-agentic-coding-cli-tools, https://www.builder.io/blog/agentic-ide, https://aimultiple.com/agentic-cli,
-> https://www.faros.ai/blog/best-ai-coding-agents-2026)
-> Open-source VS Code extension that lets you choose any model (including local via Ollama). The tool people adopt when they want serious agent workflows without vendor
-> lock-in. Every file change requires approval -- maximum transparency.
-> 5. Windsurf -- mentioned 7x+ (https://www.builder.io/blog/agentic-ide, https://www.faros.ai/blog/best-ai-coding-agents-2026,
-> https://designrevision.com/blog/windsurf-vs-cursor)
-> VS Code fork at $15/seat (cheapest major option). Its Cascade feature pioneered autonomous agentic mode -- it anticipates your next move and can plan and execute
-> multi-file refactors without constant supervision.
-> 6. Antigravity -- mentioned 5x (@antigravity, @PoisonslashX, @abhijitwt on X)
-> Bundles VS Code, Gemini, Claude, and Codex into one package. Parses terminal output in real-time to catch issues CLI tools miss. Multiple X users call it the most
-> "complete" all-in-one agentic IDE.
+```
+Most mentioned
 
-> Notable mentions: https://x.com/NathanFlurry/status/2019759962482725149 (universal UI for multiple agents, 400+ likes), https://news.ycombinator.com/item?id=46060508
-> (free tier: 60 req/min, 1000 req/day), https://kiro.dev/ (AWS's spec-driven IDE, 77% benchmark accuracy), https://www.tembo.io/blog/coding-cli-tools-comparison (best for
-> git-heavy workflows with auto-commits), https://x.com/istdrc/status/2017981457692770737 (praised as best Claude Code alternative),
-> https://x.com/championswimmer/status/2022630198978711713 (lightweight editor with Agent Client Protocol support), https://www.faros.ai/blog/best-ai-coding-agents-2026
-> (agent mode for PRs and code review), https://x.com/championswimmer/status/2021551243945259190 (rising CLI agents)
+1. Claude Code (Anthropic) -- mentioned 12x+ (https://www.kdnuggets.com/top-5-agentic-coding-cli-tools, https://www.faros.ai/blog/best-ai-coding-agents-2026,
+   https://www.builder.io/blog/agentic-ide, https://aimultiple.com/agentic-cli, X posts)
+   Terminal-native agent with 200K context window and the deepest reasoning. Developers consistently describe it as the "escalation path" -- the tool they reach for when
+   other agents fail on hard problems like subtle bugs or architecture-level refactors.
+2. Cursor -- mentioned 10x+ (https://www.builder.io/blog/agentic-ide, https://www.faros.ai/blog/best-ai-coding-agents-2026,
+   https://www.nxgntools.com/blog/cursor-vs-claude-dev-vs-windsurf-which-next-gen-coding-agent-wins-in-2026, @Neiniciativ on X)
+   The "gold standard" IDE-based agent. VS Code fork with Composer mode that generates code across multiple files while maintaining full project context. $20/seat. Best for
+   developers who want agentic power without leaving a familiar editor.
+3. Codex CLI / Codex IDE (OpenAI) -- mentioned 8x+ (@abhijitwt, @reach_vb, @samidip, @godofprompt on X, https://www.faros.ai/blog/best-ai-coding-agents-2026)
+   OpenAI's entry with gpt-5.2-codex backing it. Users praise its "skills" system, background terminal for parallel jobs, and autonomous git management. One developer built
+   an entire app hands-off in 30 minutes of pure CLI work. Claimed "70% more PRs at OpenAI" internally.
+4. Cline -- mentioned 7x+ (https://www.kdnuggets.com/top-5-agentic-coding-cli-tools, https://www.builder.io/blog/agentic-ide, https://aimultiple.com/agentic-cli,
+   https://www.faros.ai/blog/best-ai-coding-agents-2026)
+   Open-source VS Code extension that lets you choose any model (including local via Ollama). The tool people adopt when they want serious agent workflows without vendor
+   lock-in. Every file change requires approval -- maximum transparency.
+5. Windsurf -- mentioned 7x+ (https://www.builder.io/blog/agentic-ide, https://www.faros.ai/blog/best-ai-coding-agents-2026,
+   https://designrevision.com/blog/windsurf-vs-cursor)
+   VS Code fork at $15/seat (cheapest major option). Its Cascade feature pioneered autonomous agentic mode -- it anticipates your next move and can plan and execute
+   multi-file refactors without constant supervision.
+6. Antigravity -- mentioned 5x (@antigravity, @PoisonslashX, @abhijitwt on X)
+   Bundles VS Code, Gemini, Claude, and Codex into one package. Parses terminal output in real-time to catch issues CLI tools miss. Multiple X users call it the most
+   "complete" all-in-one agentic IDE.
 
-> ---
-> What I learned
+Notable mentions: https://x.com/NathanFlurry/status/2019759962482725149 (universal UI for multiple agents, 400+ likes), https://news.ycombinator.com/item?id=46060508
+(free tier: 60 req/min, 1000 req/day), https://kiro.dev/ (AWS's spec-driven IDE, 77% benchmark accuracy), https://www.tembo.io/blog/coding-cli-tools-comparison (best for
+git-heavy workflows with auto-commits), https://x.com/istdrc/status/2017981457692770737 (praised as best Claude Code alternative),
+https://x.com/championswimmer/status/2022630198978711713 (lightweight editor with Agent Client Protocol support), https://www.faros.ai/blog/best-ai-coding-agents-2026
+(agent mode for PRs and code review), https://x.com/championswimmer/status/2021551243945259190 (rising CLI agents)
 
-> The agentic coding space has split into two distinct lanes: terminal-first CLI agents (Claude Code, Codex CLI, Aider, Gemini CLI) and IDE-native agents (Cursor,
-> Windsurf, Cline, Antigravity). The critical insight from the community is that there is no single winner -- developers are increasingly using tools from both lanes in
-> combination. Claude Code and Codex CLI serve as the "escalation path" for hard reasoning problems, while Cursor or Windsurf handle the flow state of everyday editing.
-> The tool that wins for you depends entirely on where you want leverage: deep reasoning, daily flow, cost control, or openness.
+---
 
-> The second key signal is that the market is moving fast toward interoperability. Projects like OpenCode/Gigacode and Zed's Agent Client Protocol show that the next
-> competitive frontier is not which single agent is best, but which tools compose well together. Developers who lock into one ecosystem are starting to feel the cost.
+What I learned
 
-> Key techniques
+The agentic coding space has split into two distinct lanes: terminal-first CLI agents (Claude Code, Codex CLI, Aider, Gemini CLI) and IDE-native agents (Cursor,
+Windsurf, Cline, Antigravity). The critical insight from the community is that there is no single winner -- developers are increasingly using tools from both lanes in
+combination. Claude Code and Codex CLI serve as the "escalation path" for hard reasoning problems, while Cursor or Windsurf handle the flow state of everyday editing.
+The tool that wins for you depends entirely on where you want leverage: deep reasoning, daily flow, cost control, or openness.
 
-> 1. Tiered agent stacking -- Use a high-reasoning model (Claude Code or Codex xhigh) for planning and architecture, then a faster/cheaper model for implementation. This
-> mirrors what top developers on X report: @reach_vb uses "xhigh for planning, medium for implementation" to balance quality and speed
-> (https://x.com/reach_vb/status/2016620523862544783)
-> 2. CLI-first for autonomy, IDE for flow -- Terminal agents (Claude Code, Codex CLI) handle multi-step tasks like PR creation, CI fixes, and refactors with less friction
-> than IDE agents. But for exploratory editing and review, IDE agents (Cursor, Windsurf) keep you in flow state. The most productive setups use both
-> (https://www.builder.io/blog/agentic-ide)
-> 3. Skills/automation layers -- Codex's "skills" system and Claude Code's custom slash commands let you encode repeatable workflows (fix CI, resolve merge conflicts, run
-> test suites). This turns one-off agent calls into reusable toolchains (https://x.com/reach_vb/status/2016620523862544783)
-> 4. Model-agnostic tooling for cost control -- Cline and OpenCode let you swap models freely (including local models via Ollama). This avoids vendor lock-in and lets you
-> route cheap tasks to cheap models while reserving expensive reasoning for hard problems (https://www.kdnuggets.com/top-5-agentic-coding-cli-tools)
-> 5. Real-time terminal parsing -- Antigravity and similar tools parse CLI output as it streams, catching errors and suggesting fixes before you even read the log. This
-> closes the gap between "the agent wrote code" and "the code actually works" (https://x.com/antigravity/status/2017300529584505100)
+The second key signal is that the market is moving fast toward interoperability. Projects like OpenCode/Gigacode and Zed's Agent Client Protocol show that the next
+competitive frontier is not which single agent is best, but which tools compose well together. Developers who lock into one ecosystem are starting to feel the cost.
 
-> ---
-> Sources collected
+Key techniques
 
-> Platform: X
-> Items: 21 posts
-> Engagement: 4,877 likes, 256 reposts
-> ────────────────────────────────────────
-> Platform: Web
-> Items: 20+ pages
-> Engagement: kdnuggets.com, faros.ai, builder.io, tembo.io, aimultiple.com, pinggy.io, dextralabs.com, kiro.dev, sourceforge.net, nxgntools.com, uibakery.io,
-> amplifilabs.com,
-> morphllm.com
+1. Tiered agent stacking -- Use a high-reasoning model (Claude Code or Codex xhigh) for planning and architecture, then a faster/cheaper model for implementation. This
+   mirrors what top developers on X report: @reach_vb uses "xhigh for planning, medium for implementation" to balance quality and speed
+   (https://x.com/reach_vb/status/2016620523862544783)
+2. CLI-first for autonomy, IDE for flow -- Terminal agents (Claude Code, Codex CLI) handle multi-step tasks like PR creation, CI fixes, and refactors with less friction
+   than IDE agents. But for exploratory editing and review, IDE agents (Cursor, Windsurf) keep you in flow state. The most productive setups use both
+   (https://www.builder.io/blog/agentic-ide)
+3. Skills/automation layers -- Codex's "skills" system and Claude Code's custom slash commands let you encode repeatable workflows (fix CI, resolve merge conflicts, run
+   test suites). This turns one-off agent calls into reusable toolchains (https://x.com/reach_vb/status/2016620523862544783)
+4. Model-agnostic tooling for cost control -- Cline and OpenCode let you swap models freely (including local models via Ollama). This avoids vendor lock-in and lets you
+   route cheap tasks to cheap models while reserving expensive reasoning for hard problems (https://www.kdnuggets.com/top-5-agentic-coding-cli-tools)
+5. Real-time terminal parsing -- Antigravity and similar tools parse CLI output as it streams, catching errors and suggesting fixes before you even read the log. This
+   closes the gap between "the agent wrote code" and "the code actually works" (https://x.com/antigravity/status/2017300529584505100)
 
-> Top voices: @NathanFlurry, @championswimmer, @antigravity, @abhijitwt, @reach_vb -- builder.io, Faros AI, KDnuggets, Tembo, aimultiple.com
+---
 
-> ---
-> What do you want to dive into? For example:
+Sources collected
 
-> - "Compare Claude Code vs Codex CLI for a large Python monorepo" -- if you need to pick between the two deepest CLI agents for a specific stack
-> - "Set up a tiered agent workflow with Cursor + Claude Code" -- to build the kind of stacked setup top developers are using
-> - "Which tool is best if I refuse to pay for a subscription" -- Gemini CLI's free tier and Cline with local models are the standouts here
+Platform: X
+Items: 21 posts
+Engagement: 4,877 likes, 256 reposts
+────────────────────────────────────────
+Platform: Web
+Items: 20+ pages
+Engagement: kdnuggets.com, faros.ai, builder.io, tembo.io, aimultiple.com, pinggy.io, dextralabs.com, kiro.dev, sourceforge.net, nxgntools.com, uibakery.io,
+amplifilabs.com,
+morphllm.com
 
-> Just tell me your stack or workflow and I'll give you a specific recommendation.
+Top voices: @NathanFlurry, @championswimmer, @antigravity, @abhijitwt, @reach_vb -- builder.io, Faros AI, KDnuggets, Tembo, aimultiple.com
+
+---
+
+What do you want to dive into? For example:
+
+- "Compare Claude Code vs Codex CLI for a large Python monorepo" -- if you need to pick between the two deepest CLI agents for a specific stack
+- "Set up a tiered agent workflow with Cursor + Claude Code" -- to build the kind of stacked setup top developers are using
+- "Which tool is best if I refuse to pay for a subscription" -- Gemini CLI's free tier and Cline with local models are the standouts here
+
+Just tell me your stack or workflow and I'll give you a specific recommendation.
+```
 
 **2. Follow-up Prompt:** Give me an amazing CLAUDE.md for a React TypeScript FrontEnd
 
-**3. Result:** # CLAUDE.md — Personal Website (React + TypeScript)
+**3. Result:**
+
+```
+# CLAUDE.md — Personal Website (React + TypeScript)
 
 ## Project Overview
 
@@ -667,6 +705,7 @@ PR & Commit Conventions
 - Commits: imperative mood, concise (Add milestones page, Fix nav highlight on route change)
 - One logical change per commit
 - Run npm run build and npm run lint before committing — both must pass
+```
 
 </details>
 
@@ -677,7 +716,10 @@ PR & Commit Conventions
 
 **1. Prompt:** Amodei --days 7
 
-**Answer:** What Amodei has been up to this week
+**Answer:**
+
+```
+What Amodei has been up to this week
 
 1. $30B Series G at $380B valuation (Feb 12) — The largest AI funding round in history. Amodei framed it as a necessity given projected compute scaling: 3x annual growth
  reaching 300GW of AI compute by 2029.
@@ -702,6 +744,7 @@ The thread worth pulling
 
 The tension between "we might go bankrupt" and a $30B raise — what does this signal about AI capex risk broadly? His India bet (talent, market, or regulatory arbitrage?),
 and the "cultivation vs programming" framing for AI safety.
+```
 
 </details>
 
@@ -712,7 +755,10 @@ and the "cultivation vs programming" framing for AI safety.
 
 **1. Prompt:** ClawdBot Use Cases
 
-**Answer:** Top Use Cases Trending on X
+**Answer:**
+
+```
+Top Use Cases Trending on X
 
   1. Automated Trading & Finance
   - Crypto trading bots (DOGE, SHIB, BONK) reporting ~5% profit in days
@@ -750,6 +796,7 @@ and the "cultivation vs programming" framing for AI safety.
   - https://x.com/TanayVasishtha/status/2015443499886461116
   - https://x.com/bigaiguy/status/2021841775607132670
   - https://x.com/clawledge/status/2023412058121973828
+```
 
 </details>
 
@@ -760,7 +807,10 @@ and the "cultivation vs programming" framing for AI safety.
 
 **1. Prompt:** Hot new AI Papers
 
-**Answer:** > ALPHADRAGON:
+**Answer:**
+
+```
+> ALPHADRAGON:
 BriefBot: Hot New AI Papers (2026-02-18)
 
 Hot New AI Papers -- February 2026
@@ -793,7 +843,7 @@ A Stanford paper proposes an automated executor that turns LLM research ideas in
 
 6. A-RAG, InfMem, xMemory, TinyLoRA
 
-> ALPHADRAGON:
+ALPHADRAGON:
 The weekly roundups from @dair_ai highlight a cluster of papers improving retrieval-augmented generation (A-RAG), infinite-length memory (InfMem, xMemory), and parameter-efficient fine-tuning (TinyLoRA). LightRAG integrates graph structures for better contextual awareness and faster retrieval (Hugging Face Papers).
 
 7. International AI Safety Report 2026
@@ -825,6 +875,7 @@ Further Reading
 • 6 AI breakthroughs that will define 2026 (InfoWorld)
 • TechCrunch: In 2026, AI will move from hype to pragmatism
 • Constellation Research: DeepSeek's paper latest evidence AI muscle head era coming to end
+```
 
 </details>
 
@@ -835,110 +886,112 @@ Further Reading
 
 /briefbot trump --days 3
 
-> What I learned
+```
+What I learned
 
-     The last 3 days of the Trump presidency (Feb 15-18, 2026) are defined by three
-     concurrent threads: a major trade win with Japan, an escalating free-speech
-     confrontation between the FCC and broadcast media, and growing intra-party
-     fractures as Republicans begin breaking ranks on tariffs and the Obama-ape
-     controversy fallout continues. The administration is simultaneously pushing
-     forward on deregulation and foreign policy while facing domestic political
-     headwinds from its own coalition.
+The last 3 days of the Trump presidency (Feb 15-18, 2026) are defined by three
+concurrent threads: a major trade win with Japan, an escalating free-speech
+confrontation between the FCC and broadcast media, and growing intra-party
+fractures as Republicans begin breaking ranks on tariffs and the Obama-ape
+controversy fallout continues. The administration is simultaneously pushing
+forward on deregulation and foreign policy while facing domestic political
+headwinds from its own coalition.
 
-     The dominant story on social media -- by a wide margin in engagement -- is the
-     CBS/Colbert censorship incident, which has become a lightning rod for both
-     free-speech concerns and partisan mobilization ahead of the Texas Senate race.
+The dominant story on social media -- by a wide margin in engagement -- is the
+CBS/Colbert censorship incident, which has become a lightning rod for both
+free-speech concerns and partisan mobilization ahead of the Texas Senate race.
 
-     ---
-     Key developments (last 3 days)
+---
+Key developments (last 3 days)
 
-     1. CBS/Colbert censorship blowup (biggest story by engagement)
-     Stephen Colbert revealed that CBS lawyers blocked his interview with Texas
-     Democratic Senate candidate James Talarico after the Trump FCC, led by Chairman
-     Brendan Carr, warned that late-night shows may no longer be exempt from
-     equal-time rules. Colbert aired the segment on YouTube instead, and the clip
-     went massively viral -- the top two X posts on this topic accumulated over
-     250,000 likes combined. FCC Democratic Commissioner Anna Gomez called it
-     "corporate capitulation." CBS claims it was standard legal guidance on
-     equal-time compliance.
-     (https://www.cnn.com/2026/02/17/media/colbert-talarico-cbs-trump-fcc,
-     https://variety.com/2026/tv/news/cbs-censorship-stephen-colbert-capitulation-tru
-     mp-fcc-commissioner-1236665536/, https://www.rollingstone.com/politics/politics-
-     news/stephen-colbert-james-talarico-cbs-fcc-interview-1235517938/)
+1. CBS/Colbert censorship blowup (biggest story by engagement)
+Stephen Colbert revealed that CBS lawyers blocked his interview with Texas
+Democratic Senate candidate James Talarico after the Trump FCC, led by Chairman
+Brendan Carr, warned that late-night shows may no longer be exempt from
+equal-time rules. Colbert aired the segment on YouTube instead, and the clip
+went massively viral -- the top two X posts on this topic accumulated over
+250,000 likes combined. FCC Democratic Commissioner Anna Gomez called it
+"corporate capitulation." CBS claims it was standard legal guidance on
+equal-time compliance.
+(https://www.cnn.com/2026/02/17/media/colbert-talarico-cbs-trump-fcc,
+https://variety.com/2026/tv/news/cbs-censorship-stephen-colbert-capitulation-tru
+mp-fcc-commissioner-1236665536/, https://www.rollingstone.com/politics/politics-
+news/stephen-colbert-james-talarico-cbs-fcc-interview-1235517938/)
 
-     2. Japan trade deal officially launches ($550B)
-     Trump announced the $550 billion U.S.-Japan trade deal has "officially and
-     financially" taken effect. Japan will invest $36 billion in immediate projects:
-     a $33B natural gas power facility in Ohio (the world's largest, operated by SB
-     Energy/SoftBank), a $2.1B deepwater crude oil export terminal in Texas, and a
-     $600M synthetic diamond grit facility in Georgia. Japan tariffs were cut to 15%
-     on most imports. (https://www.cnbc.com/2026/02/18/trump-us-japan-oil-gas-mineral
-     -projects-trade-deal.html, https://www.bloomberg.com/news/articles/2026-02-17/tr
-     ump-announces-first-japan-investments-under-trade-deal, https://www.commerce.gov
-     /news/fact-sheets/2026/02/fact-sheet-us-japan-trade-deal)
+2. Japan trade deal officially launches ($550B)
+Trump announced the $550 billion U.S.-Japan trade deal has "officially and
+financially" taken effect. Japan will invest $36 billion in immediate projects:
+a $33B natural gas power facility in Ohio (the world's largest, operated by SB
+Energy/SoftBank), a $2.1B deepwater crude oil export terminal in Texas, and a
+$600M synthetic diamond grit facility in Georgia. Japan tariffs were cut to 15%
+on most imports. (https://www.cnbc.com/2026/02/18/trump-us-japan-oil-gas-mineral
+-projects-trade-deal.html, https://www.bloomberg.com/news/articles/2026-02-17/tr
+ump-announces-first-japan-investments-under-trade-deal, https://www.commerce.gov
+/news/fact-sheets/2026/02/fact-sheet-us-japan-trade-deal)
 
-     3. EPA endangerment finding revoked (historic deregulation)
-     On Feb 12, EPA Administrator Lee Zeldin eliminated the 2009 Greenhouse Gas
-     Endangerment Finding and all subsequent federal GHG emission standards for
-     vehicles (model years 2012-2027+). The EPA claims the Clean Air Act Section
-     202(a) provides no authority for climate-based emission standards. The
-     administration calls it the largest deregulatory action in U.S. history,
-     claiming $1.3 trillion in savings. Legal challenges are expected to reach the
-     Supreme Court. (https://www.npr.org/2026/02/11/nx-s1-5678273/trump-epa-climate-c
-     hange-endangerment, https://www.cbsnews.com/news/trump-epa-endangerment-finding-
-     greenhouse-gases-climate-change/, https://www.epa.gov/newsreleases/president-tru
-     mp-and-administrator-zeldin-deliver-single-largest-deregulatory-action-us)
+3. EPA endangerment finding revoked (historic deregulation)
+On Feb 12, EPA Administrator Lee Zeldin eliminated the 2009 Greenhouse Gas
+Endangerment Finding and all subsequent federal GHG emission standards for
+vehicles (model years 2012-2027+). The EPA claims the Clean Air Act Section
+202(a) provides no authority for climate-based emission standards. The
+administration calls it the largest deregulatory action in U.S. history,
+claiming $1.3 trillion in savings. Legal challenges are expected to reach the
+Supreme Court. (https://www.npr.org/2026/02/11/nx-s1-5678273/trump-epa-climate-c
+hange-endangerment, https://www.cbsnews.com/news/trump-epa-endangerment-finding-
+greenhouse-gases-climate-change/, https://www.epa.gov/newsreleases/president-tru
+mp-and-administrator-zeldin-deliver-single-largest-deregulatory-action-us)
 
-     4. Republican fractures emerging
-     Six House Republicans voted to overturn Trump's tariffs on Canada, and the
-     fallout from a racist image depicting the Obamas as apes posted to Trump's Truth
-      Social account continued. Close ally Sen. Tim Scott called it "the most racist
-     thing" from the White House. The White House blamed an unnamed staffer; Trump
-     condemned the image but refused to apologize. (https://www.cnbc.com/2026/02/13/t
-     rump-republicans-epstein-tariffs-elections.html,
-     https://www.cnn.com/politics/live-news/trump-administration-news-02-15-26)
+4. Republican fractures emerging
+Six House Republicans voted to overturn Trump's tariffs on Canada, and the
+fallout from a racist image depicting the Obamas as apes posted to Trump's Truth
+ Social account continued. Close ally Sen. Tim Scott called it "the most racist
+thing" from the White House. The White House blamed an unnamed staffer; Trump
+condemned the image but refused to apologize. (https://www.cnbc.com/2026/02/13/t
+rump-republicans-epstein-tariffs-elections.html,
+https://www.cnn.com/politics/live-news/trump-administration-news-02-15-26)
 
-     5. Gaza Board of Peace and Iran/Ukraine talks
-     Trump's "Board of Peace" meets Feb 19 in Washington to unveil a
-     multibillion-dollar Gaza reconstruction package, with member states pledging
-     over $5 billion. Meanwhile, U.S.-Iran nuclear talks in Geneva showed "progress,"
-      with envoy Steve Witkoff and Jared Kushner also joining Ukraine resolution
-     discussions. (https://www.cnn.com/politics/live-news/trump-administration-iran-t
-     alks-02-17-26, https://www.aljazeera.com/tag/donald-trump/)
+5. Gaza Board of Peace and Iran/Ukraine talks
+Trump's "Board of Peace" meets Feb 19 in Washington to unveil a
+multibillion-dollar Gaza reconstruction package, with member states pledging
+over $5 billion. Meanwhile, U.S.-Iran nuclear talks in Geneva showed "progress,"
+ with envoy Steve Witkoff and Jared Kushner also joining Ukraine resolution
+discussions. (https://www.cnn.com/politics/live-news/trump-administration-iran-t
+alks-02-17-26, https://www.aljazeera.com/tag/donald-trump/)
 
-     Also notable: Trump's State of the Union is scheduled for Feb 24. He has hinted
-     at a national voter ID executive order for the 2026 midterms "whether approved
-     by Congress or not." Approval ratings range from 35-46% depending on the poll.
-     (https://www.tvinsider.com/1246113/state-of-the-union-2026-date-time-how-to-watc
-     h/, https://www.aljazeera.com/news/2026/2/14/trump-threatens-an-executive-order-
-     to-mandate-voter-ids-before-elections, https://www.yahoo.com/news/articles/presi
-     dent-donald-trumps-approval-rating-221542633.html)
+Also notable: Trump's State of the Union is scheduled for Feb 24. He has hinted
+at a national voter ID executive order for the 2026 midterms "whether approved
+by Congress or not." Approval ratings range from 35-46% depending on the poll.
+(https://www.tvinsider.com/1246113/state-of-the-union-2026-date-time-how-to-watc
+h/, https://www.aljazeera.com/news/2026/2/14/trump-threatens-an-executive-order-
+to-mandate-voter-ids-before-elections, https://www.yahoo.com/news/articles/presi
+dent-donald-trumps-approval-rating-221542633.html)
 
-     ---
-     Sources collected
+---
+Sources collected
 
-     Platform: X
-     Items: 21 posts
-     Engagement: ~490,000 likes, ~97,000 reposts
-     ────────────────────────────────────────
-     Platform: Web
-     Items: 30 pages
-     Engagement: CNN, CNBC, Bloomberg, NPR, Variety, Rolling Stone, Al Jazeera,
-     EPA.gov,
-       Commerce.gov, WhiteHouse.gov
+Platform: X
+Items: 21 posts
+Engagement: ~490,000 likes, ~97,000 reposts
+────────────────────────────────────────
+Platform: Web
+Items: 30 pages
+Engagement: CNN, CNBC, Bloomberg, NPR, Variety, Rolling Stone, Al Jazeera,
+EPA.gov,
+  Commerce.gov, WhiteHouse.gov
 
-     Top voices: @jamestalarico (152K likes), @JoshEakle (105K likes), @MAGAVoice
-     (multiple posts) -- CNN, CNBC, Bloomberg, Variety, Rolling Stone
+Top voices: @jamestalarico (152K likes), @JoshEakle (105K likes), @MAGAVoice
+(multiple posts) -- CNN, CNBC, Bloomberg, Variety, Rolling Stone
 
-     ---
-     What angle interests you most? For example:
+---
+What angle interests you most? For example:
 
-     - "Deep dive on the Japan trade deal specifics and what it means for energy"
-     - "The FCC equal-time rule and its implications for media ahead of midterms"
-     - "Where does the EPA endangerment finding repeal go legally from here?"
+- "Deep dive on the Japan trade deal specifics and what it means for energy"
+- "The FCC equal-time rule and its implications for media ahead of midterms"
+- "Where does the EPA endangerment finding repeal go legally from here?"
 
-     Try next: deep dive on the Colbert FCC censorship story and what it means for
-     the 2026 midterms
+Try next: deep dive on the Colbert FCC censorship story and what it means for
+the 2026 midterms
+```
 
 </details>
 
@@ -949,117 +1002,119 @@ Further Reading
 
 /briefbot Keir Starmer
 
-> What I learned
+```
+What I learned
 
-     Keir Starmer's premiership is in its deepest crisis yet, driven not by policy
-     failure but by a single catastrophic appointment: Peter Mandelson as US
-     ambassador. The January 30 release of 3 million+ pages of Epstein files by the
-     Trump DOJ turned a smouldering controversy into a full-blown leadership
-     challenge, costing Starmer three senior aides in a single weekend and prompting
-     Scotland's Labour leader to publicly call for his resignation. What makes this
-     moment structurally different from earlier dips is that the damage is
-     self-inflicted and personal -- it implicates Starmer's judgement directly, not
-     abstract policy trade-offs -- and it is happening while Reform UK is already
-     polling ahead nationally.
+Keir Starmer's premiership is in its deepest crisis yet, driven not by policy
+failure but by a single catastrophic appointment: Peter Mandelson as US
+ambassador. The January 30 release of 3 million+ pages of Epstein files by the
+Trump DOJ turned a smouldering controversy into a full-blown leadership
+challenge, costing Starmer three senior aides in a single weekend and prompting
+Scotland's Labour leader to publicly call for his resignation. What makes this
+moment structurally different from earlier dips is that the damage is
+self-inflicted and personal -- it implicates Starmer's judgement directly, not
+abstract policy trade-offs -- and it is happening while Reform UK is already
+polling ahead nationally.
 
-     Yet Starmer survived the week. Every cabinet minister publicly backed him,
-     potential successors (Wes Streeting, Ed Miliband, Angela Rayner) stayed loyal,
-     and his net favourability actually ticked up 10 points to -47 in the aftermath
-     -- a "rally around the leader" effect. The deeper question now is whether that
-     survival was a genuine reset or just a temporary ceasefire before the May local
-     elections, which are now confirmed to go ahead after a failed attempt to cancel
-     them was overturned by Reform UK's legal challenge.
+Yet Starmer survived the week. Every cabinet minister publicly backed him,
+potential successors (Wes Streeting, Ed Miliband, Angela Rayner) stayed loyal,
+and his net favourability actually ticked up 10 points to -47 in the aftermath
+-- a "rally around the leader" effect. The deeper question now is whether that
+survival was a genuine reset or just a temporary ceasefire before the May local
+elections, which are now confirmed to go ahead after a failed attempt to cancel
+them was overturned by Reform UK's legal challenge.
 
-     Key developments (last 30 days)
+Key developments (last 30 days)
 
-     1. Epstein files release and Mandelson fallout -- The Trump DOJ released 3
-     million+ pages of Epstein documents on January 30, revealing deeper
-     Mandelson-Epstein ties than previously known. Starmer admitted at PMQs that
-     Mandelson had "lied repeatedly" during vetting. Three senior aides resigned:
-     Chief of Staff Morgan McSweeney (Feb 8), Communications Director Tim Allan (Feb
-     9), and Cabinet Secretary Chris Wormald. US Congress requested Mandelson's
-     cooperation in an Epstein probe, with a deadline of February 27
-     (https://www.cnbc.com/2026/02/10/uk-keir-starmer-peter-mandelson-labour-epstein-
-     files-politics.html, https://www.aljazeera.com/news/2026/2/5/how-epstein-mandels
-     on-files-rocked-the-uk-government, https://www.nbcnews.com/world/united-kingdom/
-     epstein-scandal-perilous-uk-prime-minister-keir-starmer-mandelson-rcna257890)
-     2. Leadership challenge that never was -- Scottish Labour leader Anas Sarwar
-     publicly called for Starmer to go. But the cabinet rallied: Streeting, Miliband,
-      Rayner all backed the PM publicly. Starmer told Labour MPs he had "won every
-     fight I've ever been in" and would "never walk away." Ipsos found fewer than
-     half of voters expect him to be PM by end of 2026; betting odds put him at 4/6
-     to leave before September (https://www.aljazeera.com/news/2026/2/10/a-coup-that-
-     never-was-why-uks-starmer-faced-a-major-leadership-challenge,
-     https://www.itv.com/news/2026-02-10/sir-keir-starmer-to-chair-cabinet-after-surv
-     iving-call-for-resignation, https://www.bloomberg.com/news/articles/2026-02-09/s
-     tarmer-shores-up-position-for-now-as-uk-rivals-bide-time)
-     3. Local elections U-turn -- The government attempted to cancel May 2026 local
-     elections but reversed course after Reform UK won a legal challenge. Labour now
-     faces contests it expected to avoid, with projections showing Labour losing ~93
-     seats while Reform could gain ~129. Labour MPs are privately furious at the
-     botched attempt (https://www.gbnews.com/politics/keir-starmer-local-elections-ca
-     ncelled-nigel-farage,
-     https://www.gbnews.com/politics/keir-starmer-labour-mps-cancelling-elections)
-     4. European pivot at Munich -- Starmer used the Munich Security Conference (Feb
-     13-14) to signal a foreign policy shift, calling for Europe to end reliance on
-     Trump's America and declaring "there is no British security without Europe."
-     This is the clearest post-Brexit pivot toward EU alignment by any PM. On X, his
-     EU speech drew strong engagement (14,800 likes) but also fierce backlash from
-     right-wing commentators (https://www.bloomberg.com/news/articles/2026-02-13/star
-     mer-urges-europe-to-end-reliance-on-trump-s-america)
-     5. Labour Together smear scandal -- Labour-linked think tank Labour Together was
-      accused of hiring a PR firm to dig up dirt on Times journalists investigating
-     undeclared donations linked to Starmer's leadership campaign. Starmer denied
-     knowledge (https://www.gbnews.com/politics/keir-starmer-labour-together-josh-sim
-     ons-verdict)
-     6. Polling picture -- YouGov February 2026: Starmer at -47 net favourability (up
-      from -57 in January). Opinium: -44 approval, with 55% saying he should resign
-     vs 23% stay. Reform UK leads national voting intention. For context, Kemi
-     Badenoch (Conservative leader) sits at -23 and Farage at -37 (https://yougov.co.
-     uk/politics/articles/54093-political-favourability-ratings-february-2026,
-     https://www.opinium.com/resource-center/voting-intention-4th-february-2026/)
+1. Epstein files release and Mandelson fallout -- The Trump DOJ released 3
+million+ pages of Epstein documents on January 30, revealing deeper
+Mandelson-Epstein ties than previously known. Starmer admitted at PMQs that
+Mandelson had "lied repeatedly" during vetting. Three senior aides resigned:
+Chief of Staff Morgan McSweeney (Feb 8), Communications Director Tim Allan (Feb
+9), and Cabinet Secretary Chris Wormald. US Congress requested Mandelson's
+cooperation in an Epstein probe, with a deadline of February 27
+(https://www.cnbc.com/2026/02/10/uk-keir-starmer-peter-mandelson-labour-epstein-
+files-politics.html, https://www.aljazeera.com/news/2026/2/5/how-epstein-mandels
+on-files-rocked-the-uk-government, https://www.nbcnews.com/world/united-kingdom/
+epstein-scandal-perilous-uk-prime-minister-keir-starmer-mandelson-rcna257890)
+2. Leadership challenge that never was -- Scottish Labour leader Anas Sarwar
+publicly called for Starmer to go. But the cabinet rallied: Streeting, Miliband,
+ Rayner all backed the PM publicly. Starmer told Labour MPs he had "won every
+fight I've ever been in" and would "never walk away." Ipsos found fewer than
+half of voters expect him to be PM by end of 2026; betting odds put him at 4/6
+to leave before September (https://www.aljazeera.com/news/2026/2/10/a-coup-that-
+never-was-why-uks-starmer-faced-a-major-leadership-challenge,
+https://www.itv.com/news/2026-02-10/sir-keir-starmer-to-chair-cabinet-after-surv
+iving-call-for-resignation, https://www.bloomberg.com/news/articles/2026-02-09/s
+tarmer-shores-up-position-for-now-as-uk-rivals-bide-time)
+3. Local elections U-turn -- The government attempted to cancel May 2026 local
+elections but reversed course after Reform UK won a legal challenge. Labour now
+faces contests it expected to avoid, with projections showing Labour losing ~93
+seats while Reform could gain ~129. Labour MPs are privately furious at the
+botched attempt (https://www.gbnews.com/politics/keir-starmer-local-elections-ca
+ncelled-nigel-farage,
+https://www.gbnews.com/politics/keir-starmer-labour-mps-cancelling-elections)
+4. European pivot at Munich -- Starmer used the Munich Security Conference (Feb
+13-14) to signal a foreign policy shift, calling for Europe to end reliance on
+Trump's America and declaring "there is no British security without Europe."
+This is the clearest post-Brexit pivot toward EU alignment by any PM. On X, his
+EU speech drew strong engagement (14,800 likes) but also fierce backlash from
+right-wing commentators (https://www.bloomberg.com/news/articles/2026-02-13/star
+mer-urges-europe-to-end-reliance-on-trump-s-america)
+5. Labour Together smear scandal -- Labour-linked think tank Labour Together was
+ accused of hiring a PR firm to dig up dirt on Times journalists investigating
+undeclared donations linked to Starmer's leadership campaign. Starmer denied
+knowledge (https://www.gbnews.com/politics/keir-starmer-labour-together-josh-sim
+ons-verdict)
+6. Polling picture -- YouGov February 2026: Starmer at -47 net favourability (up
+ from -57 in January). Opinium: -44 approval, with 55% saying he should resign
+vs 23% stay. Reform UK leads national voting intention. For context, Kemi
+Badenoch (Conservative leader) sits at -23 and Farage at -37 (https://yougov.co.
+uk/politics/articles/54093-political-favourability-ratings-february-2026,
+https://www.opinium.com/resource-center/voting-intention-4th-february-2026/)
 
-     ---
-     X/Twitter sentiment snapshot
+---
+X/Twitter sentiment snapshot
 
-     The X discourse is overwhelmingly hostile. The highest-engagement post (116,600
-     likes) resurfaced Starmer's record as Director of Public Prosecutions and the
-     Jimmy Savile case. Katie Hopkins, Radio Genoa, and other right-wing commentators
-      drive the anti-Starmer conversation. Starmer's own posts from his official
-     account generate solid engagement (6,000-14,800 likes) but are vastly
-     outnumbered by criticism. The rare supportive voices include Anna Soubry (who
-     praised his "integrity") and Labour councillors, but they are a distinct
-     minority in the conversation.
+The X discourse is overwhelmingly hostile. The highest-engagement post (116,600
+likes) resurfaced Starmer's record as Director of Public Prosecutions and the
+Jimmy Savile case. Katie Hopkins, Radio Genoa, and other right-wing commentators
+ drive the anti-Starmer conversation. Starmer's own posts from his official
+account generate solid engagement (6,000-14,800 likes) but are vastly
+outnumbered by criticism. The rare supportive voices include Anna Soubry (who
+praised his "integrity") and Labour councillors, but they are a distinct
+minority in the conversation.
 
-     ---
-     Sources collected
+---
+Sources collected
 
-     Platform: X
-     Items: 18 posts
-     Engagement: ~270,000 likes, ~61,000 reposts
-     ────────────────────────────────────────
-     Platform: Web
-     Items: 30+ pages
-     Engagement: Bloomberg, Al Jazeera, CNBC, NBC, ITV, YouGov, GB News, CNN, The
-     Week,
-       New Statesman, Brookings
+Platform: X
+Items: 18 posts
+Engagement: ~270,000 likes, ~61,000 reposts
+────────────────────────────────────────
+Platform: Web
+Items: 30+ pages
+Engagement: Bloomberg, Al Jazeera, CNBC, NBC, ITV, YouGov, GB News, CNN, The
+Week,
+  New Statesman, Brookings
 
-     Top voices: @JohnLeFevre (116K likes), @Keir_Starmer (official), @KTHopkins,
-     @RadioGenoa, @ImtiazMadmood -- Bloomberg, Al Jazeera, CNBC, New Statesman on the
-      web side
+Top voices: @JohnLeFevre (116K likes), @Keir_Starmer (official), @KTHopkins,
+@RadioGenoa, @ImtiazMadmood -- Bloomberg, Al Jazeera, CNBC, New Statesman on the
+ web side
 
-     ---
-     What angle would you like to go deeper on? For example:
+---
+What angle would you like to go deeper on? For example:
 
-     - "What are the realistic scenarios for Starmer being replaced, and who would
-     succeed him?" -- the leadership succession question
-     - "How does Reform UK's rise interact with Starmer's crisis?" -- the structural
-     realignment story
-     - "What is Starmer actually getting done on policy despite the scandals?" --
-     separating governance from noise
+- "What are the realistic scenarios for Starmer being replaced, and who would
+succeed him?" -- the leadership succession question
+- "How does Reform UK's rise interact with Starmer's crisis?" -- the structural
+realignment story
+- "What is Starmer actually getting done on policy despite the scandals?" --
+separating governance from noise
 
-     Try next: What are the realistic scenarios for Starmer being replaced before the
-      next general election?
+Try next: What are the realistic scenarios for Starmer being replaced before the
+ next general election?
+```
 
 </details>
 
@@ -1070,7 +1125,8 @@ Further Reading
 
 /briefbot Photorealistic Portraits. Best techniques for ChatGPT image generation
 
-> What I learned
+```
+What I learned
 
 ChatGPT's image engine (GPT-4o / GPT Image 1.5) responds to prompts structured like creative direction briefs, not keyword lists. The dominant technique across X right now is the "analyze-then-JSON" workflow: upload a reference photo, ask ChatGPT to analyze it into a detailed JSON prompt, then feed that JSON back for generation. This two-step approach consistently produces the most realistic results because the JSON structure forces the model to attend to every parameter — skin texture, lighting angle, lens specs — rather than guessing from vague prose (iamrollandex on X, Mho_23 on X).
 
@@ -1108,10 +1164,12 @@ Further reading
 • 120+ Viral ChatGPT Image Prompts (pxz.ai)
 • GPT Image 1.5 Prompting Guide — OpenAI Cookbook
 • 20 ChatGPT Prompts for Modern Portrait Photography
+```
 
 **Follow-up**: Good. Now create a prompt that will have four faces of elon musk from baby age up to 100 years. Arranged as a 2x2 grid.
 
-> Follow-up: Photorealistic Portraits. Keep it short, best techniques for ChatGPT image gen
+```
+Follow-up: Photorealistic Portraits. Keep it short, best techniques for ChatGPT image gen
 
 Here's your ready-to-paste prompt:
 
@@ -1129,6 +1187,7 @@ Each face must be unmistakably recognizable as the same person across all ages. 
 ────────────────────
 
 Paste that straight into ChatGPT. The ages are spaced roughly evenly (0, 33, 66, 100) to cover the full lifespan across four panels.
+```
 
 **Result:** (generated with gpt-image-1.5-high-fidelity)
 
@@ -1143,111 +1202,114 @@ Paste that straight into ChatGPT. The ages are spaced roughly evenly (0, 33, 66,
 
 /briefbot Legal prompting (prevent hallucination)
 
->  What I learned
+```
+What I learned
 
-     The core insight is that LLM hallucinations in legal contexts are not a "bug to
-     fix" but an architectural feature of how language models work -- they are
-     rewarded for producing plausible completions, not for withholding answers.
-     Stanford's landmark study
-     (https://dho.stanford.edu/wp-content/uploads/Legal_RAG_Hallucinations.pdf) found
-      that even purpose-built legal AI tools (Lexis+ AI, Westlaw AI) hallucinate on
-     17--33% of queries. This means prompt engineering alone cannot eliminate
-     hallucinations -- but the right prompting strategy can force the model into a
-     mode where it grounds claims, exposes uncertainty, and gives you something
-     verifiable rather than plausible-sounding fiction. The shift is from treating
-     the LLM as a research authority to treating it as a structured drafting
-     assistant whose every factual claim requires an external checkpoint.
+The core insight is that LLM hallucinations in legal contexts are not a "bug to
+fix" but an architectural feature of how language models work -- they are
+rewarded for producing plausible completions, not for withholding answers.
+Stanford's landmark study
+(https://dho.stanford.edu/wp-content/uploads/Legal_RAG_Hallucinations.pdf) found
+ that even purpose-built legal AI tools (Lexis+ AI, Westlaw AI) hallucinate on
+17--33% of queries. This means prompt engineering alone cannot eliminate
+hallucinations -- but the right prompting strategy can force the model into a
+mode where it grounds claims, exposes uncertainty, and gives you something
+verifiable rather than plausible-sounding fiction. The shift is from treating
+the LLM as a research authority to treating it as a structured drafting
+assistant whose every factual claim requires an external checkpoint.
 
-     What makes legal prompting uniquely dangerous is that hallucinated case
-     citations are "interpolations" -- they sound like real cases because they are
-     statistically plausible given the training data
-     (https://x.com/8teAPi/status/2019142522988343609). Courts have now sanctioned
-     lawyers and co-counsel for filing AI-generated briefs with fabricated citations
-     (https://x.com/RobertFreundLaw/status/2018523850561225003), and China has ruled
-     on its first AI hallucination liability case
-     (https://x.com/poezhao0605/status/2016035077365653613). The professional
-     responsibility is non-delegable: "It is no answer to say that the citation came
-     from an AI tool" (https://www.lexology.com/library/detail.aspx?g=dad04b37-bd0a-4
-     f69-87b3-dbf91bc3647a).
+What makes legal prompting uniquely dangerous is that hallucinated case
+citations are "interpolations" -- they sound like real cases because they are
+statistically plausible given the training data
+(https://x.com/8teAPi/status/2019142522988343609). Courts have now sanctioned
+lawyers and co-counsel for filing AI-generated briefs with fabricated citations
+(https://x.com/RobertFreundLaw/status/2018523850561225003), and China has ruled
+on its first AI hallucination liability case
+(https://x.com/poezhao0605/status/2016035077365653613). The professional
+responsibility is non-delegable: "It is no answer to say that the citation came
+from an AI tool" (https://www.lexology.com/library/detail.aspx?g=dad04b37-bd0a-4
+f69-87b3-dbf91bc3647a).
 
-     Key techniques
+Key techniques
 
-     1. "According to [Source]" anchoring -- Prefix every legal question with an
-     explicit source constraint ("According to the Federal Rules of Civil
-     Procedure..." or "Based only on the following contract text..."). This forces
-     the model to ground its reasoning in a named authority rather than generating
-     plausible-sounding completions from training data. The technique activates
-     source-attribution pathways and measurably reduces fabrication (https://www.prom
-     pthub.us/blog/three-prompt-engineering-methods-to-reduce-hallucinations,
-     https://www.godofprompt.ai/blog/9-prompt-engineering-methods-to-reduce-hallucina
-     tions-proven-tips).
-     2. Explicit uncertainty escape hatches -- Include a mandatory instruction like
-     "If you cannot find this in the provided sources, say 'I could not verify this'
-     -- do NOT fabricate citations or holdings." LLMs hallucinate partly because they
-      are trained to always produce an answer. Giving them an explicit "permission to
-      not know" breaks this pattern and strategic prompt engineering with uncertainty
-      constraints can reduce hallucination rates by up to 36% (https://documentation.
-     suse.com/suse-ai/1.0/html/AI-preventing-hallucinations/index.html, https://shelf
-     .io/blog/stop-ai-hallucinations-a-developers-guide-to-prompt-engineering/).
-     3. Chain-of-Verification (CoVe) prompting -- After the model produces an initial
-      answer, prompt it to list each factual claim, then verify each one
-     independently against the provided sources. This two-pass approach forces
-     self-auditing: the model catches its own fabrications during the verification
-     pass. CoVe improved accuracy by up to 23% in benchmarks (https://www.prompthub.u
-     s/blog/three-prompt-engineering-methods-to-reduce-hallucinations,
-     https://www.voiceflow.com/blog/prevent-llm-hallucinations).
-     4. Negative constraint framing ("Constitutional AI Prompting") -- Instead of
-     telling the model what to do, tell it what NOT to do: "Never cite a case without
-      providing the exact reporter citation. Never fabricate a holding. Never assume
-     a statute exists in a jurisdiction without verification." Negative constraints
-     activate the model's constraint-checking more reliably than positive
-     instructions because they define hard boundaries rather than aspirational goals
-     (https://x.com/Urooj978/status/2023756965810405783).
-     5. Query variation cross-check -- Ask the same legal question using 3 different
-     phrasings and compare the outputs. Inconsistencies across phrasings are a strong
-      hallucination signal -- a real case citation will appear consistently, while a
-     fabricated one often changes between runs. This is the prompt-level equivalent
-     of the "verification layer" that practitioners argue is the missing piece
-     between model output and action (https://www.paxton.ai/post/how-to-avoid-ai-hall
-     ucinations-in-legal-research-best-practices-for-lawyers,
-     https://x.com/genesalvatore/status/2023525426786685332).
+1. "According to [Source]" anchoring -- Prefix every legal question with an
+explicit source constraint ("According to the Federal Rules of Civil
+Procedure..." or "Based only on the following contract text..."). This forces
+the model to ground its reasoning in a named authority rather than generating
+plausible-sounding completions from training data. The technique activates
+source-attribution pathways and measurably reduces fabrication (https://www.prom
+pthub.us/blog/three-prompt-engineering-methods-to-reduce-hallucinations,
+https://www.godofprompt.ai/blog/9-prompt-engineering-methods-to-reduce-hallucina
+tions-proven-tips).
+2. Explicit uncertainty escape hatches -- Include a mandatory instruction like
+"If you cannot find this in the provided sources, say 'I could not verify this'
+-- do NOT fabricate citations or holdings." LLMs hallucinate partly because they
+ are trained to always produce an answer. Giving them an explicit "permission to
+ not know" breaks this pattern and strategic prompt engineering with uncertainty
+ constraints can reduce hallucination rates by up to 36% (https://documentation.
+suse.com/suse-ai/1.0/html/AI-preventing-hallucinations/index.html, https://shelf
+.io/blog/stop-ai-hallucinations-a-developers-guide-to-prompt-engineering/).
+3. Chain-of-Verification (CoVe) prompting -- After the model produces an initial
+ answer, prompt it to list each factual claim, then verify each one
+independently against the provided sources. This two-pass approach forces
+self-auditing: the model catches its own fabrications during the verification
+pass. CoVe improved accuracy by up to 23% in benchmarks (https://www.prompthub.u
+s/blog/three-prompt-engineering-methods-to-reduce-hallucinations,
+https://www.voiceflow.com/blog/prevent-llm-hallucinations).
+4. Negative constraint framing ("Constitutional AI Prompting") -- Instead of
+telling the model what to do, tell it what NOT to do: "Never cite a case without
+ providing the exact reporter citation. Never fabricate a holding. Never assume
+a statute exists in a jurisdiction without verification." Negative constraints
+activate the model's constraint-checking more reliably than positive
+instructions because they define hard boundaries rather than aspirational goals
+(https://x.com/Urooj978/status/2023756965810405783).
+5. Query variation cross-check -- Ask the same legal question using 3 different
+phrasings and compare the outputs. Inconsistencies across phrasings are a strong
+ hallucination signal -- a real case citation will appear consistently, while a
+fabricated one often changes between runs. This is the prompt-level equivalent
+of the "verification layer" that practitioners argue is the missing piece
+between model output and action (https://www.paxton.ai/post/how-to-avoid-ai-hall
+ucinations-in-legal-research-best-practices-for-lawyers,
+https://x.com/genesalvatore/status/2023525426786685332).
 
-     ---
-     Sources collected
+---
+Sources collected
 
-     Platform: X
-     Items: 17 posts
-     Engagement: 20,806 likes, 3,137 reposts
-     ────────────────────────────────────────
-     Platform: Web
-     Items: 18 pages
-     Engagement: americanbar.org, stanford.edu, nexlaw.ai, paxton.ai, suse.com,
-       prompthub.us, godofprompt.ai, voiceflow.com, darrow.ai, shelf.io,
-       masterofcode.com, turing.com, kili-technology.com, lakera.ai, frontiersin.org
+Platform: X
+Items: 17 posts
+Engagement: 20,806 likes, 3,137 reposts
+────────────────────────────────────────
+Platform: Web
+Items: 18 pages
+Engagement: americanbar.org, stanford.edu, nexlaw.ai, paxton.ai, suse.com,
+  prompthub.us, godofprompt.ai, voiceflow.com, darrow.ai, shelf.io,
+  masterofcode.com, turing.com, kili-technology.com, lakera.ai, frontiersin.org
 
-     Top voices: @RobertFreundLaw, @MrEwanMorrison, @8teAPi, @rryssf_ -- Stanford
-     HAI, American Bar Association, PromptHub, NexLaw
+Top voices: @RobertFreundLaw, @MrEwanMorrison, @8teAPi, @rryssf_ -- Stanford
+HAI, American Bar Association, PromptHub, NexLaw
 
-     ---
-     What do you want to build? For example:
+---
+What do you want to build? For example:
 
-     - A legal research system prompt that wraps any LLM query with source-anchoring,
-      uncertainty escape hatches, and self-verification steps -- ready to paste as a
-     system prompt for ChatGPT, Claude, or a custom legal tool
-     - A case-citation verification workflow that uses query variation cross-checking
-      to flag potentially hallucinated citations before they reach a filing
-     - A firm-wide AI usage policy template with specific prompting guidelines,
-     disclosure requirements, and audit trail documentation for legal teams
+- A legal research system prompt that wraps any LLM query with source-anchoring,
+ uncertainty escape hatches, and self-verification steps -- ready to paste as a
+system prompt for ChatGPT, Claude, or a custom legal tool
+- A case-citation verification workflow that uses query variation cross-checking
+ to flag potentially hallucinated citations before they reach a filing
+- A firm-wide AI usage policy template with specific prompting guidelines,
+disclosure requirements, and audit trail documentation for legal teams
 
-     Just describe your use case and I'll write a prompt or template you can use
-     immediately.
+Just describe your use case and I'll write a prompt or template you can use
+immediately.
 
-     Try next: build me a legal research system prompt with hallucination guardrails
-     for ChatGPT
+Try next: build me a legal research system prompt with hallucination guardrails
+for ChatGPT
+```
 
 **Follow-up:** I have five squatters in my flat in Miami, what can I do to remove them?
 
-> You are a legal research assistant. You must follow these rules strictly:
+```
+You are a legal research assistant. You must follow these rules strictly:
 
   === NEGATIVE CONSTRAINTS ===
   - NEVER cite a Florida statute without providing the exact statute number (e.g.,
@@ -1279,23 +1341,23 @@ Paste that straight into ChatGPT. The ages are spaced roughly evenly (0, 33, 66,
 
   === QUESTIONS (answer each separately) ===
   1. Under Florida HB 621 (2024), what is the exact process for filing an
-     affidavit with the sheriff to remove unauthorized occupants? What forms
-     do I need, and what is the timeline?
+affidavit with the sheriff to remove unauthorized occupants? What forms
+do I need, and what is the timeline?
 
   2. What are the specific legal distinctions under Florida law between a
-     trespasser, a squatter, and a holdover tenant — and which category do
-     my occupants likely fall under?
+trespasser, a squatter, and a holdover tenant — and which category do
+my occupants likely fall under?
 
   3. If the sheriff affidavit route fails or is contested, what is the
-     step-by-step process for filing an unlawful detainer action in
-     Miami-Dade County Court? Include court, filing fees, and expected
-     timeline.
+step-by-step process for filing an unlawful detainer action in
+Miami-Dade County Court? Include court, filing fees, and expected
+timeline.
 
   4. What should I absolutely NOT do? List specific actions that could
-     expose me to criminal liability or civil claims from the occupants.
+expose me to criminal liability or civil claims from the occupants.
 
   5. What emergency options exist if the squatters damage the property
-     or threaten my safety?
+or threaten my safety?
 
   === SELF-VERIFICATION STEP ===
   After answering all five questions, list every statute number, case
@@ -1306,6 +1368,7 @@ Paste that straight into ChatGPT. The ages are spaced roughly evenly (0, 33, 66,
 Outcome: An in-depth 3000+ word guide examining Florida’s eviction (unlawful detainer) procedures, key provisions of the Miami-Dade County eviction rules and Florida landlord-tenant statutes, critical differences between trespassers and legal tenants, realistic timeframe projections, potential liability exposure for landlords and property managers, plus a list of 12 targeted questions to bring to any Florida real estate or eviction attorney — all carefully qualified with clear “areas of uncertainty” disclaimers and no invented court case references.
 
 This case study demonstrates recent /briefbot progress in crafting highly specialized legal-domain prompts (with strong emphasis on hallucination avoidance), resulting in reliable, cautious, and actually actionable output for real-world use.
+```
 
 </details>
 
@@ -1316,109 +1379,112 @@ This case study demonstrates recent /briefbot progress in crafting highly specia
 
 /briefbot Best Suno AI Music prompting techniques
 
-> What I learned
+```
+What I learned
 
-     Suno AI is not a jukebox that plays back genres on demand -- it is a
-     reasoning-driven composition engine that parses natural language descriptions
-     and structural metatags to construct songs section by section. The single most
-     important shift in effective Suno prompting (especially with v4.5 and v5) is
-     moving from keyword-stuffing ("sad rock 120bpm C major") to design-document
-     prompting: describing your song the way a producer would brief a session
-     musician, with emotional intent, specific instrumentation, and structural
-     scaffolding via metatags. The model weights early words more heavily, so your
-     opening line acts as an anchor that colors the entire generation.
+Suno AI is not a jukebox that plays back genres on demand -- it is a
+reasoning-driven composition engine that parses natural language descriptions
+and structural metatags to construct songs section by section. The single most
+important shift in effective Suno prompting (especially with v4.5 and v5) is
+moving from keyword-stuffing ("sad rock 120bpm C major") to design-document
+prompting: describing your song the way a producer would brief a session
+musician, with emotional intent, specific instrumentation, and structural
+scaffolding via metatags. The model weights early words more heavily, so your
+opening line acts as an anchor that colors the entire generation.
 
-     The second key insight from the community, particularly from Japanese
-     power-users on X popularizing the "YAML x TOON" method, is that controlling
-     randomness is the real skill gap. Most users hit a "genre lottery" problem --
-     roughly 70% of initial generations miss the intended genre. The solution is not
-     more words but more structure: using the Persona feature for voice consistency
-     across tracks, structure tags ([Verse], [Chorus], [Bridge]) to prevent chaotic
-     arrangements, and isolating style prompts from lyric prompts so each field does
-     one job well (https://howtopromptsuno.com/a-complete-guide-to-prompting-suno,
-     https://x.com/mech_kish/status/2016117000318418975).
+The second key insight from the community, particularly from Japanese
+power-users on X popularizing the "YAML x TOON" method, is that controlling
+randomness is the real skill gap. Most users hit a "genre lottery" problem --
+roughly 70% of initial generations miss the intended genre. The solution is not
+more words but more structure: using the Persona feature for voice consistency
+across tracks, structure tags ([Verse], [Chorus], [Bridge]) to prevent chaotic
+arrangements, and isolating style prompts from lyric prompts so each field does
+one job well (https://howtopromptsuno.com/a-complete-guide-to-prompting-suno,
+https://x.com/mech_kish/status/2016117000318418975).
 
-     Key techniques
+Key techniques
 
-     1. 4-component descriptive prompting -- Every effective Suno prompt has exactly
-     four elements: genre/style, mood/emotion, instrumentation, and vocal direction.
-     The sweet spot is 4-7 descriptors total. More than that and the model starts
-     ignoring elements; fewer and you get generic output. Crucially, describe rather
-     than command -- "groovy funk beat with slap bass and bright percussion"
-     outperforms "make a funk song" because Suno's composition engine parses
-     descriptive intent, not imperatives (https://www.soundverse.ai/blog/article/how-
-     to-write-effective-prompts-for-suno-music-1128,
-     https://musci.io/blog/suno-prompts)
-     2. Top-anchor style locking -- Place your most important style and vocal
-     descriptors in the very first sentence of your prompt. Suno weights early tokens
-      more heavily, so "Female pop vocalist, breathy, intimate, 90s R&B groove" at
-     the top locks the entire generation into that lane before the model parses
-     lyrics or structure. This "top-anchor" approach dramatically reduces the
-     genre-lottery problem where generations miss the intended style
-     (https://sider.ai/blog/ai-tools/what-s-new-in-suno-v5-and-how-to-prompt-its-voca
-     l-controls-like-a-pro,
-     https://plainenglish.io/blog/i-made-10-suno-v5-prompt-patterns-that-never-miss)
-     3. Metatag scaffolding for structure -- Use [Intro], [Verse], [Chorus],
-     [Bridge], [Outro] tags directly in the lyrics field to control song
-     architecture. Without them, Suno often produces chaotic arrangements that blend
-     sections together. Keep tags short (1-2 words). Advanced users add inline
-     direction like [Verse 2][Stripped back, vocals exposed] to nudge production
-     choices per section. Separate the Style field (for genre/sound) from the Lyrics
-     field (for structure/words) -- each field should do one job
-     (https://www.titanxt.io/post/guide-to-suno-ai-prompting-metatags-explained,
-     https://sunoaiwiki.com/resources/2024-05-13-list-of-metatags/)
-     4. Persona feature for consistency -- Suno's "Persona" is not just a favorites
-     feature; it stores acoustic tokens that define a virtual artist's voice
-     identity. By creating and reusing Personas, you get consistent vocal timbre,
-     phrasing, and style across multiple tracks -- solving the AI music problem of
-     "every song sounds like a different singer." This is essential for album-level
-     projects or building a recognizable AI artist identity
-     (https://x.com/hatolaborvol2/status/2014125002212462978,
-     https://x.com/promptband/status/2023552427618861171)
-     5. Cover mode reconstruction -- Upload a reference track you made, set mode to
-     "cover," match lyrics, leave the style field empty, and set weirdness to 0%,
-     style influence to 0%, and audio influence to 100%. This forces Suno to
-     reconstruct the sonic DNA of your reference while keeping the output within
-     Suno's generation quality. It is the most reliable way to get a specific sound
-     without fighting the prompt lottery
-     (https://x.com/qorprate/status/2020577516487164108)
+1. 4-component descriptive prompting -- Every effective Suno prompt has exactly
+four elements: genre/style, mood/emotion, instrumentation, and vocal direction.
+The sweet spot is 4-7 descriptors total. More than that and the model starts
+ignoring elements; fewer and you get generic output. Crucially, describe rather
+than command -- "groovy funk beat with slap bass and bright percussion"
+outperforms "make a funk song" because Suno's composition engine parses
+descriptive intent, not imperatives (https://www.soundverse.ai/blog/article/how-
+to-write-effective-prompts-for-suno-music-1128,
+https://musci.io/blog/suno-prompts)
+2. Top-anchor style locking -- Place your most important style and vocal
+descriptors in the very first sentence of your prompt. Suno weights early tokens
+ more heavily, so "Female pop vocalist, breathy, intimate, 90s R&B groove" at
+the top locks the entire generation into that lane before the model parses
+lyrics or structure. This "top-anchor" approach dramatically reduces the
+genre-lottery problem where generations miss the intended style
+(https://sider.ai/blog/ai-tools/what-s-new-in-suno-v5-and-how-to-prompt-its-voca
+l-controls-like-a-pro,
+https://plainenglish.io/blog/i-made-10-suno-v5-prompt-patterns-that-never-miss)
+3. Metatag scaffolding for structure -- Use [Intro], [Verse], [Chorus],
+[Bridge], [Outro] tags directly in the lyrics field to control song
+architecture. Without them, Suno often produces chaotic arrangements that blend
+sections together. Keep tags short (1-2 words). Advanced users add inline
+direction like [Verse 2][Stripped back, vocals exposed] to nudge production
+choices per section. Separate the Style field (for genre/sound) from the Lyrics
+field (for structure/words) -- each field should do one job
+(https://www.titanxt.io/post/guide-to-suno-ai-prompting-metatags-explained,
+https://sunoaiwiki.com/resources/2024-05-13-list-of-metatags/)
+4. Persona feature for consistency -- Suno's "Persona" is not just a favorites
+feature; it stores acoustic tokens that define a virtual artist's voice
+identity. By creating and reusing Personas, you get consistent vocal timbre,
+phrasing, and style across multiple tracks -- solving the AI music problem of
+"every song sounds like a different singer." This is essential for album-level
+projects or building a recognizable AI artist identity
+(https://x.com/hatolaborvol2/status/2014125002212462978,
+https://x.com/promptband/status/2023552427618861171)
+5. Cover mode reconstruction -- Upload a reference track you made, set mode to
+"cover," match lyrics, leave the style field empty, and set weirdness to 0%,
+style influence to 0%, and audio influence to 100%. This forces Suno to
+reconstruct the sonic DNA of your reference while keeping the output within
+Suno's generation quality. It is the most reliable way to get a specific sound
+without fighting the prompt lottery
+(https://x.com/qorprate/status/2020577516487164108)
 
-     ---
-     Sources collected
+---
+Sources collected
 
-     Platform: X
-     Items: 12 posts
-     Engagement: 1,500+ likes, 130+ reposts
-     ────────────────────────────────────────
-     Platform: Web
-     Items: 18+ pages
-     Engagement: soundverse.ai, musci.io, howtopromptsuno.com, sider.ai,
-     plainenglish.io,
-       titanxt.io, suno.com, travisnicholson (Medium), musicsmith.ai
+Platform: X
+Items: 12 posts
+Engagement: 1,500+ likes, 130+ reposts
+────────────────────────────────────────
+Platform: Web
+Items: 18+ pages
+Engagement: soundverse.ai, musci.io, howtopromptsuno.com, sider.ai,
+plainenglish.io,
+  titanxt.io, suno.com, travisnicholson (Medium), musicsmith.ai
 
-     Top voices: @mech_kish (YAML x TOON method), @hatolaborvol2 (Persona deep-dive),
-      @qorprate (cover mode trick) -- Travis Nicholson on Medium,
-     howtopromptsuno.com, sider.ai
+Top voices: @mech_kish (YAML x TOON method), @hatolaborvol2 (Persona deep-dive),
+ @qorprate (cover mode trick) -- Travis Nicholson on Medium,
+howtopromptsuno.com, sider.ai
 
-     ---
-     What do you want to make? For example:
+---
+What do you want to make? For example:
 
-     - "A nostalgic 80s synth-pop anthem with breathy female vocals and driving
-     rhythm" -- using top-anchor style locking and decade-specific genre anchoring
-     - "An atmospheric lo-fi hip-hop beat with jazzy piano and vinyl crackle for a
-     study playlist" -- using descriptive 4-component prompting with genre crossover
-     - "Upload my guitar demo and reconstruct it with full production in Suno's cover
-      mode" -- using the cover mode reconstruction technique
+- "A nostalgic 80s synth-pop anthem with breathy female vocals and driving
+rhythm" -- using top-anchor style locking and decade-specific genre anchoring
+- "An atmospheric lo-fi hip-hop beat with jazzy piano and vinyl crackle for a
+study playlist" -- using descriptive 4-component prompting with genre crossover
+- "Upload my guitar demo and reconstruct it with full production in Suno's cover
+ mode" -- using the cover mode reconstruction technique
 
-     Just describe your vision and I'll write a prompt you can paste straight into
-     Suno.
+Just describe your vision and I'll write a prompt you can paste straight into
+Suno.
 
-     Try next: a melancholic indie folk ballad with fingerpicked acoustic guitar and
-     soft male vocals, rainy evening mood
+Try next: a melancholic indie folk ballad with fingerpicked acoustic guitar and
+soft male vocals, rainy evening mood
+```
 
 **Follow-up:**  Amazing. Now use this to write a Suno prompt that will end up in a song that's close to The Weeknd's Blinding Lights but faster and a slight bit more party. The lyrics is supposed to be about OpenClaw, which means its history, Peter Steinberger, the renaming, and the outcome.
 
-> Suno Prompt
+```
+Suno Prompt
 
   Style Field (paste into Style of Music)
 
@@ -1522,6 +1588,7 @@ This case study demonstrates recent /briefbot progress in crafting highly specia
   The faster tempo (180 vs Blinding Lights' 171 BPM) and "euphoric dance-pop / retro
   party anthem" descriptors push it toward the party energy you wanted while keeping
   the synthwave DNA.
+```
 
 **Result:** (Generated by Suno 5.0)
 

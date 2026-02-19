@@ -1,20 +1,5 @@
 #!/usr/bin/env python3
-#
-# BriefBot Module: Multi-platform content aggregation engine
-# Retrieves and consolidates recent discussions from Reddit, X, YouTube, and LinkedIn
-#
-# Invocation pattern:
-#     python briefbot.py <subject_matter> [flags]
-#
-# Supported flags:
-#     --mock              Substitute fixture data for live API responses
-#     --emit=MODE         Select output format: compact|json|md|context|path (compact is default)
-#     --sources=MODE      Platform filter: auto|reddit|x|youtube|linkedin|both|all (auto is default)
-#     --quick             Streamlined mode - reduced result set (8-12 per platform)
-#     --deep              Exhaustive mode - expanded result set (50-70 Reddit, 40-60 X)
-#     --debug             Activate detailed diagnostic output
-#     --audio             Generate MP3 audio of the research output
-#
+"""Multi-platform research aggregation engine."""
 
 import argparse
 import json
@@ -35,12 +20,12 @@ DISABLE_BIRD = True
 def _log(message: str):
     """Emit a debug log line to stderr, gated by BRIEFBOT_DEBUG."""
     if os.environ.get("BRIEFBOT_DEBUG", "").lower() in ("1", "true", "yes"):
-        sys.stderr.write("[BRIEFBOT] {}\n".format(message))
+        sys.stderr.write(f"[BRIEFBOT] {message}\n")
         sys.stderr.flush()
 
 # Ensure library modules are discoverable
-MODULE_ROOT = Path(__file__).parent.resolve()
-sys.path.insert(0, str(MODULE_ROOT))
+ROOT = Path(__file__).parent.resolve()
+sys.path.insert(0, str(ROOT))
 
 from lib import (
     bird_x,
@@ -67,362 +52,288 @@ from lib import (
 )
 
 
-def retrieve_fixture_data(fixture_identifier: str) -> dict:
-    """
-    Fetches mock data from the fixtures directory.
+def load_fixture(name: str) -> dict:
+    """Load mock data from the fixtures directory."""
+    path = ROOT.parent / "fixtures" / name
 
-    This helper enables testing without live API calls by loading
-    pre-recorded response samples from disk.
-    """
-    fixture_location = MODULE_ROOT.parent / "fixtures" / fixture_identifier
-
-    if not fixture_location.exists():
+    if not path.exists():
         return {}
 
-    with open(fixture_location) as file_handle:
-        return json.load(file_handle)
+    with open(path) as f:
+        return json.load(f)
 
 
-def _execute_reddit_query(
-    subject_matter: str,
-    configuration: dict,
-    model_selection: dict,
+def _query_reddit(
+    topic: str,
+    config: dict,
+    models_picked: dict,
     start_date: str,
     end_date: str,
-    thoroughness: str,
-    use_mock_data: bool,
+    depth: str,
+    mock: bool,
 ) -> tuple:
-    """
-    Queries Reddit content via the OpenAI web search API.
+    """Query Reddit via OpenAI web search API. Returns (items, response, error)."""
+    response = None
+    error = None
 
-    Designed to execute within a thread pool for concurrent operation.
-
-    Returns a three-element tuple containing:
-        - List of Reddit discussion items
-        - Raw API response payload
-        - Error message (None if successful)
-    """
-    api_response = None
-    failure_message = None
-
-    if use_mock_data:
-        api_response = retrieve_fixture_data("openai_sample.json")
+    if mock:
+        response = load_fixture("openai_sample.json")
     else:
         try:
-            api_response = openai_reddit.search_reddit(
-                configuration["OPENAI_API_KEY"],
-                model_selection["openai"],
-                subject_matter,
+            response = openai_reddit.search(
+                config["OPENAI_API_KEY"],
+                models_picked["openai"],
+                topic,
                 start_date,
                 end_date,
-                thoroughness=thoroughness,
+                depth=depth,
             )
         except http.HTTPError as network_err:
-            api_response = {"error": str(network_err)}
-            failure_message = "API error: {}".format(network_err)
+            response = {"error": str(network_err)}
+            error = f"API error: {network_err}"
         except Exception as generic_err:
-            api_response = {"error": str(generic_err)}
-            failure_message = "{}: {}".format(type(generic_err).__name__, generic_err)
+            response = {"error": str(generic_err)}
+            error = f"{type(generic_err).__name__}: {generic_err}"
 
     # Transform raw response into structured items
-    discussion_items = openai_reddit.parse_reddit_response(api_response or {})
+    items = openai_reddit.parse_reddit_response(response or {})
 
     # Sparse results trigger automatic retry with simplified query
-    has_few_results = len(discussion_items) < 5
-    should_retry = has_few_results and not use_mock_data and failure_message is None
+    has_few_results = len(items) < 5
+    should_retry = has_few_results and not mock and error is None
 
     if should_retry:
-        simplified_subject = openai_reddit._extract_core_subject(subject_matter)
-        subjects_differ = simplified_subject.lower() != subject_matter.lower()
+        simplified_topic = openai_reddit._core_subject(topic)
+        topics_differ = simplified_topic.lower() != topic.lower()
 
-        if subjects_differ:
+        if topics_differ:
             try:
-                supplemental_response = openai_reddit.search_reddit(
-                    configuration["OPENAI_API_KEY"],
-                    model_selection["openai"],
-                    simplified_subject,
+                supplemental_response = openai_reddit.search(
+                    config["OPENAI_API_KEY"],
+                    models_picked["openai"],
+                    simplified_topic,
                     start_date,
                     end_date,
-                    thoroughness=thoroughness,
+                    depth=depth,
                 )
                 supplemental_items = openai_reddit.parse_reddit_response(
                     supplemental_response
                 )
 
                 # Merge unique items based on URL
-                known_urls = {entry.get("url") for entry in discussion_items}
+                known_urls = {entry.get("url") for entry in items}
 
                 for supplemental_entry in supplemental_items:
-                    url_is_new = supplemental_entry.get("url") not in known_urls
-                    if url_is_new:
-                        discussion_items.append(supplemental_entry)
+                    if supplemental_entry.get("url") not in known_urls:
+                        items.append(supplemental_entry)
             except Exception:
                 pass  # Retry failure is non-critical
 
-    return discussion_items, api_response, failure_message
+    return items, response, error
 
 
-def _execute_x_query(
-    subject_matter: str,
-    configuration: dict,
-    model_selection: dict,
+def _query_x(
+    topic: str,
+    config: dict,
+    models_picked: dict,
     start_date: str,
     end_date: str,
-    thoroughness: str,
-    use_mock_data: bool,
+    depth: str,
+    mock: bool,
 ) -> tuple:
-    """
-    Queries X/Twitter content via Bird search (primary) or xAI API (fallback).
+    """Query X/Twitter via Bird search (primary) or xAI API (fallback). Returns (items, response, error)."""
+    response = None
+    error = None
 
-    Bird search uses browser cookies (free, no API key needed).
-    xAI search uses the paid xAI API with XAI_API_KEY.
+    _log("=== _query_x START ===")
+    _log(f"  Subject: '{topic}'")
+    _log(f"  Date range: {start_date} to {end_date}")
+    _log(f"  Depth: {depth}")
+    _log(f"  Mock data: {mock}")
 
-    Designed to execute within a thread pool for concurrent operation.
-
-    Returns a three-element tuple containing:
-        - List of X post items
-        - Raw API response payload
-        - Error message (None if successful)
-    """
-    api_response = None
-    failure_message = None
-
-    _log("=== _execute_x_query START ===")
-    _log("  Subject: '{}'".format(subject_matter))
-    _log("  Date range: {} to {}".format(start_date, end_date))
-    _log("  Thoroughness: {}".format(thoroughness))
-    _log("  Mock data: {}".format(use_mock_data))
-
-    if use_mock_data:
+    if mock:
         _log("  Using MOCK data for X search")
-        api_response = retrieve_fixture_data("xai_sample.json")
-        post_items = xai_x.parse_x_response(api_response or {})
-        _log("  Mock returned {} items".format(len(post_items)))
-        return post_items, api_response, failure_message
+        response = load_fixture("xai_sample.json")
+        items = xai_x.parse_x_response(response or {})
+        _log(f"  Mock returned {len(items)} items")
+        return items, response, error
 
     # Determine which X backend to use: Bird (free) > xAI (paid)
-    use_bird = configuration.get("BIRD_X_AVAILABLE", False)
-    has_xai = bool(configuration.get("XAI_API_KEY"))
+    use_bird = config.get("BIRD_X_AVAILABLE", False)
+    has_xai = bool(config.get("XAI_API_KEY"))
     xai_key_preview = ""
     if has_xai:
-        xai_key = configuration["XAI_API_KEY"]
-        xai_key_preview = "{}...{} ({} chars)".format(xai_key[:8], xai_key[-4:], len(xai_key))
+        xai_key = config["XAI_API_KEY"]
+        xai_key_preview = f"{xai_key[:8]}...{xai_key[-4:]} ({len(xai_key)} chars)"
 
-    _log("  DISABLE_BIRD: {}".format(DISABLE_BIRD))
-    _log("  Bird available: {}".format(use_bird))
-    _log("  xAI key present: {} {}".format(has_xai, xai_key_preview if has_xai else ""))
-    _log("  xAI model: {}".format(model_selection.get("xai")))
+    _log(f"  DISABLE_BIRD: {DISABLE_BIRD}")
+    _log(f"  Bird available: {use_bird}")
+    _log(f"  xAI key present: {has_xai} {xai_key_preview if has_xai else ''}")
+    _log(f"  xAI model: {models_picked.get('xai')}")
 
     if not DISABLE_BIRD and use_bird:
         # Primary path: Bird search (browser cookies, no API key)
         _log("  PATH: Bird search (primary, free)")
         try:
-            api_response = bird_x.search_x(
-                subject_matter,
+            response = bird_x.search_x(
+                topic,
                 start_date,
                 end_date,
-                depth=thoroughness,
+                depth=depth,
             )
             _log("  Bird API call succeeded")
         except Exception as generic_err:
-            api_response = {"error": str(generic_err)}
-            failure_message = "Bird: {}: {}".format(
-                type(generic_err).__name__, generic_err
-            )
-            _log("  Bird API call FAILED: {}".format(failure_message))
+            response = {"error": str(generic_err)}
+            error = f"Bird: {type(generic_err).__name__}: {generic_err}"
+            _log(f"  Bird API call FAILED: {error}")
 
-        post_items = bird_x.parse_bird_response(api_response or {})
-        _log("  Bird parsed {} items".format(len(post_items)))
+        items = bird_x.parse_bird_response(response or {})
+        _log(f"  Bird parsed {len(items)} items")
 
         # If Bird returned 0 results and xAI is available, fall back
-        if not post_items and has_xai and failure_message is None:
+        if not items and has_xai and error is None:
             _log("  Bird returned 0 results, falling back to xAI API...")
             try:
-                api_response = xai_x.search_x(
-                    configuration["XAI_API_KEY"],
-                    model_selection["xai"],
-                    subject_matter,
+                response = xai_x.search(
+                    config["XAI_API_KEY"],
+                    models_picked["xai"],
+                    topic,
                     start_date,
                     end_date,
-                    thoroughness=thoroughness,
+                    depth=depth,
                 )
-                post_items = xai_x.parse_x_response(api_response or {})
-                failure_message = None
-                _log("  xAI fallback returned {} items".format(len(post_items)))
+                items = xai_x.parse_x_response(response or {})
+                error = None
+                _log(f"  xAI fallback returned {len(items)} items")
             except Exception as fallback_err:
-                _log("  xAI fallback FAILED: {}: {}".format(
-                    type(fallback_err).__name__, fallback_err))
+                _log(f"  xAI fallback FAILED: {type(fallback_err).__name__}: {fallback_err}")
                 pass  # Keep Bird's (empty) result
     elif has_xai:
         # Fallback path: xAI API (paid)
         _log("  PATH: xAI API (paid, direct)")
-        _log("  Calling xai_x.search_x(key={}, model={}, topic='{}', dates={}->{}, thoroughness={})".format(
-            xai_key_preview, model_selection.get("xai"), subject_matter[:50], start_date, end_date, thoroughness))
+        _log(f"  Calling xai_x.search(key={xai_key_preview}, model={models_picked.get('xai')}, topic='{topic[:50]}', dates={start_date}->{end_date}, depth={depth})")
         try:
-            api_response = xai_x.search_x(
-                configuration["XAI_API_KEY"],
-                model_selection["xai"],
-                subject_matter,
+            response = xai_x.search(
+                config["XAI_API_KEY"],
+                models_picked["xai"],
+                topic,
                 start_date,
                 end_date,
-                thoroughness=thoroughness,
+                depth=depth,
             )
-            _log("  xAI API call succeeded, response keys: {}".format(
-                list(api_response.keys()) if isinstance(api_response, dict) else type(api_response).__name__))
+            _log(f"  xAI API call succeeded, response keys: {list(response.keys()) if isinstance(response, dict) else type(response).__name__}")
         except http.HTTPError as network_err:
-            api_response = {"error": str(network_err)}
-            failure_message = "API error: {}".format(network_err)
-            _log("  xAI API HTTP ERROR: {} (status={}, body={})".format(
-                network_err, getattr(network_err, 'status_code', '?'),
-                (getattr(network_err, 'body', '') or '')[:300]))
+            response = {"error": str(network_err)}
+            error = f"API error: {network_err}"
+            _log(f"  xAI API HTTP ERROR: {network_err} (status={getattr(network_err, 'status_code', '?')}, body={(getattr(network_err, 'body', '') or '')[:300]})")
         except Exception as generic_err:
-            api_response = {"error": str(generic_err)}
-            failure_message = "{}: {}".format(type(generic_err).__name__, generic_err)
-            _log("  xAI API EXCEPTION: {}".format(failure_message))
+            response = {"error": str(generic_err)}
+            error = f"{type(generic_err).__name__}: {generic_err}"
+            _log(f"  xAI API EXCEPTION: {error}")
 
-        post_items = xai_x.parse_x_response(api_response or {})
-        _log("  xAI parsed {} items".format(len(post_items)))
+        items = xai_x.parse_x_response(response or {})
+        _log(f"  xAI parsed {len(items)} items")
     else:
         # No X backend available
         _log("  PATH: NO X BACKEND AVAILABLE (no xAI key, Bird not authenticated)")
-        api_response = {
+        response = {
             "error": "No X search backend available (no xAI key, Bird not authenticated)"
         }
-        failure_message = "No X search backend available"
-        post_items = []
+        error = "No X search backend available"
+        items = []
 
-    _log("=== _execute_x_query END: {} items, error={} ===".format(
-        len(post_items), failure_message))
-    return post_items, api_response, failure_message
+    _log(f"=== _query_x END: {len(items)} items, error={error} ===")
+    return items, response, error
 
 
-def _execute_youtube_query(
-    subject_matter: str,
-    configuration: dict,
-    model_selection: dict,
+def _query_youtube(
+    topic: str,
+    config: dict,
+    models_picked: dict,
     start_date: str,
     end_date: str,
-    thoroughness: str,
-    use_mock_data: bool,
+    depth: str,
+    mock: bool,
 ) -> tuple:
-    """
-    Queries YouTube content via the OpenAI web search API.
+    """Query YouTube via OpenAI web search API. Returns (items, response, error)."""
+    response = None
+    error = None
 
-    Designed to execute within a thread pool for concurrent operation.
-
-    Returns a three-element tuple containing:
-        - List of YouTube video items
-        - Raw API response payload
-        - Error message (None if successful)
-    """
-    api_response = None
-    failure_message = None
-
-    if use_mock_data:
-        api_response = retrieve_fixture_data("youtube_sample.json")
+    if mock:
+        response = load_fixture("youtube_sample.json")
     else:
         try:
-            api_response = openai_youtube.search_youtube(
-                configuration["OPENAI_API_KEY"],
-                model_selection["openai"],
-                subject_matter,
+            response = openai_youtube.search(
+                config["OPENAI_API_KEY"],
+                models_picked["openai"],
+                topic,
                 start_date,
                 end_date,
-                thoroughness=thoroughness,
+                depth=depth,
             )
         except http.HTTPError as network_err:
-            api_response = {"error": str(network_err)}
-            failure_message = "API error: {}".format(network_err)
+            response = {"error": str(network_err)}
+            error = f"API error: {network_err}"
         except Exception as generic_err:
-            api_response = {"error": str(generic_err)}
-            failure_message = "{}: {}".format(type(generic_err).__name__, generic_err)
+            response = {"error": str(generic_err)}
+            error = f"{type(generic_err).__name__}: {generic_err}"
 
     # Transform raw response into structured items
-    video_items = openai_youtube.parse_youtube_response(api_response or {})
+    items = openai_youtube.parse_youtube_response(response or {})
 
-    return video_items, api_response, failure_message
+    return items, response, error
 
 
-def _execute_linkedin_query(
-    subject_matter: str,
-    configuration: dict,
-    model_selection: dict,
+def _query_linkedin(
+    topic: str,
+    config: dict,
+    models_picked: dict,
     start_date: str,
     end_date: str,
-    thoroughness: str,
-    use_mock_data: bool,
+    depth: str,
+    mock: bool,
 ) -> tuple:
-    """
-    Queries LinkedIn content via the OpenAI web search API.
+    """Query LinkedIn via OpenAI web search API. Returns (items, response, error)."""
+    response = None
+    error = None
 
-    Designed to execute within a thread pool for concurrent operation.
-
-    Returns a three-element tuple containing:
-        - List of LinkedIn post items
-        - Raw API response payload
-        - Error message (None if successful)
-    """
-    api_response = None
-    failure_message = None
-
-    if use_mock_data:
-        api_response = retrieve_fixture_data("linkedin_sample.json")
+    if mock:
+        response = load_fixture("linkedin_sample.json")
     else:
         try:
-            api_response = openai_linkedin.search_linkedin(
-                configuration["OPENAI_API_KEY"],
-                model_selection["openai"],
-                subject_matter,
+            response = openai_linkedin.search(
+                config["OPENAI_API_KEY"],
+                models_picked["openai"],
+                topic,
                 start_date,
                 end_date,
-                thoroughness=thoroughness,
+                depth=depth,
             )
         except http.HTTPError as network_err:
-            api_response = {"error": str(network_err)}
-            failure_message = "API error: {}".format(network_err)
+            response = {"error": str(network_err)}
+            error = f"API error: {network_err}"
         except Exception as generic_err:
-            api_response = {"error": str(generic_err)}
-            failure_message = "{}: {}".format(type(generic_err).__name__, generic_err)
+            response = {"error": str(generic_err)}
+            error = f"{type(generic_err).__name__}: {generic_err}"
 
     # Transform raw response into structured items
-    article_items = openai_linkedin.parse_linkedin_response(api_response or {})
+    items = openai_linkedin.parse_linkedin_response(response or {})
 
-    return article_items, api_response, failure_message
+    return items, response, error
 
 
-def orchestrate_research(
-    subject_matter: str,
-    platform_selection: str,
-    configuration: dict,
-    model_selection: dict,
+def run_research(
+    topic: str,
+    platform: str,
+    config: dict,
+    models_picked: dict,
     start_date: str,
     end_date: str,
-    thoroughness: str = "default",
-    use_mock_data: bool = False,
-    status_tracker: ui.ResearchProgressTracker = None,
+    depth: str = "default",
+    mock: bool = False,
+    progress: ui.Progress = None,
 ) -> tuple:
-    """
-    Orchestrates the complete research pipeline across all platforms.
-
-    This function coordinates parallel API queries, collects results,
-    enriches Reddit data with thread content, and handles errors gracefully.
-
-    Returns a 14-element tuple containing:
-        - reddit_items: Processed Reddit discussions
-        - x_items: Processed X/Twitter posts
-        - youtube_items: Processed YouTube videos
-        - linkedin_items: Processed LinkedIn articles
-        - requires_web_search: Boolean indicating if Claude should do WebSearch
-        - raw_openai: Raw Reddit API response
-        - raw_xai: Raw X API response
-        - raw_youtube: Raw YouTube API response
-        - raw_linkedin: Raw LinkedIn API response
-        - raw_reddit_enriched: Enriched Reddit thread data
-        - reddit_error: Reddit search error message
-        - x_error: X search error message
-        - youtube_error: YouTube search error message
-        - linkedin_error: LinkedIn search error message
-    """
+    """Orchestrate the full research pipeline across all platforms. Returns a 14-element tuple."""
     # Initialize all result containers
     reddit_items = []
     x_items = []
@@ -440,13 +351,13 @@ def orchestrate_research(
 
     # Determine if supplemental web search is warranted
     web_search_modes = ("all", "web", "reddit-web", "x-web")
-    requires_web_search = platform_selection in web_search_modes
+    requires_web_search = platform in web_search_modes
 
     # Web-only mode bypasses all API calls - Claude handles everything
-    if platform_selection == "web":
-        if status_tracker is not None:
-            status_tracker.start_web_only()
-            status_tracker.end_web_only()
+    if platform == "web":
+        if progress is not None:
+            progress.start_web_only()
+            progress.end_web_only()
 
         return (
             reddit_items,
@@ -466,19 +377,19 @@ def orchestrate_research(
         )
 
     # Determine API availability based on configured keys and Bird
-    openai_available = bool(configuration.get("OPENAI_API_KEY"))
-    xai_available = bool(configuration.get("XAI_API_KEY"))
-    bird_available = bool(configuration.get("BIRD_X_AVAILABLE"))
+    openai_available = bool(config.get("OPENAI_API_KEY"))
+    xai_available = bool(config.get("XAI_API_KEY"))
+    bird_available = bool(config.get("BIRD_X_AVAILABLE"))
     x_available = xai_available or bird_available
 
-    _log("=== orchestrate_research ===")
-    _log("  Platform selection: '{}'".format(platform_selection))
-    _log("  OpenAI available: {}".format(openai_available))
-    _log("  xAI available: {}".format(xai_available))
-    _log("  Bird available: {}".format(bird_available))
-    _log("  X available (xAI or Bird): {}".format(x_available))
-    _log("  Thoroughness: {}".format(thoroughness))
-    _log("  Model selection: {}".format(model_selection))
+    _log("=== run_research ===")
+    _log(f"  Platform: '{platform}'")
+    _log(f"  OpenAI available: {openai_available}")
+    _log(f"  xAI available: {xai_available}")
+    _log(f"  Bird available: {bird_available}")
+    _log(f"  X available (xAI or Bird): {x_available}")
+    _log(f"  Depth: {depth}")
+    _log(f"  Models picked: {models_picked}")
 
     # Compute which platform searches should execute
     reddit_platforms = ("both", "reddit", "all", "reddit-web")
@@ -486,19 +397,17 @@ def orchestrate_research(
     youtube_platforms = ("all", "youtube")
     linkedin_platforms = ("all", "linkedin")
 
-    should_query_reddit = platform_selection in reddit_platforms and openai_available
-    should_query_x = platform_selection in x_platforms and x_available
-    should_query_youtube = platform_selection in youtube_platforms and openai_available
+    should_query_reddit = platform in reddit_platforms and openai_available
+    should_query_x = platform in x_platforms and x_available
+    should_query_youtube = platform in youtube_platforms and openai_available
     should_query_linkedin = (
-        platform_selection in linkedin_platforms and openai_available
+        platform in linkedin_platforms and openai_available
     )
 
-    _log("  should_query_reddit: {} (platform '{}' in {} AND openai={})".format(
-        should_query_reddit, platform_selection, reddit_platforms, openai_available))
-    _log("  should_query_x: {} (platform '{}' in {} AND x={})".format(
-        should_query_x, platform_selection, x_platforms, x_available))
-    _log("  should_query_youtube: {}".format(should_query_youtube))
-    _log("  should_query_linkedin: {}".format(should_query_linkedin))
+    _log(f"  should_query_reddit: {should_query_reddit} (platform '{platform}' in {reddit_platforms} AND openai={openai_available})")
+    _log(f"  should_query_x: {should_query_x} (platform '{platform}' in {x_platforms} AND x={x_available})")
+    _log(f"  should_query_youtube: {should_query_youtube}")
+    _log(f"  should_query_linkedin: {should_query_linkedin}")
 
     # Prepare future handles for concurrent execution
     reddit_future = None
@@ -510,60 +419,60 @@ def orchestrate_research(
     with ThreadPoolExecutor(max_workers=4) as thread_pool:
         # Dispatch Reddit query
         if should_query_reddit:
-            if status_tracker is not None:
-                status_tracker.start_reddit()
+            if progress is not None:
+                progress.start_reddit()
 
             reddit_future = thread_pool.submit(
-                _execute_reddit_query,
-                subject_matter,
-                configuration,
-                model_selection,
+                _query_reddit,
+                topic,
+                config,
+                models_picked,
                 start_date,
                 end_date,
-                thoroughness,
-                use_mock_data,
+                depth,
+                mock,
             )
 
         # Dispatch X query
         if should_query_x:
-            if status_tracker is not None:
-                status_tracker.start_x()
+            if progress is not None:
+                progress.start_x()
 
             x_future = thread_pool.submit(
-                _execute_x_query,
-                subject_matter,
-                configuration,
-                model_selection,
+                _query_x,
+                topic,
+                config,
+                models_picked,
                 start_date,
                 end_date,
-                thoroughness,
-                use_mock_data,
+                depth,
+                mock,
             )
 
         # Dispatch YouTube query
         if should_query_youtube:
             youtube_future = thread_pool.submit(
-                _execute_youtube_query,
-                subject_matter,
-                configuration,
-                model_selection,
+                _query_youtube,
+                topic,
+                config,
+                models_picked,
                 start_date,
                 end_date,
-                thoroughness,
-                use_mock_data,
+                depth,
+                mock,
             )
 
         # Dispatch LinkedIn query
         if should_query_linkedin:
             linkedin_future = thread_pool.submit(
-                _execute_linkedin_query,
-                subject_matter,
-                configuration,
-                model_selection,
+                _query_linkedin,
+                topic,
+                config,
+                models_picked,
                 start_date,
                 end_date,
-                thoroughness,
-                use_mock_data,
+                depth,
+                mock,
             )
 
         # Harvest Reddit results
@@ -571,105 +480,90 @@ def orchestrate_research(
             try:
                 reddit_items, raw_openai, reddit_error = reddit_future.result()
 
-                if reddit_error is not None and status_tracker is not None:
-                    status_tracker.show_error("Reddit error: {}".format(reddit_error))
+                if reddit_error is not None and progress is not None:
+                    progress.show_error(f"Reddit error: {reddit_error}")
             except Exception as exc:
-                reddit_error = "{}: {}".format(type(exc).__name__, exc)
+                reddit_error = f"{type(exc).__name__}: {exc}"
 
-                if status_tracker is not None:
-                    status_tracker.show_error("Reddit error: {}".format(exc))
+                if progress is not None:
+                    progress.show_error(f"Reddit error: {exc}")
 
-            if status_tracker is not None:
-                status_tracker.end_reddit(len(reddit_items))
+            if progress is not None:
+                progress.end_reddit(len(reddit_items))
 
         # Harvest X results
         if x_future is not None:
             try:
                 x_items, raw_xai, x_error = x_future.result()
 
-                if x_error is not None and status_tracker is not None:
-                    status_tracker.show_error("X error: {}".format(x_error))
+                if x_error is not None and progress is not None:
+                    progress.show_error(f"X error: {x_error}")
             except Exception as exc:
-                x_error = "{}: {}".format(type(exc).__name__, exc)
+                x_error = f"{type(exc).__name__}: {exc}"
 
-                if status_tracker is not None:
-                    status_tracker.show_error("X error: {}".format(exc))
+                if progress is not None:
+                    progress.show_error(f"X error: {exc}")
 
-            if status_tracker is not None:
-                status_tracker.end_x(len(x_items))
+            if progress is not None:
+                progress.end_x(len(x_items))
 
         # Harvest YouTube results
         if youtube_future is not None:
             try:
                 youtube_items, raw_youtube, youtube_error = youtube_future.result()
 
-                if youtube_error is not None and status_tracker is not None:
-                    status_tracker.show_error("YouTube error: {}".format(youtube_error))
+                if youtube_error is not None and progress is not None:
+                    progress.show_error(f"YouTube error: {youtube_error}")
             except Exception as exc:
-                youtube_error = "{}: {}".format(type(exc).__name__, exc)
+                youtube_error = f"{type(exc).__name__}: {exc}"
 
-                if status_tracker is not None:
-                    status_tracker.show_error("YouTube error: {}".format(exc))
+                if progress is not None:
+                    progress.show_error(f"YouTube error: {exc}")
 
         # Harvest LinkedIn results
         if linkedin_future is not None:
             try:
                 linkedin_items, raw_linkedin, linkedin_error = linkedin_future.result()
 
-                if linkedin_error is not None and status_tracker is not None:
-                    status_tracker.show_error(
-                        "LinkedIn error: {}".format(linkedin_error)
-                    )
+                if linkedin_error is not None and progress is not None:
+                    progress.show_error(f"LinkedIn error: {linkedin_error}")
             except Exception as exc:
-                linkedin_error = "{}: {}".format(type(exc).__name__, exc)
+                linkedin_error = f"{type(exc).__name__}: {exc}"
 
-                if status_tracker is not None:
-                    status_tracker.show_error("LinkedIn error: {}".format(exc))
+                if progress is not None:
+                    progress.show_error(f"LinkedIn error: {exc}")
 
     _log("=== Query results summary ===")
-    _log("  Reddit: {} items, error={}".format(len(reddit_items), reddit_error))
-    _log("  X:      {} items, error={}".format(len(x_items), x_error))
-    _log("  YouTube: {} items, error={}".format(len(youtube_items), youtube_error))
-    _log("  LinkedIn: {} items, error={}".format(len(linkedin_items), linkedin_error))
+    _log(f"  Reddit: {len(reddit_items)} items, error={reddit_error}")
+    _log(f"  X:      {len(x_items)} items, error={x_error}")
+    _log(f"  YouTube: {len(youtube_items)} items, error={youtube_error}")
+    _log(f"  LinkedIn: {len(linkedin_items)} items, error={linkedin_error}")
 
     # Augment Reddit items with full thread content
     # This runs sequentially since each item requires individual API call
     if len(reddit_items) > 0:
-        if status_tracker is not None:
-            status_tracker.start_reddit_enrich(1, len(reddit_items))
+        if progress is not None:
+            progress.start_reddit_enrich(1, len(reddit_items))
 
-        item_index = 0
-        while item_index < len(reddit_items):
-            current_item = reddit_items[item_index]
-
-            if status_tracker is not None and item_index > 0:
-                status_tracker.update_reddit_enrich(item_index + 1, len(reddit_items))
+        for i, item in enumerate(reddit_items):
+            if progress is not None and i > 0:
+                progress.update_reddit_enrich(i + 1, len(reddit_items))
 
             try:
-                if use_mock_data:
-                    mock_thread_data = retrieve_fixture_data(
-                        "reddit_thread_sample.json"
-                    )
-                    reddit_items[item_index] = reddit_enrich.enrich_reddit_item(
-                        current_item, mock_thread_data
-                    )
+                if mock:
+                    thread_data = load_fixture("reddit_thread_sample.json")
+                    reddit_items[i] = reddit_enrich.enrich(item, thread_data)
                 else:
-                    reddit_items[item_index] = reddit_enrich.enrich_reddit_item(
-                        current_item
-                    )
-            except Exception as enrichment_err:
-                # Enrichment failure is non-fatal - preserve original item
-                if status_tracker is not None:
-                    item_url = current_item.get("url", "unknown")
-                    status_tracker.show_error(
-                        "Enrich failed for {}: {}".format(item_url, enrichment_err)
-                    )
+                    reddit_items[i] = reddit_enrich.enrich(item)
+            except Exception as err:
+                if progress is not None:
+                    url = item.get("url", "unknown")
+                    progress.show_error(f"Enrich failed for {url}: {err}")
 
-            raw_reddit_enriched.append(reddit_items[item_index])
-            item_index += 1
+            raw_reddit_enriched.append(reddit_items[i])
 
-        if status_tracker is not None:
-            status_tracker.end_reddit_enrich()
+        if progress is not None:
+            progress.end_reddit_enrich()
 
     return (
         reddit_items,
@@ -689,76 +583,70 @@ def orchestrate_research(
     )
 
 
-def bootstrap():
-    """
-    Entry point for command-line execution.
-
-    Parses arguments, validates configuration, runs the research pipeline,
-    processes results through normalization/scoring/deduplication, and
-    outputs the final report in the requested format.
-    """
-    argument_parser = argparse.ArgumentParser(
+def main():
+    """Entry point for command-line execution."""
+    parser = argparse.ArgumentParser(
         description="Research a topic from the last N days on Reddit + X + YouTube + LinkedIn"
     )
 
-    argument_parser.add_argument("topic", nargs="?", help="Topic to research")
-    argument_parser.add_argument("--mock", action="store_true", help="Use fixtures")
-    argument_parser.add_argument(
+    parser.add_argument("topic", nargs="?", help="Topic to research")
+    parser.add_argument("--mock", action="store_true", help="Use fixtures")
+    parser.add_argument(
         "--emit",
         choices=["compact", "json", "md", "context", "path"],
         default="compact",
         help="Output mode",
     )
-    argument_parser.add_argument(
+    parser.add_argument(
         "--sources",
         choices=["auto", "reddit", "x", "youtube", "linkedin", "both", "all"],
         default="auto",
         help="Source selection (auto, reddit, x, youtube, linkedin, both=reddit+x, all=all sources)",
     )
-    argument_parser.add_argument(
+    parser.add_argument(
         "--quick",
         action="store_true",
         help="Faster research with fewer sources (8-12 each)",
     )
-    argument_parser.add_argument(
+    parser.add_argument(
         "--deep",
         action="store_true",
         help="Comprehensive research with more sources (50-70 Reddit, 40-60 X)",
     )
-    argument_parser.add_argument(
+    parser.add_argument(
         "--debug",
         action="store_true",
         help="Enable verbose debug logging",
     )
-    argument_parser.add_argument(
+    parser.add_argument(
         "--days",
         type=int,
         default=30,
         help="Number of days to search back (default: 30, e.g., 7 for a week, 1 for today)",
     )
-    argument_parser.add_argument(
+    parser.add_argument(
         "--include-web",
         action="store_true",
         help="Include general web search alongside Reddit/X (lower weighted)",
     )
-    argument_parser.add_argument(
+    parser.add_argument(
         "--audio",
         action="store_true",
         help="Generate MP3 audio of the research output (uses edge-tts or ElevenLabs)",
     )
-    argument_parser.add_argument(
+    parser.add_argument(
         "--schedule",
         type=str,
         metavar="CRON",
         help='Create a scheduled job with a cron expression (e.g., "0 6 * * *" for daily at 6am)',
     )
-    argument_parser.add_argument(
+    parser.add_argument(
         "--email",
         type=str,
         metavar="ADDRESS",
         help="Email the report to this address (comma-separated for multiple recipients)",
     )
-    argument_parser.add_argument(
+    parser.add_argument(
         "--telegram",
         type=str,
         nargs="?",
@@ -766,147 +654,145 @@ def bootstrap():
         metavar="CHAT_ID",
         help="Send via Telegram (optional CHAT_ID overrides config default)",
     )
-    argument_parser.add_argument(
+    parser.add_argument(
         "--list-jobs",
         action="store_true",
         help="List all registered scheduled jobs",
     )
-    argument_parser.add_argument(
+    parser.add_argument(
         "--delete-job",
         type=str,
         metavar="JOB_ID",
         help="Delete a scheduled job by ID (e.g., cu_ABC123)",
     )
-    argument_parser.add_argument(
+    parser.add_argument(
         "--skip-immediate-run",
         action="store_true",
         help="With --schedule: only create the job, don't run research now",
     )
-    argument_parser.add_argument(
+    parser.add_argument(
         "--setup",
         action="store_true",
         help="Run the interactive setup wizard to configure API keys and services",
     )
 
-    cli_args = argument_parser.parse_args()
+    args = parser.parse_args()
 
     # Handle setup wizard (exit early)
-    if cli_args.setup:
+    if args.setup:
         from setup import run_setup
 
         run_setup()
         return
 
     # Handle scheduling commands (exit early, no research)
-    if cli_args.list_jobs:
-        _handle_list_jobs()
+    if args.list_jobs:
+        _list_jobs()
         return
 
-    if cli_args.delete_job:
-        _handle_delete_job(cli_args.delete_job)
+    if args.delete_job:
+        _delete_job(args.delete_job)
         return
 
-    if cli_args.schedule:
-        _handle_create_schedule(cli_args)
+    if args.schedule:
+        _create_schedule(args)
         return
 
     # Activate diagnostic output when requested
-    if cli_args.debug:
+    if args.debug:
         os.environ["BRIEFBOT_DEBUG"] = "1"
         # Force http module to recognize debug flag
         from lib import http as http_module
 
         http_module.DEBUG = True
 
-    # Resolve thoroughness level (mutually exclusive options)
-    if cli_args.quick and cli_args.deep:
+    # Resolve depth level (mutually exclusive options)
+    if args.quick and args.deep:
         print("Error: Cannot use both --quick and --deep", file=sys.stderr)
         sys.exit(1)
 
-    thoroughness = "default"
-    if cli_args.quick:
-        thoroughness = "quick"
-    elif cli_args.deep:
-        thoroughness = "deep"
+    depth = "default"
+    if args.quick:
+        depth = "quick"
+    elif args.deep:
+        depth = "deep"
 
     # Validate topic was provided
-    if cli_args.topic is None:
+    if args.topic is None:
         print("Error: Please provide a topic to research.", file=sys.stderr)
         print("Usage: python3 briefbot.py <topic> [options]", file=sys.stderr)
         sys.exit(1)
 
     # Retrieve API configuration
-    _log("=== bootstrap: Loading configuration ===")
-    configuration = env.assemble_configuration()
+    _log("=== main: Loading configuration ===")
+    config = env.load_config()
 
     # Detect Bird X search availability (browser cookies, free)
-    configuration["BIRD_X_AVAILABLE"] = env.is_bird_x_available()
-    _log("BIRD_X_AVAILABLE: {}".format(configuration["BIRD_X_AVAILABLE"]))
+    config["BIRD_X_AVAILABLE"] = env.is_bird_x_available()
+    _log(f"BIRD_X_AVAILABLE: {config['BIRD_X_AVAILABLE']}")
 
     # Determine which platforms have valid credentials
-    available_platforms = env.determine_available_platforms(configuration)
-    _log("Available platforms: '{}'".format(available_platforms))
+    platforms = env.determine_available_platforms(config)
+    _log(f"Available platforms: '{platforms}'")
 
     # Mock mode operates without API keys
-    if cli_args.mock:
-        platform_selection = "both" if cli_args.sources == "auto" else cli_args.sources
+    if args.mock:
+        platform = "both" if args.sources == "auto" else args.sources
     else:
         # Validate requested sources against available credentials
-        platform_selection, validation_error = env.validate_sources(
-            cli_args.sources, available_platforms, cli_args.include_web
+        platform, src_err = env.validate_sources(
+            args.sources, platforms, args.include_web
         )
 
-        _log("Source validation: platform_selection='{}', error={}".format(
-            platform_selection, validation_error))
+        _log(f"Source validation: platform='{platform}', error={src_err}")
 
-        if validation_error is not None:
+        if src_err is not None:
             # WebSearch fallback is advisory, not fatal
-            if "WebSearch fallback" in validation_error:
-                print("Note: {}".format(validation_error), file=sys.stderr)
+            if "WebSearch fallback" in src_err:
+                print(f"Note: {src_err}", file=sys.stderr)
             else:
-                print("Error: {}".format(validation_error), file=sys.stderr)
+                print(f"Error: {src_err}", file=sys.stderr)
                 sys.exit(1)
 
     # Compute the date window based on --days argument
-    day_count = cli_args.days
-    start_date, end_date = dates.compute_date_window(day_count)
+    days = args.days
+    start_date, end_date = dates.date_window(days)
 
     # Identify missing API keys for promotional messaging
-    absent_credentials = env.identify_missing_credentials(configuration)
+    missing_keys = env.identify_missing_credentials(config)
 
     # Initialize the progress display subsystem
-    status_tracker = ui.ResearchProgressTracker(cli_args.topic, display_header=True)
+    progress = ui.Progress(args.topic, display_header=True)
 
     # Display promotional content for missing credentials before research begins
-    if absent_credentials != "none":
-        status_tracker.show_promo(absent_credentials)
+    if missing_keys != "none":
+        progress.show_promo(missing_keys)
 
     # Select appropriate models based on API availability
-    if cli_args.mock:
+    if args.mock:
         # Substitute mock model listings
-        mock_openai_models = retrieve_fixture_data("models_openai_sample.json").get(
+        mock_openai_models = load_fixture("models_openai_sample.json").get(
             "data", []
         )
-        mock_xai_models = retrieve_fixture_data("models_xai_sample.json").get(
+        mock_xai_models = load_fixture("models_xai_sample.json").get(
             "data", []
         )
 
-        model_selection = models.get_models(
+        models_picked = models.get_models(
             {
                 "OPENAI_API_KEY": "mock",
                 "XAI_API_KEY": "mock",
-                **configuration,
+                **config,
             },
             mock_openai_models,
             mock_xai_models,
         )
     else:
-        model_selection = models.get_models(configuration)
+        models_picked = models.get_models(config)
 
-    _log("Model selection: openai={}, xai={}".format(
-        model_selection.get("openai"), model_selection.get("xai")))
+    _log(f"Models picked: openai={models_picked.get('openai')}, xai={models_picked.get('xai')}")
 
-    # Translate platform selection to display mode
+    # Translate platform to display mode
     mode_mapping = {
         "all": "all",
         "both": "both",
@@ -918,7 +804,7 @@ def bootstrap():
         "linkedin": "linkedin-only",
         "web": "web-only",
     }
-    display_mode = mode_mapping.get(platform_selection, platform_selection)
+    display_mode = mode_mapping.get(platform, platform)
 
     # Execute the research pipeline
     (
@@ -936,57 +822,57 @@ def bootstrap():
         x_error,
         youtube_error,
         linkedin_error,
-    ) = orchestrate_research(
-        cli_args.topic,
-        platform_selection,
-        configuration,
-        model_selection,
+    ) = run_research(
+        args.topic,
+        platform,
+        config,
+        models_picked,
         start_date,
         end_date,
-        thoroughness,
-        cli_args.mock,
-        status_tracker,
+        depth,
+        args.mock,
+        progress,
     )
 
     # Begin post-processing phase
-    status_tracker.start_processing()
+    progress.start_processing()
 
     # Standardize item formats across platforms
-    normalized_reddit = normalize.normalize_reddit_items(
+    normalized_reddit = normalize.to_reddit(
         reddit_items, start_date, end_date
     )
-    normalized_x = normalize.normalize_x_items(x_items, start_date, end_date)
-    normalized_youtube = normalize.normalize_youtube_items(
+    normalized_x = normalize.to_x(x_items, start_date, end_date)
+    normalized_youtube = normalize.to_youtube(
         youtube_items, start_date, end_date
     )
-    normalized_linkedin = normalize.normalize_linkedin_items(
+    normalized_linkedin = normalize.to_linkedin(
         linkedin_items, start_date, end_date
     )
 
     # Apply strict date filtering as final validation layer
     # This ensures no content outside the window survives regardless of API behavior
-    filtered_reddit = normalize.filter_by_date_range(
+    filtered_reddit = normalize.filter_dates(
         normalized_reddit, start_date, end_date
     )
-    filtered_x = normalize.filter_by_date_range(normalized_x, start_date, end_date)
-    filtered_youtube = normalize.filter_by_date_range(
+    filtered_x = normalize.filter_dates(normalized_x, start_date, end_date)
+    filtered_youtube = normalize.filter_dates(
         normalized_youtube, start_date, end_date
     )
-    filtered_linkedin = normalize.filter_by_date_range(
+    filtered_linkedin = normalize.filter_dates(
         normalized_linkedin, start_date, end_date
     )
 
     # Compute relevance scores for ranking
-    scored_reddit = score.compute_reddit_scores(filtered_reddit)
-    scored_x = score.compute_x_scores(filtered_x)
-    scored_youtube = score.compute_youtube_scores(filtered_youtube)
-    scored_linkedin = score.compute_linkedin_scores(filtered_linkedin)
+    scored_reddit = score.score_reddit(filtered_reddit)
+    scored_x = score.score_x(filtered_x)
+    scored_youtube = score.score_youtube(filtered_youtube)
+    scored_linkedin = score.score_linkedin(filtered_linkedin)
 
     # Order items by computed score
-    sorted_reddit = score.arrange_by_score(scored_reddit)
-    sorted_x = score.arrange_by_score(scored_x)
-    sorted_youtube = score.arrange_by_score(scored_youtube)
-    sorted_linkedin = score.arrange_by_score(scored_linkedin)
+    sorted_reddit = score.rank(scored_reddit)
+    sorted_x = score.rank(scored_x)
+    sorted_youtube = score.rank(scored_youtube)
+    sorted_linkedin = score.rank(scored_linkedin)
 
     # Remove duplicate entries
     deduped_reddit = dedupe.dedupe_reddit(sorted_reddit)
@@ -994,16 +880,16 @@ def bootstrap():
     deduped_youtube = dedupe.dedupe_youtube(sorted_youtube)
     deduped_linkedin = dedupe.dedupe_linkedin(sorted_linkedin)
 
-    status_tracker.end_processing()
+    progress.end_processing()
 
     # Assemble the final report structure
-    report = schema.instantiate_report(
-        cli_args.topic,
+    report = schema.make_report(
+        args.topic,
         start_date,
         end_date,
         display_mode,
-        model_selection.get("openai"),
-        model_selection.get("xai"),
+        models_picked.get("openai"),
+        models_picked.get("xai"),
     )
     report.reddit = deduped_reddit
     report.x = deduped_x
@@ -1015,18 +901,18 @@ def bootstrap():
     report.linkedin_error = linkedin_error
 
     # Generate the condensed context snippet
-    report.context_snippet_md = render.generate_context_fragment(report)
+    report.context_snippet_md = render.context_fragment(report)
 
     # Persist all output artifacts
-    render.persist_all_artifacts(
+    render.save_artifacts(
         report, raw_openai, raw_xai, raw_reddit_enriched, raw_youtube, raw_linkedin
     )
 
     # Display completion status
-    if platform_selection == "web":
-        status_tracker.show_web_only_complete()
+    if platform == "web":
+        progress.show_web_only_complete()
     else:
-        status_tracker.show_complete(
+        progress.show_complete(
             len(deduped_reddit),
             len(deduped_x),
             len(deduped_youtube),
@@ -1034,20 +920,20 @@ def bootstrap():
         )
 
     # Emit final result in requested format
-    emit_research_output(
+    output_report(
         report,
-        cli_args.emit,
+        args.emit,
         requires_web_search,
-        cli_args.topic,
+        args.topic,
         start_date,
         end_date,
-        absent_credentials,
-        day_count,
+        missing_keys,
+        days,
     )
 
 
-def _handle_list_jobs():
-    """Displays all registered scheduled jobs."""
+def _list_jobs():
+    """Display all registered scheduled jobs."""
     all_jobs = jobs.list_jobs()
 
     if not all_jobs:
@@ -1057,7 +943,7 @@ def _handle_list_jobs():
         )
         return
 
-    print("Scheduled jobs ({}):\n".format(len(all_jobs)))
+    print(f"Scheduled jobs ({len(all_jobs)}):\n")
 
     for job in all_jobs:
         try:
@@ -1072,37 +958,33 @@ def _handle_list_jobs():
             else ("ERR" if job.get("last_status") == "error" else "NEW")
         )
 
-        print("  {} [{}]".format(job["id"], status_indicator))
-        print("    Topic:    {}".format(job["topic"]))
-        print("    Schedule: {} ({})".format(job["schedule"], schedule_desc))
+        print(f"  {job['id']} [{status_indicator}]")
+        print(f"    Topic:    {job['topic']}")
+        print(f"    Schedule: {job['schedule']} ({schedule_desc})")
         if job.get("email"):
-            print("    Email:    {}".format(job["email"]))
+            print(f"    Email:    {job['email']}")
         if job.get("args", {}).get("telegram"):
             tg_val = job["args"]["telegram"]
             if tg_val == "__default__":
                 print("    Telegram: enabled (default chat)")
             else:
-                print("    Telegram: chat {}".format(tg_val))
+                print(f"    Telegram: chat {tg_val}")
         if job.get("args", {}).get("audio"):
             print("    Audio:    enabled")
-        print("    Runs:     {}".format(job.get("run_count", 0)))
+        print(f"    Runs:     {job.get('run_count', 0)}")
         if job.get("last_run"):
-            print(
-                "    Last run: {} ({})".format(
-                    job["last_run"], job.get("last_status", "unknown")
-                )
-            )
+            print(f"    Last run: {job['last_run']} ({job.get('last_status', 'unknown')})")
         if job.get("last_error"):
-            print("    Error:    {}".format(job["last_error"]))
+            print(f"    Error:    {job['last_error']}")
         print()
 
 
-def _handle_delete_job(job_id: str):
-    """Removes a scheduled job from both the OS scheduler and the registry."""
+def _delete_job(job_id: str):
+    """Remove a scheduled job from both the OS scheduler and the registry."""
     job = jobs.get_job(job_id)
 
     if job is None:
-        print("Error: Job {} not found.".format(job_id), file=sys.stderr)
+        print(f"Error: Job {job_id} not found.", file=sys.stderr)
         sys.exit(1)
 
     # Remove from OS scheduler
@@ -1111,22 +993,22 @@ def _handle_delete_job(job_id: str):
         print(scheduler_msg)
     except RuntimeError as err:
         print(
-            "Warning: Could not remove from OS scheduler: {}".format(err),
+            f"Warning: Could not remove from OS scheduler: {err}",
             file=sys.stderr,
         )
 
     # Remove from registry
     deleted = jobs.delete_job(job_id)
     if deleted:
-        print("Job {} deleted from registry.".format(job_id))
+        print(f"Job {job_id} deleted from registry.")
     else:
-        print("Warning: Job {} was not in registry.".format(job_id), file=sys.stderr)
+        print(f"Warning: Job {job_id} was not in registry.", file=sys.stderr)
 
 
-def _handle_create_schedule(cli_args):
-    """Creates a new scheduled job from CLI arguments."""
+def _create_schedule(args):
+    """Create a new scheduled job from CLI arguments."""
     # Validate required arguments
-    if not cli_args.topic:
+    if not args.topic:
         print("Error: Topic is required when creating a schedule.", file=sys.stderr)
         print(
             'Usage: python briefbot.py "topic" --schedule "0 6 * * *" --email you@example.com',
@@ -1136,21 +1018,21 @@ def _handle_create_schedule(cli_args):
 
     # Validate cron expression
     try:
-        parsed = cron_parse.parse_cron_expression(cli_args.schedule)
+        parsed = cron_parse.parse_cron_expression(args.schedule)
         schedule_desc = cron_parse.describe_schedule(parsed)
     except ValueError as err:
-        print("Error: Invalid schedule: {}".format(err), file=sys.stderr)
+        print(f"Error: Invalid schedule: {err}", file=sys.stderr)
         sys.exit(1)
 
     # Validate SMTP configuration only when email is requested
-    if cli_args.email:
-        configuration = env.assemble_configuration()
-        smtp_error = email_sender.validate_smtp_config(configuration)
+    if args.email:
+        config = env.load_config()
+        smtp_error = email_sender.validate_smtp_config(config)
         if smtp_error:
-            print("Error: {}".format(smtp_error), file=sys.stderr)
+            print(f"Error: {smtp_error}", file=sys.stderr)
             sys.exit(1)
 
-    if not cli_args.email and not cli_args.audio and not cli_args.telegram:
+    if not args.email and not args.audio and not args.telegram:
         print(
             "Warning: No --email, --audio, or --telegram specified. The job will run research but produce no output.",
             file=sys.stderr,
@@ -1159,83 +1041,78 @@ def _handle_create_schedule(cli_args):
 
     # Capture current CLI arguments into the job record
     args_dict = {
-        "quick": cli_args.quick,
-        "deep": cli_args.deep,
-        "audio": cli_args.audio,
-        "days": cli_args.days,
-        "sources": cli_args.sources,
-        "include_web": cli_args.include_web,
-        "telegram": cli_args.telegram,
+        "quick": args.quick,
+        "deep": args.deep,
+        "audio": args.audio,
+        "days": args.days,
+        "sources": args.sources,
+        "include_web": args.include_web,
+        "telegram": args.telegram,
     }
 
     # Create the job
     job = jobs.create_job(
-        topic=cli_args.topic,
-        schedule=cli_args.schedule,
-        email=cli_args.email or "",
+        topic=args.topic,
+        schedule=args.schedule,
+        email=args.email or "",
         args_dict=args_dict,
     )
 
-    print("Created scheduled job: {}".format(job["id"]))
-    print("  Topic:    {}".format(job["topic"]))
-    print("  Schedule: {} ({})".format(job["schedule"], schedule_desc))
+    print(f"Created scheduled job: {job['id']}")
+    print(f"  Topic:    {job['topic']}")
+    print(f"  Schedule: {job['schedule']} ({schedule_desc})")
     if job["email"]:
-        print("  Email:    {}".format(job["email"]))
-    if cli_args.telegram:
-        if cli_args.telegram == "__default__":
+        print(f"  Email:    {job['email']}")
+    if args.telegram:
+        if args.telegram == "__default__":
             print("  Telegram: enabled (default chat)")
         else:
-            print("  Telegram: chat {}".format(cli_args.telegram))
-    if cli_args.audio:
+            print(f"  Telegram: chat {args.telegram}")
+    if args.audio:
         print("  Audio:    enabled")
 
     # Register with OS scheduler
-    runner_path = MODULE_ROOT / "run_job.py"
+    runner_path = ROOT / "run_job.py"
     try:
         scheduler_msg = scheduler.register_job(job, runner_path)
-        print("  {}".format(scheduler_msg))
+        print(f"  {scheduler_msg}")
     except RuntimeError as err:
         print(
-            "\nWarning: Could not register with OS scheduler: {}".format(err),
+            f"\nWarning: Could not register with OS scheduler: {err}",
             file=sys.stderr,
         )
         print(
-            "You can manually run: python {} {}".format(runner_path, job["id"]),
+            f"You can manually run: python {runner_path} {job['id']}",
             file=sys.stderr,
         )
 
     # Show next occurrence
     try:
         next_fire = cron_parse.next_occurrence(parsed)
-        print("\n  Next run: {}".format(next_fire.strftime("%Y-%m-%d %H:%M")))
+        print(f"\n  Next run: {next_fire.strftime('%Y-%m-%d %H:%M')}")
     except ValueError:
         pass
 
 
-def emit_research_output(
+def output_report(
     report: schema.Report,
     output_format: str,
     requires_web_search: bool = False,
-    subject_matter: str = "",
+    topic: str = "",
     start_date: str = "",
     end_date: str = "",
-    absent_credentials: str = "none",
-    day_count: int = 30,
+    missing_keys: str = "none",
+    days: int = 30,
 ):
-    """
-    Renders and outputs the research report in the specified format.
-
-    When web search is required, appends instructions for Claude to
-    perform supplemental WebSearch queries.
-    """
+    """Render and output the research report in the specified format."""
     format_handlers = {
         "compact": lambda: print(
-            render.generate_compact_output(report, absent_credentials=absent_credentials)
+            render.compact(report, missing_keys=missing_keys)
         ),
         "json": lambda: print(json.dumps(report.to_dict(), indent=2)),
-        "md": lambda: print(render.generate_comprehensive_report(report)),
+        "md": lambda: print(render.full_report(report)),
         "context": lambda: print(report.context_snippet_md),
-        "path": lambda: print(render.retrieve_context_filepath()),
+        "path": lambda: print(render.context_path()),
     }
 
     handler = format_handlers.get(output_format)
@@ -1250,16 +1127,12 @@ def emit_research_output(
         print(separator_line)
         print("### WEBSEARCH REQUIRED ###")
         print(separator_line)
-        print("Topic: {}".format(subject_matter))
-        print("Date range: {} to {}".format(start_date, end_date))
+        print(f"Topic: {topic}")
+        print(f"Date range: {start_date} to {end_date}")
         print()
         print("Claude: Use your WebSearch tool to find 8-15 relevant web pages.")
         print("EXCLUDE: reddit.com, x.com, twitter.com (already covered above)")
-        print(
-            "INCLUDE: blogs, docs, news, tutorials from the last {} days".format(
-                day_count
-            )
-        )
+        print(f"INCLUDE: blogs, docs, news, tutorials from the last {days} days")
         print()
         print("After searching, synthesize WebSearch results WITH the Reddit/X")
         print("results above. WebSearch items should rank LOWER than comparable")
@@ -1268,4 +1141,4 @@ def emit_research_output(
 
 
 if __name__ == "__main__":
-    bootstrap()
+    main()

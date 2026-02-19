@@ -1,523 +1,275 @@
-#
-# Ranking Engine: Computes popularity-aware scores for discovered content
-# Implements weighted scoring based on relevance, recency, and engagement
-#
+"""Weighted scoring engine for multi-platform content ranking."""
 
 import math
 from typing import List, Optional, Union
 
 from . import dates, schema
 
-# Weight distribution for platforms with engagement data (Reddit/X)
-RELEVANCE_COEFFICIENT = 0.45
-RECENCY_COEFFICIENT = 0.25
-ENGAGEMENT_COEFFICIENT = 0.30
+WEIGHTS = {"relevance": 0.42, "recency": 0.28, "engagement": 0.30}
+WEB_WEIGHTS = {"relevance": 0.52, "recency": 0.48}
+WEB_SOURCE_PENALTY = 12
+WEB_DATE_BONUS = 8
+WEB_DATE_PENALTY = 18
 
-# Weight distribution for web search (no engagement, redistributed to 100%)
-WEB_RELEVANCE_COEFFICIENT = 0.55
-WEB_RECENCY_COEFFICIENT = 0.45
-WEB_SOURCE_DEDUCTION = 15  # Points subtracted for lacking engagement data
-
-# Web search date confidence modifiers
-WEB_VERIFIED_DATE_BONUS = 10   # Reward for URL-verified recent date (high confidence)
-WEB_MISSING_DATE_PENALTY = 20  # Penalty for no date signals (low confidence)
-
-# Fallback engagement score
-BASELINE_ENGAGEMENT = 35
-MISSING_ENGAGEMENT_PENALTY = 10
+BASELINE_ENGAGEMENT = 32
+MISSING_ENGAGEMENT_PENALTY = 12
 
 
-def safe_logarithm(metric_value: Optional[int]) -> float:
-    """Computes log1p safely, handling None and negative inputs."""
-    if metric_value is None or metric_value < 0:
+def _log1p(val: Optional[int]) -> float:
+    """Safe log1p, returns 0.0 for None or negative inputs."""
+    if val is None or val < 0:
         return 0.0
-    return math.log1p(metric_value)
+    return math.log1p(val)
 
 
-def calculate_reddit_engagement_value(engagement_metrics: Optional[schema.Engagement]) -> Optional[float]:
-    """
-    Derives raw engagement value for Reddit content.
-
-    Formula: 0.55*log1p(score) + 0.40*log1p(num_comments) + 0.05*(upvote_ratio*10)
-    """
-    if engagement_metrics is None:
+def _reddit_engagement(eng: Optional[schema.Engagement]) -> Optional[float]:
+    """Raw engagement value for Reddit: 0.55*score + 0.40*comments + 0.05*ratio."""
+    if eng is None:
         return None
-
-    if engagement_metrics.score is None and engagement_metrics.num_comments is None:
+    if eng.score is None and eng.num_comments is None:
         return None
-
-    score_component = safe_logarithm(engagement_metrics.score)
-    comments_component = safe_logarithm(engagement_metrics.num_comments)
-    ratio_component = (engagement_metrics.upvote_ratio or 0.5) * 10
-
-    return 0.55 * score_component + 0.40 * comments_component + 0.05 * ratio_component
+    sc = _log1p(eng.score)
+    cm = _log1p(eng.num_comments)
+    ra = (eng.upvote_ratio or 0.5) * 10
+    return 0.55 * sc + 0.40 * cm + 0.05 * ra
 
 
-def calculate_x_engagement_value(engagement_metrics: Optional[schema.Engagement]) -> Optional[float]:
-    """
-    Derives raw engagement value for X content.
-
-    Formula: 0.55*log1p(likes) + 0.25*log1p(reposts) + 0.15*log1p(replies) + 0.05*log1p(quotes)
-    """
-    if engagement_metrics is None:
+def _x_engagement(eng: Optional[schema.Engagement]) -> Optional[float]:
+    """Raw engagement value for X: 0.55*likes + 0.25*reposts + 0.15*replies + 0.05*quotes."""
+    if eng is None:
         return None
-
-    if engagement_metrics.likes is None and engagement_metrics.reposts is None:
+    if eng.likes is None and eng.reposts is None:
         return None
-
-    likes_component = safe_logarithm(engagement_metrics.likes)
-    reposts_component = safe_logarithm(engagement_metrics.reposts)
-    replies_component = safe_logarithm(engagement_metrics.replies)
-    quotes_component = safe_logarithm(engagement_metrics.quotes)
-
-    return 0.55 * likes_component + 0.25 * reposts_component + 0.15 * replies_component + 0.05 * quotes_component
+    lk = _log1p(eng.likes)
+    rp = _log1p(eng.reposts)
+    re = _log1p(eng.replies)
+    qu = _log1p(eng.quotes)
+    return 0.55 * lk + 0.25 * rp + 0.15 * re + 0.05 * qu
 
 
-def calculate_youtube_engagement_value(engagement_metrics: Optional[schema.Engagement]) -> Optional[float]:
-    """
-    Derives raw engagement value for YouTube content.
-
-    Formula: 0.70*log1p(views) + 0.30*log1p(likes)
-    Views receive heavy weighting as the primary engagement signal for video content.
-    """
-    if engagement_metrics is None:
+def _youtube_engagement(eng: Optional[schema.Engagement]) -> Optional[float]:
+    """Raw engagement value for YouTube: 0.70*views + 0.30*likes."""
+    if eng is None:
         return None
-
-    if engagement_metrics.views is None and engagement_metrics.likes is None:
+    if eng.views is None and eng.likes is None:
         return None
-
-    views_component = safe_logarithm(engagement_metrics.views)
-    likes_component = safe_logarithm(engagement_metrics.likes)
-
-    return 0.70 * views_component + 0.30 * likes_component
+    vw = _log1p(eng.views)
+    lk = _log1p(eng.likes)
+    return 0.70 * vw + 0.30 * lk
 
 
-def calculate_linkedin_engagement_value(engagement_metrics: Optional[schema.Engagement]) -> Optional[float]:
-    """
-    Derives raw engagement value for LinkedIn content.
-
-    Formula: 0.60*log1p(reactions) + 0.40*log1p(comments)
-    """
-    if engagement_metrics is None:
+def _linkedin_engagement(eng: Optional[schema.Engagement]) -> Optional[float]:
+    """Raw engagement value for LinkedIn: 0.60*reactions + 0.40*comments."""
+    if eng is None:
         return None
-
-    if engagement_metrics.reactions is None and engagement_metrics.comments is None:
+    if eng.reactions is None and eng.comments is None:
         return None
-
-    reactions_component = safe_logarithm(engagement_metrics.reactions)
-    comments_component = safe_logarithm(engagement_metrics.comments)
-
-    return 0.60 * reactions_component + 0.40 * comments_component
+    rx = _log1p(eng.reactions)
+    cm = _log1p(eng.comments)
+    return 0.60 * rx + 0.40 * cm
 
 
-def scale_to_percentage(raw_values: List[float], fallback: float = 50) -> List[float]:
-    """
-    Rescales a collection of values to the 0-100 range.
+def _to_pct(values: List[float], fallback: float = 50) -> List[float]:
+    """Rescale values to 0-100 range, preserving None entries."""
+    valid = [v for v in values if v is not None]
+    if not valid:
+        return [fallback if v is None else 50 for v in values]
 
-    Args:
-        raw_values: Unscaled values (None values are preserved)
-        fallback: Default value assigned to None entries
+    lo = min(valid)
+    hi = max(valid)
+    span = hi - lo
 
-    Returns:
-        Rescaled values
-    """
-    # Extract non-None values
-    valid_entries = [entry for entry in raw_values if entry is not None]
-    if not valid_entries:
-        return [fallback if entry is None else 50 for entry in raw_values]
+    if span == 0:
+        return [50 if v is None else 50 for v in values]
 
-    minimum_value = min(valid_entries)
-    maximum_value = max(valid_entries)
-    value_span = maximum_value - minimum_value
-
-    if value_span == 0:
-        return [50 if entry is None else 50 for entry in raw_values]
-
-    scaled_results = []
-    entry_index = 0
-    while entry_index < len(raw_values):
-        entry = raw_values[entry_index]
-        if entry is None:
-            scaled_results.append(None)
+    result = []
+    for v in values:
+        if v is None:
+            result.append(None)
         else:
-            scaled_value = ((entry - minimum_value) / value_span) * 100
-            scaled_results.append(scaled_value)
-        entry_index += 1
-
-    return scaled_results
+            result.append(((v - lo) / span) * 100)
+    return result
 
 
-def compute_reddit_scores(item_collection: List[schema.RedditItem]) -> List[schema.RedditItem]:
-    """
-    Assigns scores to Reddit items based on the weighted formula.
+def score_reddit(items: List[schema.RedditItem]) -> List[schema.RedditItem]:
+    """Assign weighted scores to Reddit items."""
+    if not items:
+        return items
 
-    Args:
-        item_collection: Reddit items to score
+    raw_eng = [_reddit_engagement(item.engagement) for item in items]
+    scaled_eng = _to_pct(raw_eng)
 
-    Returns:
-        Items with populated score fields
-    """
-    if not item_collection:
-        return item_collection
+    for i, item in enumerate(items):
+        rel = int(item.relevance * 100)
+        rec = dates.recency_score(item.date)
+        eng_score = int(scaled_eng[i]) if scaled_eng[i] is not None else BASELINE_ENGAGEMENT
 
-    # Calculate raw engagement values
-    raw_engagement_values = []
-    item_index = 0
-    while item_index < len(item_collection):
-        raw_engagement_values.append(calculate_reddit_engagement_value(item_collection[item_index].engagement))
-        item_index += 1
+        item.subs = schema.SubScores(relevance=rel, recency=rec, engagement=eng_score)
 
-    # Scale engagement to percentage
-    scaled_engagement = scale_to_percentage(raw_engagement_values)
-
-    item_index = 0
-    while item_index < len(item_collection):
-        current_item = item_collection[item_index]
-
-        # Relevance component (model-provided, scale to 0-100)
-        relevance_component = int(current_item.relevance * 100)
-
-        # Recency component
-        recency_component = dates.compute_recency_score(current_item.date)
-
-        # Engagement component
-        if scaled_engagement[item_index] is not None:
-            engagement_component = int(scaled_engagement[item_index])
-        else:
-            engagement_component = BASELINE_ENGAGEMENT
-
-        # Record component scores
-        current_item.subs = schema.SubScores(
-            relevance=relevance_component,
-            recency=recency_component,
-            engagement=engagement_component,
+        total = (
+            WEIGHTS["relevance"] * rel
+            + WEIGHTS["recency"] * rec
+            + WEIGHTS["engagement"] * eng_score
         )
 
-        # Calculate weighted total
-        weighted_total = (
-            RELEVANCE_COEFFICIENT * relevance_component +
-            RECENCY_COEFFICIENT * recency_component +
-            ENGAGEMENT_COEFFICIENT * engagement_component
+        if raw_eng[i] is None:
+            total -= MISSING_ENGAGEMENT_PENALTY
+        if item.date_confidence == "low":
+            total -= 10
+        elif item.date_confidence == "med":
+            total -= 5
+
+        item.score = max(0, min(100, int(total)))
+
+    return items
+
+
+def score_x(items: List[schema.XItem]) -> List[schema.XItem]:
+    """Assign weighted scores to X items."""
+    if not items:
+        return items
+
+    raw_eng = [_x_engagement(item.engagement) for item in items]
+    scaled_eng = _to_pct(raw_eng)
+
+    for i, item in enumerate(items):
+        rel = int(item.relevance * 100)
+        rec = dates.recency_score(item.date)
+        eng_score = int(scaled_eng[i]) if scaled_eng[i] is not None else BASELINE_ENGAGEMENT
+
+        item.subs = schema.SubScores(relevance=rel, recency=rec, engagement=eng_score)
+
+        total = (
+            WEIGHTS["relevance"] * rel
+            + WEIGHTS["recency"] * rec
+            + WEIGHTS["engagement"] * eng_score
         )
 
-        # Apply penalty for missing engagement
-        if raw_engagement_values[item_index] is None:
-            weighted_total -= MISSING_ENGAGEMENT_PENALTY
+        if raw_eng[i] is None:
+            total -= MISSING_ENGAGEMENT_PENALTY
+        if item.date_confidence == "low":
+            total -= 10
+        elif item.date_confidence == "med":
+            total -= 5
 
-        # Apply penalty for uncertain dates
-        if current_item.date_confidence == "low":
-            weighted_total -= 10
-        elif current_item.date_confidence == "med":
-            weighted_total -= 5
+        item.score = max(0, min(100, int(total)))
 
-        current_item.score = max(0, min(100, int(weighted_total)))
-        item_index += 1
-
-    return item_collection
+    return items
 
 
-def compute_x_scores(item_collection: List[schema.XItem]) -> List[schema.XItem]:
-    """
-    Assigns scores to X items based on the weighted formula.
+def score_youtube(items: List[schema.YouTubeItem]) -> List[schema.YouTubeItem]:
+    """Assign weighted scores to YouTube items."""
+    if not items:
+        return items
 
-    Args:
-        item_collection: X items to score
+    raw_eng = [_youtube_engagement(item.engagement) for item in items]
+    scaled_eng = _to_pct(raw_eng)
 
-    Returns:
-        Items with populated score fields
-    """
-    if not item_collection:
-        return item_collection
+    for i, item in enumerate(items):
+        rel = int(item.relevance * 100)
+        rec = dates.recency_score(item.date)
+        eng_score = int(scaled_eng[i]) if scaled_eng[i] is not None else BASELINE_ENGAGEMENT
 
-    # Calculate raw engagement values
-    raw_engagement_values = []
-    item_index = 0
-    while item_index < len(item_collection):
-        raw_engagement_values.append(calculate_x_engagement_value(item_collection[item_index].engagement))
-        item_index += 1
+        item.subs = schema.SubScores(relevance=rel, recency=rec, engagement=eng_score)
 
-    # Scale engagement to percentage
-    scaled_engagement = scale_to_percentage(raw_engagement_values)
-
-    item_index = 0
-    while item_index < len(item_collection):
-        current_item = item_collection[item_index]
-
-        # Relevance component
-        relevance_component = int(current_item.relevance * 100)
-
-        # Recency component
-        recency_component = dates.compute_recency_score(current_item.date)
-
-        # Engagement component
-        if scaled_engagement[item_index] is not None:
-            engagement_component = int(scaled_engagement[item_index])
-        else:
-            engagement_component = BASELINE_ENGAGEMENT
-
-        # Record component scores
-        current_item.subs = schema.SubScores(
-            relevance=relevance_component,
-            recency=recency_component,
-            engagement=engagement_component,
+        total = (
+            WEIGHTS["relevance"] * rel
+            + WEIGHTS["recency"] * rec
+            + WEIGHTS["engagement"] * eng_score
         )
 
-        # Calculate weighted total
-        weighted_total = (
-            RELEVANCE_COEFFICIENT * relevance_component +
-            RECENCY_COEFFICIENT * recency_component +
-            ENGAGEMENT_COEFFICIENT * engagement_component
+        if raw_eng[i] is None:
+            total -= MISSING_ENGAGEMENT_PENALTY
+        if item.date_confidence == "low":
+            total -= 10
+        elif item.date_confidence == "med":
+            total -= 5
+
+        item.score = max(0, min(100, int(total)))
+
+    return items
+
+
+def score_linkedin(items: List[schema.LinkedInItem]) -> List[schema.LinkedInItem]:
+    """Assign weighted scores to LinkedIn items."""
+    if not items:
+        return items
+
+    raw_eng = [_linkedin_engagement(item.engagement) for item in items]
+    scaled_eng = _to_pct(raw_eng)
+
+    for i, item in enumerate(items):
+        rel = int(item.relevance * 100)
+        rec = dates.recency_score(item.date)
+        eng_score = int(scaled_eng[i]) if scaled_eng[i] is not None else BASELINE_ENGAGEMENT
+
+        item.subs = schema.SubScores(relevance=rel, recency=rec, engagement=eng_score)
+
+        total = (
+            WEIGHTS["relevance"] * rel
+            + WEIGHTS["recency"] * rec
+            + WEIGHTS["engagement"] * eng_score
         )
 
-        # Apply penalty for missing engagement
-        if raw_engagement_values[item_index] is None:
-            weighted_total -= MISSING_ENGAGEMENT_PENALTY
+        if raw_eng[i] is None:
+            total -= MISSING_ENGAGEMENT_PENALTY
+        if item.date_confidence == "low":
+            total -= 10
+        elif item.date_confidence == "med":
+            total -= 5
 
-        # Apply penalty for uncertain dates
-        if current_item.date_confidence == "low":
-            weighted_total -= 10
-        elif current_item.date_confidence == "med":
-            weighted_total -= 5
+        item.score = max(0, min(100, int(total)))
 
-        current_item.score = max(0, min(100, int(weighted_total)))
-        item_index += 1
-
-    return item_collection
+    return items
 
 
-def compute_youtube_scores(item_collection: List[schema.YouTubeItem]) -> List[schema.YouTubeItem]:
-    """
-    Assigns scores to YouTube items based on the weighted formula.
+def score_web(items: List[schema.WebSearchItem]) -> List[schema.WebSearchItem]:
+    """Assign scores to web items using the engagement-free formula."""
+    if not items:
+        return items
 
-    Args:
-        item_collection: YouTube items to score
+    for i, item in enumerate(items):
+        rel = int(item.relevance * 100)
+        rec = dates.recency_score(item.date)
 
-    Returns:
-        Items with populated score fields
-    """
-    if not item_collection:
-        return item_collection
+        item.subs = schema.SubScores(relevance=rel, recency=rec, engagement=0)
 
-    # Calculate raw engagement values
-    raw_engagement_values = []
-    item_index = 0
-    while item_index < len(item_collection):
-        raw_engagement_values.append(calculate_youtube_engagement_value(item_collection[item_index].engagement))
-        item_index += 1
-
-    # Scale engagement to percentage
-    scaled_engagement = scale_to_percentage(raw_engagement_values)
-
-    item_index = 0
-    while item_index < len(item_collection):
-        current_item = item_collection[item_index]
-
-        # Relevance component
-        relevance_component = int(current_item.relevance * 100)
-
-        # Recency component
-        recency_component = dates.compute_recency_score(current_item.date)
-
-        # Engagement component
-        if scaled_engagement[item_index] is not None:
-            engagement_component = int(scaled_engagement[item_index])
-        else:
-            engagement_component = BASELINE_ENGAGEMENT
-
-        # Record component scores
-        current_item.subs = schema.SubScores(
-            relevance=relevance_component,
-            recency=recency_component,
-            engagement=engagement_component,
+        total = (
+            WEB_WEIGHTS["relevance"] * rel
+            + WEB_WEIGHTS["recency"] * rec
         )
 
-        # Calculate weighted total
-        weighted_total = (
-            RELEVANCE_COEFFICIENT * relevance_component +
-            RECENCY_COEFFICIENT * recency_component +
-            ENGAGEMENT_COEFFICIENT * engagement_component
-        )
+        total -= WEB_SOURCE_PENALTY
 
-        # Apply penalty for missing engagement
-        if raw_engagement_values[item_index] is None:
-            weighted_total -= MISSING_ENGAGEMENT_PENALTY
+        if item.date_confidence == "high":
+            total += WEB_DATE_BONUS
+        elif item.date_confidence == "low":
+            total -= WEB_DATE_PENALTY
 
-        # Apply penalty for uncertain dates
-        if current_item.date_confidence == "low":
-            weighted_total -= 10
-        elif current_item.date_confidence == "med":
-            weighted_total -= 5
+        item.score = max(0, min(100, int(total)))
 
-        current_item.score = max(0, min(100, int(weighted_total)))
-        item_index += 1
-
-    return item_collection
+    return items
 
 
-def compute_linkedin_scores(item_collection: List[schema.LinkedInItem]) -> List[schema.LinkedInItem]:
-    """
-    Assigns scores to LinkedIn items based on the weighted formula.
-
-    Args:
-        item_collection: LinkedIn items to score
-
-    Returns:
-        Items with populated score fields
-    """
-    if not item_collection:
-        return item_collection
-
-    # Calculate raw engagement values
-    raw_engagement_values = []
-    item_index = 0
-    while item_index < len(item_collection):
-        raw_engagement_values.append(calculate_linkedin_engagement_value(item_collection[item_index].engagement))
-        item_index += 1
-
-    # Scale engagement to percentage
-    scaled_engagement = scale_to_percentage(raw_engagement_values)
-
-    item_index = 0
-    while item_index < len(item_collection):
-        current_item = item_collection[item_index]
-
-        # Relevance component
-        relevance_component = int(current_item.relevance * 100)
-
-        # Recency component
-        recency_component = dates.compute_recency_score(current_item.date)
-
-        # Engagement component
-        if scaled_engagement[item_index] is not None:
-            engagement_component = int(scaled_engagement[item_index])
-        else:
-            engagement_component = BASELINE_ENGAGEMENT
-
-        # Record component scores
-        current_item.subs = schema.SubScores(
-            relevance=relevance_component,
-            recency=recency_component,
-            engagement=engagement_component,
-        )
-
-        # Calculate weighted total
-        weighted_total = (
-            RELEVANCE_COEFFICIENT * relevance_component +
-            RECENCY_COEFFICIENT * recency_component +
-            ENGAGEMENT_COEFFICIENT * engagement_component
-        )
-
-        # Apply penalty for missing engagement
-        if raw_engagement_values[item_index] is None:
-            weighted_total -= MISSING_ENGAGEMENT_PENALTY
-
-        # Apply penalty for uncertain dates
-        if current_item.date_confidence == "low":
-            weighted_total -= 10
-        elif current_item.date_confidence == "med":
-            weighted_total -= 5
-
-        current_item.score = max(0, min(100, int(weighted_total)))
-        item_index += 1
-
-    return item_collection
-
-
-def compute_websearch_scores(item_collection: List[schema.WebSearchItem]) -> List[schema.WebSearchItem]:
-    """
-    Assigns scores to WebSearch items using the engagement-free formula.
-
-    Uses redistributed weights: 55% relevance + 45% recency - 15pt source penalty.
-    This ensures web results rank below comparable Reddit/X items.
-
-    Date confidence modifiers:
-    - High confidence (URL-verified date): +10 bonus
-    - Med confidence (snippet-extracted date): neutral
-    - Low confidence (no date signals): -20 penalty
-
-    Args:
-        item_collection: WebSearch items to score
-
-    Returns:
-        Items with populated score fields
-    """
-    if not item_collection:
-        return item_collection
-
-    item_index = 0
-    while item_index < len(item_collection):
-        current_item = item_collection[item_index]
-
-        # Relevance component
-        relevance_component = int(current_item.relevance * 100)
-
-        # Recency component
-        recency_component = dates.compute_recency_score(current_item.date)
-
-        # Record component scores (engagement is 0 - no data available)
-        current_item.subs = schema.SubScores(
-            relevance=relevance_component,
-            recency=recency_component,
-            engagement=0,  # Explicitly zero - no engagement data available
-        )
-
-        # Calculate weighted total using web-specific coefficients
-        weighted_total = (
-            WEB_RELEVANCE_COEFFICIENT * relevance_component +
-            WEB_RECENCY_COEFFICIENT * recency_component
-        )
-
-        # Apply source penalty (web results < Reddit/X for equivalent relevance/recency)
-        weighted_total -= WEB_SOURCE_DEDUCTION
-
-        # Apply date confidence modifiers
-        # High confidence (URL-verified): bonus
-        # Med confidence (snippet-extracted): neutral
-        # Low confidence (no date signals): heavy penalty
-        if current_item.date_confidence == "high":
-            weighted_total += WEB_VERIFIED_DATE_BONUS
-        elif current_item.date_confidence == "low":
-            weighted_total -= WEB_MISSING_DATE_PENALTY
-
-        current_item.score = max(0, min(100, int(weighted_total)))
-        item_index += 1
-
-    return item_collection
-
-
-def arrange_by_score(item_collection: List[Union[schema.RedditItem, schema.XItem, schema.YouTubeItem, schema.LinkedInItem, schema.WebSearchItem]]) -> List:
-    """
-    Orders items by score (descending), then date, then source priority.
-
-    Args:
-        item_collection: Items to arrange
-
-    Returns:
-        Arranged items
-    """
-    def ordering_key(item):
-        # Primary: score descending (negate for descending order)
+def rank(items: List[Union[schema.RedditItem, schema.XItem, schema.YouTubeItem, schema.LinkedInItem, schema.WebSearchItem]]) -> List:
+    """Sort items by score (desc), date, then source priority."""
+    def sort_key(item):
         score_key = -item.score
+        date_val = item.date or "0000-00-00"
+        date_key = -int(date_val.replace("-", ""))
 
-        # Secondary: date descending (most recent first)
-        date_value = item.date or "0000-00-00"
-        date_key = -int(date_value.replace("-", ""))
-
-        # Tertiary: source priority (Reddit > X > YouTube > LinkedIn > WebSearch)
         if isinstance(item, schema.RedditItem):
-            source_rank = 0
+            src = 0
         elif isinstance(item, schema.XItem):
-            source_rank = 1
+            src = 1
         elif isinstance(item, schema.YouTubeItem):
-            source_rank = 2
+            src = 2
         elif isinstance(item, schema.LinkedInItem):
-            source_rank = 3
-        else:  # WebSearchItem
-            source_rank = 4
+            src = 3
+        else:
+            src = 4
 
-        # Quaternary: content text for stability
-        content_text = getattr(item, "title", "") or getattr(item, "text", "")
+        text = getattr(item, "title", "") or getattr(item, "text", "")
+        return (score_key, date_key, src, text)
 
-        return (score_key, date_key, source_rank, content_text)
-
-    return sorted(item_collection, key=ordering_key)
+    return sorted(items, key=sort_key)

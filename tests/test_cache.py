@@ -1,60 +1,55 @@
-#
-# Verification Suite: Cache Module Functionality
-#
-
 import sys
 import unittest
 from pathlib import Path
 
-# Configure module search path
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
 from lib import cache
 
 
-class CacheIdentifierVerification(unittest.TestCase):
+class TestCacheKey(unittest.TestCase):
     def test_produces_string_value(self):
-        computed_result = cache.compute_cache_identifier("test topic", "2026-01-01", "2026-01-31", "both")
-        self.assertIsInstance(computed_result, str)
+        got = cache.cache_key("test topic", "2026-01-01", "2026-01-31", "both")
+        self.assertIsInstance(got, str)
 
     def test_deterministic_for_identical_inputs(self):
-        first_key = cache.compute_cache_identifier("test topic", "2026-01-01", "2026-01-31", "both")
-        second_key = cache.compute_cache_identifier("test topic", "2026-01-01", "2026-01-31", "both")
+        first_key = cache.cache_key("test topic", "2026-01-01", "2026-01-31", "both")
+        second_key = cache.cache_key("test topic", "2026-01-01", "2026-01-31", "both")
         self.assertEqual(first_key, second_key)
 
     def test_varies_for_distinct_inputs(self):
-        first_key = cache.compute_cache_identifier("topic a", "2026-01-01", "2026-01-31", "both")
-        second_key = cache.compute_cache_identifier("topic b", "2026-01-01", "2026-01-31", "both")
+        first_key = cache.cache_key("topic a", "2026-01-01", "2026-01-31", "both")
+        second_key = cache.cache_key("topic b", "2026-01-01", "2026-01-31", "both")
         self.assertNotEqual(first_key, second_key)
 
     def test_identifier_length(self):
-        computed_key = cache.compute_cache_identifier("test", "2026-01-01", "2026-01-31", "both")
-        self.assertEqual(len(computed_key), 16)
+        got = cache.cache_key("test", "2026-01-01", "2026-01-31", "both")
+        self.assertEqual(len(got), 16)
 
 
-class CacheFilepathVerification(unittest.TestCase):
+class TestCachePath(unittest.TestCase):
     def test_produces_path_object(self):
-        computed_result = cache.resolve_cache_filepath("abc123")
-        self.assertIsInstance(computed_result, Path)
+        got = cache.cache_path("abc123")
+        self.assertIsInstance(got, Path)
 
     def test_includes_json_suffix(self):
-        computed_result = cache.resolve_cache_filepath("abc123")
-        self.assertEqual(computed_result.suffix, ".json")
+        got = cache.cache_path("abc123")
+        self.assertEqual(got.suffix, ".json")
 
 
-class CacheValidityVerification(unittest.TestCase):
+class TestCacheValidity(unittest.TestCase):
     def test_absent_file_is_invalid(self):
         nonexistent_path = Path("/nonexistent/path/file.json")
-        computed_result = cache.verify_cache_validity(nonexistent_path)
-        self.assertFalse(computed_result)
+        got = cache.is_valid(nonexistent_path)
+        self.assertFalse(got)
 
 
-class ModelCacheVerification(unittest.TestCase):
+class TestModelCache(unittest.TestCase):
     def test_absent_provider_returns_none(self):
         # Query a provider that should not exist
-        computed_result = cache.get_cached_model("nonexistent_provider")
+        got = cache.get_cached_model("nonexistent_provider")
         # May return None or cached value, but must not raise exception
-        self.assertTrue(computed_result is None or isinstance(computed_result, str))
+        self.assertTrue(got is None or isinstance(got, str))
 
 
 if __name__ == "__main__":

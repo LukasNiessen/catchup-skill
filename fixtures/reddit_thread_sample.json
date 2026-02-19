@@ -6,13 +6,13 @@
         {
           "kind": "t3",
           "data": {
-            "title": "Best practices for Claude Code skills - comprehensive guide",
-            "score": 847,
-            "num_comments": 156,
-            "upvote_ratio": 0.94,
-            "created_utc": 1705363200,
-            "permalink": "/r/ClaudeAI/comments/abc123/best_practices_for_claude_code_skills/",
-            "selftext": "After building 20+ skills for Claude Code, here are my key learnings..."
+            "title": "Zigbee vs Z-Wave for whole-house automation in 2026",
+            "score": 623,
+            "num_comments": 214,
+            "upvote_ratio": 0.91,
+            "created_utc": 1708041600,
+            "permalink": "/r/HomeAutomation/comments/zw2026/zigbee_vs_zwave_for_whole_house_automation_2026/",
+            "selftext": "I'm planning a full-house automation retrofit - about 85 devices across lighting, sensors, locks, and blinds. Zigbee and Z-Wave both seem mature now, but I keep seeing conflicting advice. What's the current consensus for a large deployment in 2026?"
           }
         }
       ]
@@ -25,81 +25,81 @@
         {
           "kind": "t1",
           "data": {
-            "score": 234,
-            "created_utc": 1705366800,
-            "author": "skill_expert",
-            "body": "Great guide! One thing I'd add: always use explicit tool permissions in your SKILL.md. Don't default to allowing everything.",
-            "permalink": "/r/ClaudeAI/comments/abc123/best_practices_for_claude_code_skills/comment1/"
+            "score": 301,
+            "created_utc": 1708045200,
+            "author": "mesh_master",
+            "body": "Zigbee wins on device variety and price. Z-Wave wins on interference resistance (900 MHz vs 2.4 GHz). For 85 devices I'd lean Zigbee - the mesh gets *stronger* the more mains-powered devices you add, and the ecosystem is just bigger.",
+            "permalink": "/r/HomeAutomation/comments/zw2026/zigbee_vs_zwave_for_whole_house_automation_2026/c1/"
           }
         },
         {
           "kind": "t1",
           "data": {
-            "score": 189,
-            "created_utc": 1705370400,
-            "author": "claude_dev",
-            "body": "The context: fork tip is gold. I was wondering why my heavy research skill was slow - it was blocking the main thread!",
-            "permalink": "/r/ClaudeAI/comments/abc123/best_practices_for_claude_code_skills/comment2/"
+            "score": 247,
+            "created_utc": 1708048800,
+            "author": "zwave_advocate",
+            "body": "Counterpoint: Z-Wave Long Range just got certified and it supports up to 4000 devices on a single network. The 900 MHz band means it punches through walls way better than Zigbee. In a whole-house setup that matters a lot.",
+            "permalink": "/r/HomeAutomation/comments/zw2026/zigbee_vs_zwave_for_whole_house_automation_2026/c2/"
           }
         },
         {
           "kind": "t1",
           "data": {
-            "score": 145,
-            "created_utc": 1705374000,
-            "author": "ai_builder",
-            "body": "For anyone starting out: begin with a simple skill that just runs one bash command. Once that works, build up complexity gradually.",
-            "permalink": "/r/ClaudeAI/comments/abc123/best_practices_for_claude_code_skills/comment3/"
+            "score": 198,
+            "created_utc": 1708052400,
+            "author": "protocol_nerd",
+            "body": "I run both protocols via Home Assistant - Zigbee2MQTT for Zigbee and Z-Wave JS for Z-Wave. Honestly, the 'vs' framing is outdated. Use Zigbee for cheap sensors and bulbs, Z-Wave for locks and critical devices where reliability matters most.",
+            "permalink": "/r/HomeAutomation/comments/zw2026/zigbee_vs_zwave_for_whole_house_automation_2026/c3/"
           }
         },
         {
           "kind": "t1",
           "data": {
-            "score": 98,
-            "created_utc": 1705377600,
-            "author": "dev_tips",
-            "body": "The --mock flag pattern for testing without API calls is essential. I always build that in from day one now.",
-            "permalink": "/r/ClaudeAI/comments/abc123/best_practices_for_claude_code_skills/comment4/"
+            "score": 156,
+            "created_utc": 1708056000,
+            "author": "matter_watcher",
+            "body": "Don't sleep on Thread/Matter. A lot of new Zigbee devices are shipping with Thread firmware too. If you're building from scratch in 2026 you should at least future-proof by picking devices that support both.",
+            "permalink": "/r/HomeAutomation/comments/zw2026/zigbee_vs_zwave_for_whole_house_automation_2026/c4/"
           }
         },
         {
           "kind": "t1",
           "data": {
-            "score": 76,
-            "created_utc": 1705381200,
-            "author": "code_writer",
-            "body": "Thanks for sharing! Question: how do you handle API key storage securely in skills?",
-            "permalink": "/r/ClaudeAI/comments/abc123/best_practices_for_claude_code_skills/comment5/"
+            "score": 112,
+            "created_utc": 1708059600,
+            "author": "wifi_is_fine",
+            "body": "Hot take: for 85 devices just go WiFi with ESPHome. No coordinator, no mesh headaches, and ESP32-C6 chips are $2. I run 120 WiFi devices on a dedicated VLAN with zero issues.",
+            "permalink": "/r/HomeAutomation/comments/zw2026/zigbee_vs_zwave_for_whole_house_automation_2026/c5/"
           }
         },
         {
           "kind": "t1",
           "data": {
-            "score": 65,
-            "created_utc": 1705384800,
-            "author": "security_minded",
-            "body": "I use ~/.config/skillname/.env with chmod 600. Never hardcode keys, and definitely don't commit them!",
-            "permalink": "/r/ClaudeAI/comments/abc123/best_practices_for_claude_code_skills/comment6/"
+            "score": 89,
+            "created_utc": 1708063200,
+            "author": "rf_engineer_ha",
+            "body": "As an RF engineer: if your house has plaster walls with metal lath, skip 2.4 GHz entirely. Z-Wave at 908 MHz will save you so much frustration. Otherwise Zigbee is fine for most construction types.",
+            "permalink": "/r/HomeAutomation/comments/zw2026/zigbee_vs_zwave_for_whole_house_automation_2026/c6/"
           }
         },
         {
           "kind": "t1",
           "data": {
-            "score": 52,
-            "created_utc": 1705388400,
-            "author": "helpful_user",
-            "body": "The caching pattern you described saved me so much on API costs. 24h TTL is perfect for most research skills.",
-            "permalink": "/r/ClaudeAI/comments/abc123/best_practices_for_claude_code_skills/comment7/"
+            "score": 67,
+            "created_utc": 1708066800,
+            "author": "coordinator_crasher",
+            "body": "Whatever you pick, buy a GOOD coordinator. The $8 eBay Zigbee sticks are why people think Zigbee is unreliable. A SONOFF ZBDongle-E or TubeZB EFR32 makes a night-and-day difference.",
+            "permalink": "/r/HomeAutomation/comments/zw2026/zigbee_vs_zwave_for_whole_house_automation_2026/c7/"
           }
         },
         {
           "kind": "t1",
           "data": {
-            "score": 34,
-            "created_utc": 1705392000,
-            "author": "newbie_coder",
-            "body": "This is exactly what I needed. Starting my first skill this weekend!",
-            "permalink": "/r/ClaudeAI/comments/abc123/best_practices_for_claude_code_skills/comment8/"
+            "score": 43,
+            "created_utc": 1708070400,
+            "author": "just_automated",
+            "body": "I just finished a 90-device Zigbee install. Took a weekend and everything pairs instantly with Zigbee2MQTT. Biggest tip: plan your mains-powered router devices first, then fill in battery sensors.",
+            "permalink": "/r/HomeAutomation/comments/zw2026/zigbee_vs_zwave_for_whole_house_automation_2026/c8/"
           }
         }
       ]

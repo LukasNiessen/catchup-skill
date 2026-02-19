@@ -4,19 +4,19 @@
     {
       "id": "grok-4-latest",
       "object": "model",
-      "created": 1704067200,
+      "created": 1704153600,
       "owned_by": "xai"
     },
     {
       "id": "grok-4",
       "object": "model",
-      "created": 1701388800,
+      "created": 1701475200,
       "owned_by": "xai"
     },
     {
       "id": "grok-3",
       "object": "model",
-      "created": 1698710400,
+      "created": 1698796800,
       "owned_by": "xai"
     }
   ]

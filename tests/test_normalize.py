@@ -1,18 +1,13 @@
-#
-# Verification Suite: Normalization Module Functionality
-#
-
 import sys
 import unittest
 from pathlib import Path
 
-# Configure module search path
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
 from lib import normalize, schema
 
 
-class RedditItemNormalizationVerification(unittest.TestCase):
+class TestRedditNormalization(unittest.TestCase):
     def test_normalizes_basic_item(self):
         test_items = [
             {
@@ -26,13 +21,13 @@ class RedditItemNormalizationVerification(unittest.TestCase):
             }
         ]
 
-        computed_result = normalize.normalize_reddit_items(test_items, "2026-01-01", "2026-01-31")
+        actual = normalize.to_reddit(test_items, "2026-01-01", "2026-01-31")
 
-        self.assertEqual(len(computed_result), 1)
-        self.assertIsInstance(computed_result[0], schema.RedditItem)
-        self.assertEqual(computed_result[0].id, "R1")
-        self.assertEqual(computed_result[0].title, "Test Thread")
-        self.assertEqual(computed_result[0].date_confidence, "high")
+        self.assertEqual(len(actual), 1)
+        self.assertIsInstance(actual[0], schema.RedditItem)
+        self.assertEqual(actual[0].id, "R1")
+        self.assertEqual(actual[0].title, "Test Thread")
+        self.assertEqual(actual[0].date_confidence, "high")
 
     def test_sets_low_confidence_for_old_date(self):
         test_items = [
@@ -46,9 +41,9 @@ class RedditItemNormalizationVerification(unittest.TestCase):
             }
         ]
 
-        computed_result = normalize.normalize_reddit_items(test_items, "2026-01-01", "2026-01-31")
+        actual = normalize.to_reddit(test_items, "2026-01-01", "2026-01-31")
 
-        self.assertEqual(computed_result[0].date_confidence, "low")
+        self.assertEqual(actual[0].date_confidence, "low")
 
     def test_handles_engagement(self):
         test_items = [
@@ -66,14 +61,14 @@ class RedditItemNormalizationVerification(unittest.TestCase):
             }
         ]
 
-        computed_result = normalize.normalize_reddit_items(test_items, "2026-01-01", "2026-01-31")
+        actual = normalize.to_reddit(test_items, "2026-01-01", "2026-01-31")
 
-        self.assertIsNotNone(computed_result[0].engagement)
-        self.assertEqual(computed_result[0].engagement.score, 100)
-        self.assertEqual(computed_result[0].engagement.num_comments, 50)
+        self.assertIsNotNone(actual[0].engagement)
+        self.assertEqual(actual[0].engagement.score, 100)
+        self.assertEqual(actual[0].engagement.num_comments, 50)
 
 
-class XItemNormalizationVerification(unittest.TestCase):
+class TestXNormalization(unittest.TestCase):
     def test_normalizes_basic_item(self):
         test_items = [
             {
@@ -87,12 +82,12 @@ class XItemNormalizationVerification(unittest.TestCase):
             }
         ]
 
-        computed_result = normalize.normalize_x_items(test_items, "2026-01-01", "2026-01-31")
+        actual = normalize.to_x(test_items, "2026-01-01", "2026-01-31")
 
-        self.assertEqual(len(computed_result), 1)
-        self.assertIsInstance(computed_result[0], schema.XItem)
-        self.assertEqual(computed_result[0].id, "X1")
-        self.assertEqual(computed_result[0].author_handle, "testuser")
+        self.assertEqual(len(actual), 1)
+        self.assertIsInstance(actual[0], schema.XItem)
+        self.assertEqual(actual[0].id, "X1")
+        self.assertEqual(actual[0].author_handle, "testuser")
 
     def test_handles_x_engagement(self):
         test_items = [
@@ -111,14 +106,14 @@ class XItemNormalizationVerification(unittest.TestCase):
             }
         ]
 
-        computed_result = normalize.normalize_x_items(test_items, "2026-01-01", "2026-01-31")
+        actual = normalize.to_x(test_items, "2026-01-01", "2026-01-31")
 
-        self.assertIsNotNone(computed_result[0].engagement)
-        self.assertEqual(computed_result[0].engagement.likes, 100)
-        self.assertEqual(computed_result[0].engagement.reposts, 25)
+        self.assertIsNotNone(actual[0].engagement)
+        self.assertEqual(actual[0].engagement.likes, 100)
+        self.assertEqual(actual[0].engagement.reposts, 25)
 
 
-class ItemDictConversionVerification(unittest.TestCase):
+class TestItemDictConversion(unittest.TestCase):
     def test_converts_items(self):
         test_items = [
             schema.RedditItem(
@@ -129,11 +124,11 @@ class ItemDictConversionVerification(unittest.TestCase):
             )
         ]
 
-        computed_result = normalize.items_to_dicts(test_items)
+        actual = normalize.as_dicts(test_items)
 
-        self.assertEqual(len(computed_result), 1)
-        self.assertIsInstance(computed_result[0], dict)
-        self.assertEqual(computed_result[0]["id"], "R1")
+        self.assertEqual(len(actual), 1)
+        self.assertIsInstance(actual[0], dict)
+        self.assertEqual(actual[0]["id"], "R1")
 
 
 if __name__ == "__main__":

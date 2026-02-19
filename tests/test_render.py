@@ -1,18 +1,13 @@
-#
-# Verification Suite: Render Module Functionality
-#
-
 import sys
 import unittest
 from pathlib import Path
 
-# Configure module search path
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
 from lib import render, schema
 
 
-class CompactRenderVerification(unittest.TestCase):
+class TestCompactOutput(unittest.TestCase):
     def test_renders_basic_report(self):
         test_report = schema.Report(
             topic="test topic",
@@ -24,12 +19,12 @@ class CompactRenderVerification(unittest.TestCase):
             xai_model_used="grok-4-latest",
         )
 
-        computed_result = render.generate_compact_output(test_report)
+        out = render.compact(test_report)
 
-        self.assertIn("test topic", computed_result)
-        self.assertIn("2026-01-01", computed_result)
-        self.assertIn("both", computed_result)
-        self.assertIn("gpt-5.2", computed_result)
+        self.assertIn("test topic", out)
+        self.assertIn("2026-01-01", out)
+        self.assertIn("both", out)
+        self.assertIn("gpt-5.2", out)
 
     def test_renders_reddit_items(self):
         test_report = schema.Report(
@@ -52,11 +47,11 @@ class CompactRenderVerification(unittest.TestCase):
             ],
         )
 
-        computed_result = render.generate_compact_output(test_report)
+        out = render.compact(test_report)
 
-        self.assertIn("R1", computed_result)
-        self.assertIn("Test Thread", computed_result)
-        self.assertIn("r/test", computed_result)
+        self.assertIn("R1", out)
+        self.assertIn("Test Thread", out)
+        self.assertIn("r/test", out)
 
     def test_shows_limited_data_warning_for_reddit_only(self):
         test_report = schema.Report(
@@ -67,12 +62,12 @@ class CompactRenderVerification(unittest.TestCase):
             mode="reddit-only",
         )
 
-        computed_result = render.generate_compact_output(test_report)
+        out = render.compact(test_report)
 
-        self.assertIn("reddit-only", computed_result)
+        self.assertIn("reddit-only", out)
 
 
-class ContextSnippetRenderVerification(unittest.TestCase):
+class TestContextFragment(unittest.TestCase):
     def test_renders_snippet(self):
         test_report = schema.Report(
             topic="Claude Code Skills",
@@ -82,13 +77,13 @@ class ContextSnippetRenderVerification(unittest.TestCase):
             mode="both",
         )
 
-        computed_result = render.generate_context_fragment(test_report)
+        out = render.context_fragment(test_report)
 
-        self.assertIn("Claude Code Skills", computed_result)
-        self.assertIn("Last 30 Days", computed_result)
+        self.assertIn("Claude Code Skills", out)
+        self.assertIn("Last 30 Days", out)
 
 
-class FullReportRenderVerification(unittest.TestCase):
+class TestFullReport(unittest.TestCase):
     def test_renders_full_report(self):
         test_report = schema.Report(
             topic="test topic",
@@ -100,18 +95,18 @@ class FullReportRenderVerification(unittest.TestCase):
             xai_model_used="grok-4-latest",
         )
 
-        computed_result = render.generate_comprehensive_report(test_report)
+        out = render.full_report(test_report)
 
-        self.assertIn("# test topic", computed_result)
-        self.assertIn("## Models Used", computed_result)
-        self.assertIn("gpt-5.2", computed_result)
+        self.assertIn("# test topic", out)
+        self.assertIn("## Models Used", out)
+        self.assertIn("gpt-5.2", out)
 
 
-class ContextPathRetrievalVerification(unittest.TestCase):
+class TestContextPath(unittest.TestCase):
     def test_returns_path_string(self):
-        computed_result = render.retrieve_context_filepath()
-        self.assertIsInstance(computed_result, str)
-        self.assertIn("briefbot.context.md", computed_result)
+        out = render.context_path()
+        self.assertIsInstance(out, str)
+        self.assertIn("briefbot.context.md", out)
 
 
 if __name__ == "__main__":
