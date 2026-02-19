@@ -1,5 +1,5 @@
 {
-  "id": "resp_mock_ha_789",
+  "id": "resp_bb_zigbee_001",
   "object": "response",
   "created": 1708300800,
   "model": "gpt-5.2",
@@ -15,8 +15,8 @@
     }
   ],
   "usage": {
-    "prompt_tokens": 175,
-    "completion_tokens": 520,
-    "total_tokens": 695
+    "prompt_tokens": 195,
+    "completion_tokens": 542,
+    "total_tokens": 737
   }
 }

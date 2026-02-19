@@ -81,7 +81,7 @@ class TestXAI(unittest.TestCase):
             "fake-key",
             selection_policy="latest"
         )
-        self.assertEqual(got, "grok-4-1-fast")
+        self.assertEqual(got, "grok-4-fast")
 
     def test_stable_policy_returns_stable(self):
         # Clear cache to avoid interference
@@ -91,7 +91,7 @@ class TestXAI(unittest.TestCase):
             "fake-key",
             selection_policy="stable"
         )
-        self.assertEqual(got, "grok-4-1-fast")
+        self.assertEqual(got, "grok-4-fast")
 
     def test_pinned_policy_returns_pin(self):
         got = models.choose_xai_model(
@@ -125,7 +125,7 @@ class TestLookup(unittest.TestCase):
         mock_xai_list = [{"id": "grok-4-1-fast", "created": 1704067200}]
         got = models.get_models(configuration, mock_openai_list, mock_xai_list)
         self.assertEqual(got["openai"], "gpt-5.2")
-        self.assertEqual(got["xai"], "grok-4-1-fast")
+        self.assertEqual(got["xai"], "grok-4-fast")
 
 
 if __name__ == "__main__":

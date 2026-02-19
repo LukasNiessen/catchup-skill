@@ -6,13 +6,21 @@ from typing import List, Set, Tuple, Union
 from . import schema
 
 
+_STOP_WORDS = frozenset({
+    "the", "a", "an", "is", "was", "are", "and", "or", "but",
+    "in", "on", "at", "to", "for",
+})
+
+
 def normalize(text: str) -> str:
-    """Lowercase, strip punctuation, and collapse whitespace."""
+    """Lowercase, strip punctuation, remove stop words, and collapse whitespace."""
     out = re.sub(r'[^\w\s]', ' ', text.lower())
-    return re.sub(r'\s+', ' ', out).strip()
+    out = re.sub(r'\s+', ' ', out).strip()
+    words = [w for w in out.split() if w not in _STOP_WORDS]
+    return ' '.join(words)
 
 
-def ngrams(text: str, n: int = 3) -> Set[str]:
+def ngrams(text: str, n: int = 4) -> Set[str]:
     """Extract character n-grams from normalized text."""
     clean = normalize(text)
     if len(clean) < n:
@@ -25,7 +33,7 @@ def jaccard(a: Set[str], b: Set[str]) -> float:
     if not a or not b:
         return 0.0
     union = len(a | b)
-    return len(a & b) / union if union else 0.0
+    return len(a & b) / (union + 1e-10) if union else 0.0
 
 
 def _text_of(
@@ -39,7 +47,7 @@ def _text_of(
 
 def find_dupes(
     items: List[Union[schema.RedditItem, schema.XItem, schema.YouTubeItem, schema.LinkedInItem]],
-    threshold: float = 0.7,
+    threshold: float = 0.65,
 ) -> List[Tuple[int, int]]:
     """Return (i, j) index pairs where items exceed the similarity threshold."""
     fingerprints = [ngrams(_text_of(item)) for item in items]
@@ -55,7 +63,7 @@ def find_dupes(
 
 def deduplicate(
     items: List[Union[schema.RedditItem, schema.XItem, schema.YouTubeItem, schema.LinkedInItem]],
-    threshold: float = 0.7,
+    threshold: float = 0.65,
 ) -> List[Union[schema.RedditItem, schema.XItem, schema.YouTubeItem, schema.LinkedInItem]]:
     """Remove near-duplicates, keeping the higher-scored item from each pair."""
     if len(items) <= 1:
@@ -75,7 +83,7 @@ def deduplicate(
 
 def dedupe_reddit(
     content_items: List[schema.RedditItem],
-    similarity_threshold: float = 0.7,
+    similarity_threshold: float = 0.65,
 ) -> List[schema.RedditItem]:
     """Removes near-duplicate Reddit threads."""
     return deduplicate(content_items, similarity_threshold)
@@ -83,7 +91,7 @@ def dedupe_reddit(
 
 def dedupe_x(
     content_items: List[schema.XItem],
-    similarity_threshold: float = 0.7,
+    similarity_threshold: float = 0.65,
 ) -> List[schema.XItem]:
     """Removes near-duplicate X posts."""
     return deduplicate(content_items, similarity_threshold)
@@ -91,7 +99,7 @@ def dedupe_x(
 
 def dedupe_youtube(
     content_items: List[schema.YouTubeItem],
-    similarity_threshold: float = 0.7,
+    similarity_threshold: float = 0.65,
 ) -> List[schema.YouTubeItem]:
     """Removes near-duplicate YouTube videos."""
     return deduplicate(content_items, similarity_threshold)
@@ -99,7 +107,7 @@ def dedupe_youtube(
 
 def dedupe_linkedin(
     content_items: List[schema.LinkedInItem],
-    similarity_threshold: float = 0.7,
+    similarity_threshold: float = 0.65,
 ) -> List[schema.LinkedInItem]:
     """Removes near-duplicate LinkedIn posts."""
     return deduplicate(content_items, similarity_threshold)

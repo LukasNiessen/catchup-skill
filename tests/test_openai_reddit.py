@@ -63,7 +63,7 @@ class TestFallbackModels(unittest.TestCase):
 
     def test_gpt4o_is_first(self):
         # gpt-4o should be the first fallback option
-        self.assertEqual(FALLBACK_MODELS[0], "gpt-4o")
+        self.assertEqual(FALLBACK_MODELS[0], "gpt-4o-mini")
 
 
 if __name__ == "__main__":

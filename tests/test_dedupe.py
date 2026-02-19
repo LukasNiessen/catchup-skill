@@ -38,7 +38,7 @@ class JaccardTests(unittest.TestCase):
     def test_identical_sets_equal_one(self):
         test_set = {"a", "b", "c"}
         out = dedupe.jaccard(test_set, test_set)
-        self.assertEqual(out, 1.0)
+        self.assertAlmostEqual(out, 1.0, places=5)
 
     def test_disjoint_sets_equal_zero(self):
         first_set = {"a", "b", "c"}
@@ -50,7 +50,7 @@ class JaccardTests(unittest.TestCase):
         first_set = {"a", "b", "c"}
         second_set = {"b", "c", "d"}
         out = dedupe.jaccard(first_set, second_set)
-        self.assertEqual(out, 0.5)  # 2 overlap / 4 union
+        self.assertAlmostEqual(out, 0.5, places=5)  # 2 overlap / 4 union
 
     def test_empty_sets_equal_zero(self):
         out = dedupe.jaccard(set(), set())

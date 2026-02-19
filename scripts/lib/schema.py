@@ -1,4 +1,4 @@
-"""Data structures for content items and research reports."""
+"""Data structures for normalized content items and aggregated research output."""
 
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 @dataclass
 class Engagement:
-    """Platform-specific interaction metrics."""
+    """Engagement signals across content sources."""
 
     score: Optional[int] = None
     num_comments: Optional[int] = None
@@ -19,6 +19,7 @@ class Engagement:
     views: Optional[int] = None
     reactions: Optional[int] = None
     comments: Optional[int] = None
+    bookmarks: Optional[int] = None
 
     def to_dict(self) -> Dict[str, Any]:
         d = {}
@@ -42,12 +43,14 @@ class Engagement:
             d['reactions'] = self.reactions
         if self.comments is not None:
             d['comments'] = self.comments
+        if self.bookmarks is not None:
+            d['bookmarks'] = self.bookmarks
         return d if d else None
 
 
 @dataclass
 class Comment:
-    """A Reddit comment."""
+    """Comment extracted from a Reddit thread."""
 
     score: int
     date: Optional[str]
@@ -98,6 +101,7 @@ class RedditItem:
     why_relevant: str = ""
     subs: SubScores = field(default_factory=SubScores)
     score: int = 0
+    flair: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -114,6 +118,7 @@ class RedditItem:
             'why_relevant': self.why_relevant,
             'subs': self.subs.to_dict(),
             'score': self.score,
+            'flair': self.flair,
         }
 
 
@@ -132,6 +137,8 @@ class XItem:
     why_relevant: str = ""
     subs: SubScores = field(default_factory=SubScores)
     score: int = 0
+    is_repost: bool = False
+    language: str = "en"
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -146,6 +153,8 @@ class XItem:
             'why_relevant': self.why_relevant,
             'subs': self.subs.to_dict(),
             'score': self.score,
+            'is_repost': self.is_repost,
+            'language': self.language,
         }
 
 
@@ -165,6 +174,7 @@ class YouTubeItem:
     why_relevant: str = ""
     subs: SubScores = field(default_factory=SubScores)
     score: int = 0
+    duration_seconds: Optional[int] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -180,6 +190,7 @@ class YouTubeItem:
             'why_relevant': self.why_relevant,
             'subs': self.subs.to_dict(),
             'score': self.score,
+            'duration_seconds': self.duration_seconds,
         }
 
 
@@ -232,6 +243,7 @@ class WebSearchItem:
     why_relevant: str = ""
     subs: SubScores = field(default_factory=SubScores)
     score: int = 0
+    language: str = "en"
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -246,12 +258,13 @@ class WebSearchItem:
             'why_relevant': self.why_relevant,
             'subs': self.subs.to_dict(),
             'score': self.score,
+            'language': self.language,
         }
 
 
 @dataclass
 class Report:
-    """Complete research report container."""
+    """Aggregated research output with metadata."""
 
     topic: str
     range_from: str
@@ -275,6 +288,8 @@ class Report:
     web_error: Optional[str] = None
     from_cache: bool = False
     cache_age_hours: Optional[float] = None
+    search_duration_seconds: Optional[float] = None
+    item_count: int = 0
 
     def to_dict(self) -> Dict[str, Any]:
         d = {
@@ -310,11 +325,19 @@ class Report:
             d['from_cache'] = self.from_cache
         if self.cache_age_hours is not None:
             d['cache_age_hours'] = self.cache_age_hours
+        if self.search_duration_seconds is not None:
+            d['search_duration_seconds'] = self.search_duration_seconds
+        if self.item_count:
+            d['item_count'] = self.item_count
         return d
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Report":
         """Reconstruct a Report from its serialized dict."""
+        if 'item_count' not in data:
+            data['item_count'] = sum(
+                len(data.get(k, [])) for k in ('reddit', 'x', 'youtube', 'linkedin', 'web')
+            )
         range_section = data.get('range', {})
         start = range_section.get('from', data.get('range_from', ''))
         end = range_section.get('to', data.get('range_to', ''))
@@ -451,6 +474,8 @@ class Report:
             web_error=data.get('web_error'),
             from_cache=data.get('from_cache', False),
             cache_age_hours=data.get('cache_age_hours'),
+            search_duration_seconds=data.get('search_duration_seconds'),
+            item_count=data.get('item_count', 0),
         )
 
 
@@ -461,8 +486,9 @@ def make_report(
     mode: str,
     openai_model: Optional[str] = None,
     xai_model: Optional[str] = None,
+    **kwargs,
 ) -> Report:
-    """Create a new report with metadata."""
+    """Create a new report with metadata and optional extra fields."""
     return Report(
         topic=topic,
         range_from=start,
@@ -471,4 +497,5 @@ def make_report(
         mode=mode,
         openai_model_used=openai_model,
         xai_model_used=xai_model,
+        **kwargs,
     )

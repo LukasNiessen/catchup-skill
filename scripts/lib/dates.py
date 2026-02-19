@@ -4,16 +4,17 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, Tuple
 
 FORMATS = [
-    "%Y-%m-%d",
-    "%Y-%m-%dT%H:%M:%S",
-    "%Y-%m-%dT%H:%M:%SZ",
-    "%Y-%m-%dT%H:%M:%S%z",
     "%Y-%m-%dT%H:%M:%S.%f%z",
+    "%Y-%m-%dT%H:%M:%SZ",
+    "%Y-%m-%dT%H:%M:%S",
+    "%Y-%m-%d",
+    "%B %d, %Y",
+    "%d/%m/%Y",
 ]
 
 
 def date_window(days: int = 30) -> Tuple[str, str]:
-    """Return (start, end) ISO date strings spanning the last N days."""
+    """Return (start, end) ISO date strings for a rolling window of N calendar days."""
     today = datetime.now(timezone.utc).date()
     start = today - timedelta(days=days)
     return start.isoformat(), today.isoformat()
@@ -49,7 +50,7 @@ def timestamp_to_date(unix_timestamp: Optional[float]) -> Optional[str]:
     try:
         dt = datetime.fromtimestamp(unix_timestamp, tz=timezone.utc)
         return dt.date().isoformat()
-    except (ValueError, TypeError, OSError):
+    except (ValueError, TypeError, OverflowError):
         return None
 
 
@@ -97,4 +98,4 @@ def recency_score(date_input: Optional[str], max_days: int = 30) -> int:
     if age >= max_days:
         return 0
 
-    return int(100 * (1 - age / max_days))
+    return int(100 * ((max_days - age) / max_days) ** 0.95)

@@ -7,11 +7,10 @@ import time
 import urllib.error
 import urllib.request
 from typing import Any, Dict, Optional
-from urllib.parse import urlencode
 
-TIMEOUT = 30
-MAX_RETRIES = 3
-BACKOFF = 1.0
+TIMEOUT = 25
+MAX_RETRIES = 4
+BACKOFF = 0.75
 USER_AGENT = "briefbot-skill/1.0 (Claude Code Skill)"
 
 DEBUG = os.environ.get("BRIEFBOT_DEBUG", "").lower() in ("1", "true", "yes")
@@ -20,7 +19,7 @@ DEBUG = os.environ.get("BRIEFBOT_DEBUG", "").lower() in ("1", "true", "yes")
 def _debug(msg: str):
     """Write a debug message to stderr if debug mode is on."""
     if DEBUG:
-        sys.stderr.write(f"[DEBUG] {msg}\n")
+        sys.stderr.write(f"[HTTP] {msg}\n")
         sys.stderr.flush()
 
 
@@ -70,11 +69,16 @@ def request(
                 _debug(f"Response: {resp.status} ({len(body)} bytes)")
                 return json.loads(body) if body else {}
 
+        except json.JSONDecodeError as e:
+            _debug(f"JSON decode error: {e}")
+            last_err = HTTPError(f"Invalid JSON response: {e}")
+            raise last_err
+
         except urllib.error.HTTPError as e:
             err_body = None
             try:
                 err_body = e.read().decode('utf-8')
-            except:
+            except Exception:
                 pass
 
             _debug(f"HTTP Error {e.code}: {e.reason}")
@@ -83,24 +87,13 @@ def request(
 
             last_err = HTTPError(f"HTTP {e.code}: {e.reason}", e.code, err_body)
 
-            # Don't retry client errors (4xx) except rate limits
-            if 400 <= e.code < 500 and e.code != 429:
+            # Don't retry client errors (4xx) except rate limits (429) and 503
+            if 400 <= e.code < 500 and e.code not in (429, 503):
                 raise last_err
 
             if attempt < retries - 1:
-                time.sleep(BACKOFF * (attempt + 1))
-
-        except urllib.error.URLError as e:
-            _debug(f"URL Error: {e.reason}")
-            last_err = HTTPError(f"URL Error: {e.reason}")
-
-            if attempt < retries - 1:
-                time.sleep(BACKOFF * (attempt + 1))
-
-        except json.JSONDecodeError as e:
-            _debug(f"JSON decode error: {e}")
-            last_err = HTTPError(f"Invalid JSON response: {e}")
-            raise last_err
+                delay = BACKOFF * (2 ** attempt) + (attempt * 0.1)
+                time.sleep(delay)
 
         except (OSError, TimeoutError, ConnectionResetError) as e:
             etype = type(e).__name__
@@ -108,12 +101,21 @@ def request(
             last_err = HTTPError(f"Connection error: {etype}: {e}")
 
             if attempt < retries - 1:
-                time.sleep(BACKOFF * (attempt + 1))
+                delay = BACKOFF * (2 ** attempt) + (attempt * 0.1)
+                time.sleep(delay)
+
+        except urllib.error.URLError as e:
+            _debug(f"URL Error: {e.reason}")
+            last_err = HTTPError(f"URL Error: {e.reason}")
+
+            if attempt < retries - 1:
+                delay = BACKOFF * (2 ** attempt) + (attempt * 0.1)
+                time.sleep(delay)
 
     if last_err:
         raise last_err
 
-    raise HTTPError("Request failed with no error details")
+    raise HTTPError("All retry attempts exhausted without a response")
 
 
 def get(url: str, headers: Optional[Dict[str, str]] = None, **kwargs) -> Dict[str, Any]:
@@ -140,7 +142,11 @@ def reddit_json(path: str) -> Dict[str, Any]:
     if not path.endswith('.json'):
         path = f"{path}.json"
 
-    url = f"https://www.reddit.com{path}?raw_json=1"
+    url = f"https://www.reddit.com{path}"
+    if "?" not in url:
+        url += "?raw_json=1"
+    else:
+        url += "&raw_json=1"
     return get(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
 
 

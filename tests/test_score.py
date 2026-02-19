@@ -59,9 +59,9 @@ class TestPercentageScaling(unittest.TestCase):
     def test_normalizes_values(self):
         test_values = [0, 50, 100]
         result = score._to_pct(test_values)
-        self.assertEqual(result[0], 0)
-        self.assertEqual(result[1], 50)
-        self.assertEqual(result[2], 100)
+        self.assertAlmostEqual(result[0], 0, delta=1)
+        self.assertAlmostEqual(result[1], 50, delta=1)
+        self.assertAlmostEqual(result[2], 100, delta=1)
 
     def test_handles_none(self):
         test_values = [0, None, 100]

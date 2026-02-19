@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 from . import http
 
 # Fallback chain when the primary model is inaccessible
-FALLBACK_MODELS = ["gpt-4o", "gpt-4o-mini"]
+FALLBACK_MODELS = ["gpt-4o-mini", "gpt-4o"]
 
 
 def _err(msg: str):
@@ -43,38 +43,42 @@ API_URL = "https://api.openai.com/v1/responses"
 
 # How many results to request per depth level (over-fetch for date filtering)
 DEPTH_SIZES = {
-    "quick": (15, 25),
-    "default": (30, 50),
-    "deep": (70, 100),
+    "quick": (12, 20),
+    "default": (25, 45),
+    "deep": (55, 85),
 }
 
-REDDIT_DISCOVERY_PROMPT = """Search Reddit for discussions about: {topic}
+REDDIT_DISCOVERY_PROMPT = """Investigate Reddit community discussions related to: {topic}
 
-First, identify the core concept. Strip filler words:
-- "best nano banana prompting practices" -> search for "nano banana"
-- "killer features of clawdbot" -> search for "clawdbot"
+First, distill the essential query. Simplify compound queries to their root subject
+(e.g., "best wireless headphones 2026" becomes "wireless headphones",
+"killer features of clawdbot" becomes "clawdbot").
 
-Run multiple searches combining the core concept with site:reddit.com.
-Cast a wide net -- we handle date filtering on our end.
+Execute broad searches using site:reddit.com combined with the distilled subject.
+Over-fetch rather than under-fetch -- server-side filters will handle precision.
 
-For each thread found, capture:
-- The full reddit.com URL (must contain /r/ and /comments/)
-- Skip any developers.reddit.com or business.reddit.com links
-- Date as YYYY-MM-DD if visible, otherwise null
-- A relevance score from 0.0 to 1.0
+Content window: {from_date} through {to_date}
 
-Target {min_items}-{max_items} threads. Err on the side of more.
+For every matching thread, record:
+- Thread title
+- Full reddit.com URL -- URLs must include both /r/ and /comments/ path segments.
+  Discard developers.reddit.com and business.reddit.com domains.
+- Publication date in YYYY-MM-DD format, or null if not visible
+- A relevance score between 0.0 and 1.0
+- Brief explanation of why the thread is relevant
+
+Aim for {min_items} to {max_items} threads. More is better than fewer.
 
 Output strictly as JSON:
 {{
   "items": [
     {{
-      "title": "Thread title here",
-      "url": "https://www.reddit.com/r/sub/comments/id/slug/",
-      "subreddit": "sub_name",
-      "date": "YYYY-MM-DD or null",
-      "why_relevant": "One sentence explanation",
-      "relevance": 0.85
+      "title": "Example discussion title",
+      "url": "https://www.reddit.com/r/example/comments/abc123/example_thread/",
+      "subreddit": "example",
+      "date": "2026-01-15",
+      "why_relevant": "Directly discusses the topic with community input",
+      "relevance": 0.9
     }}
   ]
 }}"""
@@ -83,9 +87,9 @@ Output strictly as JSON:
 def _core_subject(verbose_query: str) -> str:
     """Strip filler words from a query, returning the essential subject."""
     filler = {
-        'best', 'top', 'how to', 'tips for', 'practices', 'features',
-        'killer', 'guide', 'tutorial', 'recommendations', 'advice',
-        'prompting', 'using', 'for', 'with', 'the', 'of', 'in', 'on',
+        'best', 'top', 'how to', 'tips for', 'review', 'features',
+        'killer', 'comparison', 'overview', 'recommendations', 'advice',
+        'tutorial', 'prompting', 'using', 'for', 'with', 'the', 'of', 'in', 'on',
     }
     tokens = verbose_query.lower().split()
     kept = [t for t in tokens if t not in filler]
@@ -113,8 +117,8 @@ def search(
         "Content-Type": "application/json",
     }
 
-    timeout_map = {"quick": 90, "default": 120, "deep": 180}
-    timeout = timeout_map.get(depth, 120)
+    timeout_map = {"quick": 75, "default": 105, "deep": 160}
+    timeout = timeout_map.get(depth, 105)
 
     models_chain = [model] + [m for m in FALLBACK_MODELS if m != model]
 
@@ -208,7 +212,7 @@ def parse_reddit_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]]:
         return extracted
 
     # Pull JSON from the text
-    match = re.search(r'\{[\s\S]*"items"[\s\S]*\}', output_text)
+    match = re.search(r'\{[^{}]*"items"\s*:\s*\[[\s\S]*?\]\s*\}', output_text)
 
     if match:
         try:

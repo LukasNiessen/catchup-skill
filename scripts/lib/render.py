@@ -48,8 +48,8 @@ def _freshness_check(report: schema.Report) -> dict:
         "web_recent": web_recent,
         "total_recent": total_recent,
         "total_items": total_items,
-        "is_sparse": total_recent < 5,
-        "mostly_evergreen": total_items > 0 and total_recent < total_items * 0.3,
+        "is_sparse": total_recent < 4,
+        "mostly_evergreen": total_items > 0 and total_recent < total_items * 0.25,
     }
 
 
@@ -57,7 +57,7 @@ def compact(report: schema.Report, max_per_source: int = 15, missing_keys: str =
     """Produce condensed markdown for Claude to synthesize."""
     lines = []
 
-    lines.append(f"## Research Results: {report.topic}")
+    lines.append(f"## Findings: {report.topic}")
     lines.append("")
 
     freshness = _freshness_check(report)
@@ -91,6 +91,33 @@ def compact(report: schema.Report, max_per_source: int = 15, missing_keys: str =
         lines.append(f"**xAI Model:** {report.xai_model_used}")
     lines.append("")
 
+    # Platform status summary — unambiguous per-platform success/failure
+    # so the skill agent never confuses one platform's error for another
+    if report.mode != "web-only":
+        status_parts = []
+        if report.mode in ("both", "reddit-only", "all", "reddit-web"):
+            if report.reddit_error:
+                status_parts.append(f"Reddit=ERROR ({report.reddit_error})")
+            else:
+                status_parts.append(f"Reddit=OK ({len(report.reddit)} threads)")
+        if report.mode in ("both", "x-only", "all", "x-web"):
+            if report.x_error:
+                status_parts.append(f"X=ERROR ({report.x_error})")
+            else:
+                status_parts.append(f"X=OK ({len(report.x)} posts)")
+        if report.mode in ("all",):
+            if report.youtube_error:
+                status_parts.append(f"YouTube=ERROR")
+            elif report.youtube:
+                status_parts.append(f"YouTube=OK ({len(report.youtube)} videos)")
+            if report.linkedin_error:
+                status_parts.append(f"LinkedIn=ERROR")
+            elif report.linkedin:
+                status_parts.append(f"LinkedIn=OK ({len(report.linkedin)} posts)")
+        if status_parts:
+            lines.append(f"**Platform Status:** {' | '.join(status_parts)}")
+            lines.append("")
+
     if report.mode == "reddit-only" and missing_keys == "x":
         lines.append("*\U0001f4a1 Tip: Add XAI_API_KEY for X/Twitter data and better triangulation.*")
         lines.append("")
@@ -117,16 +144,16 @@ def compact(report: schema.Report, max_per_source: int = 15, missing_keys: str =
             if item.engagement:
                 parts = []
                 if item.engagement.score is not None:
-                    parts.append(f"{item.engagement.score}pts")
+                    parts.append(f"{item.engagement.score}pt")
                 if item.engagement.num_comments is not None:
-                    parts.append(f"{item.engagement.num_comments}cmt")
+                    parts.append(f"{item.engagement.num_comments}c")
                 if parts:
                     eng = f" [{', '.join(parts)}]"
 
-            date_str = f" ({item.date})" if item.date else " (date unknown)"
-            conf = f" [date:{item.date_confidence}]" if item.date_confidence != "high" else ""
+            date_str = f" ({item.date})" if item.date else " (no date)"
+            conf = f" [{item.date_confidence}]" if item.date_confidence != "high" else ""
 
-            lines.append(f"**{item.id}** (score:{item.score}) r/{item.subreddit}{date_str}{conf}{eng}")
+            lines.append(f"**{item.id}** [{item.score}] r/{item.subreddit}{date_str}{conf}{eng}")
             lines.append(f"  {item.title}")
             lines.append(f"  {item.url}")
             lines.append(f"  *{item.why_relevant}*")
@@ -157,17 +184,17 @@ def compact(report: schema.Report, max_per_source: int = 15, missing_keys: str =
             if item.engagement:
                 parts = []
                 if item.engagement.likes is not None:
-                    parts.append(f"{item.engagement.likes}likes")
+                    parts.append(f"{item.engagement.likes}lk")
                 if item.engagement.reposts is not None:
-                    parts.append(f"{item.engagement.reposts}rt")
+                    parts.append(f"{item.engagement.reposts}rp")
                 if parts:
                     eng = f" [{', '.join(parts)}]"
 
-            date_str = f" ({item.date})" if item.date else " (date unknown)"
-            conf = f" [date:{item.date_confidence}]" if item.date_confidence != "high" else ""
+            date_str = f" ({item.date})" if item.date else " (no date)"
+            conf = f" [{item.date_confidence}]" if item.date_confidence != "high" else ""
 
-            lines.append(f"**{item.id}** (score:{item.score}) @{item.author_handle}{date_str}{conf}{eng}")
-            lines.append(f"  {item.text[:200]}...")
+            lines.append(f"**{item.id}** [{item.score}] @{item.author_handle}{date_str}{conf}{eng}")
+            lines.append(f"  {item.text[:180]}...")
             lines.append(f"  {item.url}")
             lines.append(f"  *{item.why_relevant}*")
             lines.append("")
@@ -192,10 +219,10 @@ def compact(report: schema.Report, max_per_source: int = 15, missing_keys: str =
                 if parts:
                     eng = f" [{', '.join(parts)}]"
 
-            date_str = f" ({item.date})" if item.date else " (date unknown)"
-            conf = f" [date:{item.date_confidence}]" if item.date_confidence != "high" else ""
+            date_str = f" ({item.date})" if item.date else " (no date)"
+            conf = f" [{item.date_confidence}]" if item.date_confidence != "high" else ""
 
-            lines.append(f"**{item.id}** (score:{item.score}) {item.channel_name}{date_str}{conf}{eng}")
+            lines.append(f"**{item.id}** [{item.score}] {item.channel_name}{date_str}{conf}{eng}")
             lines.append(f"  {item.title}")
             lines.append(f"  {item.url}")
             lines.append(f"  *{item.why_relevant}*")
@@ -221,13 +248,13 @@ def compact(report: schema.Report, max_per_source: int = 15, missing_keys: str =
                 if parts:
                     eng = f" [{', '.join(parts)}]"
 
-            date_str = f" ({item.date})" if item.date else " (date unknown)"
-            conf = f" [date:{item.date_confidence}]" if item.date_confidence != "high" else ""
+            date_str = f" ({item.date})" if item.date else " (no date)"
+            conf = f" [{item.date_confidence}]" if item.date_confidence != "high" else ""
             author = item.author_name
             if item.author_title:
                 author += f" ({item.author_title})"
 
-            lines.append(f"**{item.id}** (score:{item.score}) {author}{date_str}{conf}{eng}")
+            lines.append(f"**{item.id}** [{item.score}] {author}{date_str}{conf}{eng}")
             lines.append(f"  {item.text[:200]}...")
             lines.append(f"  {item.url}")
             lines.append(f"  *{item.why_relevant}*")
@@ -243,13 +270,13 @@ def compact(report: schema.Report, max_per_source: int = 15, missing_keys: str =
         lines.append("### Web Results")
         lines.append("")
         for item in report.web[:max_per_source]:
-            date_str = f" ({item.date})" if item.date else " (date unknown)"
-            conf = f" [date:{item.date_confidence}]" if item.date_confidence != "high" else ""
+            date_str = f" ({item.date})" if item.date else " (no date)"
+            conf = f" [{item.date_confidence}]" if item.date_confidence != "high" else ""
 
-            lines.append(f"**{item.id}** [WEB] (score:{item.score}) {item.source_domain}{date_str}{conf}")
+            lines.append(f"**{item.id}** [WEB] [{item.score}] {item.source_domain}{date_str}{conf}")
             lines.append(f"  {item.title}")
             lines.append(f"  {item.url}")
-            lines.append(f"  {item.snippet[:150]}...")
+            lines.append(f"  {item.snippet[:120]}...")
             lines.append(f"  *{item.why_relevant}*")
             lines.append("")
 
@@ -286,7 +313,7 @@ def context_fragment(report: schema.Report) -> str:
 
     aggregated.sort(key=lambda entry: -entry[0])
 
-    for score_val, source, text, url in aggregated[:7]:
+    for score_val, source, text, url in aggregated[:10]:
         lines.append(f"- [{source}] {text}")
 
     lines.append("")
@@ -445,10 +472,10 @@ def save_artifacts(
     """Write all output artifacts to disk."""
     _ensure_output_dir()
 
-    with open(OUTPUT_DIR / "report.json", "w", encoding="utf-8") as fh:
+    with open(OUTPUT_DIR / "data.json", "w", encoding="utf-8") as fh:
         json.dump(report.to_dict(), fh, indent=2, ensure_ascii=False)
 
-    with open(OUTPUT_DIR / "report.md", "w", encoding="utf-8") as fh:
+    with open(OUTPUT_DIR / "summary.md", "w", encoding="utf-8") as fh:
         fh.write(full_report(report))
 
     with open(OUTPUT_DIR / "briefbot.context.md", "w", encoding="utf-8") as fh:

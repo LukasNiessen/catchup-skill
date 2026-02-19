@@ -1,4 +1,4 @@
-"""Bird X search client - vendored Twitter GraphQL search for BriefBot.
+"""Twitter/X GraphQL search via vendored bird-search client.
 
 Uses a vendored subset of @steipete/bird v0.8.0 (MIT License) to search X
 via Twitter's GraphQL API. No external `bird` CLI binary needed - just Node.js 22+.
@@ -19,9 +19,9 @@ _BIRD_SEARCH_MJS = Path(__file__).parent / "vendor" / "bird-search" / "bird-sear
 
 # Depth configurations: number of results to request
 DEPTH_CONFIG = {
-    "quick": 12,
-    "default": 30,
-    "deep": 60,
+    "quick": 15,
+    "default": 25,
+    "deep": 50,
 }
 
 
@@ -112,10 +112,10 @@ def _extract_core_subject(topic: str) -> str:
         # Question/filler words
         'a', 'an', 'the', 'is', 'are', 'was', 'were', 'and', 'or',
         'of', 'in', 'on', 'for', 'with', 'about', 'to',
-        'people', 'saying', 'think', 'said', 'lately',
+        'people', 'saying', 'think', 'said',
         # Research/meta descriptors
-        'best', 'top', 'good', 'great', 'awesome', 'killer',
-        'latest', 'new', 'news', 'update', 'updates',
+        'best', 'top', 'good', 'great', 'overview',
+        'latest', 'new', 'recent', 'news', 'update', 'updates',
         'practices', 'features', 'guide', 'tutorial',
         'recommendations', 'advice', 'review', 'reviews',
         'usecases', 'examples', 'comparison', 'versus', 'vs',
@@ -128,7 +128,7 @@ def _extract_core_subject(topic: str) -> str:
     words = text.split()
     result = [w for w in words if w not in _noise]
 
-    return ' '.join(result[:3]) or topic.lower().strip()  # Max 3 words
+    return ' '.join(result[:4]) or topic.lower().strip()  # Max 4 words
 
 
 def is_bird_installed() -> bool:
@@ -182,7 +182,7 @@ def install_bird() -> Tuple[bool, str]:
         Tuple of (success, message).
     """
     if is_bird_installed():
-        return True, "Bird search is bundled with BriefBot - no installation needed."
+        return True, "Bird search is included in the skill package - no installation needed."
     if not shutil.which("node"):
         return False, "Node.js 22+ is required for X search. Install Node.js first."
     return False, f"Vendored bird-search.mjs not found at {_BIRD_SEARCH_MJS}"

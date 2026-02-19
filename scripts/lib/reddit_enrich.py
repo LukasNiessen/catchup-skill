@@ -56,7 +56,7 @@ def _parse_thread(raw_data: Any) -> Dict[str, Any]:
                 "created_utc": sub.get("created_utc"),
                 "permalink": sub.get("permalink"),
                 "title": sub.get("title"),
-                "selftext": sub.get("selftext", "")[:500],
+                "selftext": sub.get("selftext", "")[:600],
             }
 
     # Comments live in the second listing
@@ -75,15 +75,15 @@ def _parse_thread(raw_data: Any) -> Dict[str, Any]:
                 components["comments"].append({
                     "score": cdata.get("score", 0),
                     "created_utc": cdata.get("created_utc"),
-                    "author": cdata.get("author", "[deleted]"),
-                    "body": cdata.get("body", "")[:300],
+                    "author": cdata.get("author", "[deleted]"),  # Reddit's default for deleted accounts
+                    "body": cdata.get("body", "")[:350],
                     "permalink": cdata.get("permalink"),
                 })
 
     return components
 
 
-def _top_comments(comments: List[Dict], limit: int = 10) -> List[Dict[str, Any]]:
+def _top_comments(comments: List[Dict], limit: int = 12) -> List[Dict[str, Any]]:
     """Return the highest-scoring comments, excluding deleted authors."""
     excluded = {"[deleted]", "[removed]"}
     valid = [c for c in comments if c.get("author") not in excluded]
@@ -91,22 +91,21 @@ def _top_comments(comments: List[Dict], limit: int = 10) -> List[Dict[str, Any]]
     return ranked[:limit]
 
 
-def _extract_insights(comments: List[Dict], limit: int = 7) -> List[str]:
+def _extract_insights(comments: List[Dict], limit: int = 6) -> List[str]:
     """Pull substantive insights from top comments, skipping low-value noise."""
     insights = []
-    candidates = comments[:limit * 2]
+    candidates = comments[:limit * 3]
 
     low_value_patterns = [
-        r'^(this|same|agreed|exactly|yep|nope|yes|no|thanks|thank you)\.?$',
-        r'^lol|lmao|haha',
-        r'^\[deleted\]',
-        r'^\[removed\]',
+        r'^(yep|nope|same|agreed|this|exactly|thanks|thank\s*you|yes|no|ok|okay)\.?!?$',
+        r'^(lol|lmao|rofl|haha|heh)+$',
+        r'^\[(deleted|removed)\]$',
     ]
 
     for comment in candidates:
         body = comment.get("body", "").strip()
 
-        if len(body) < 30:
+        if len(body) < 25:
             continue
 
         body_lower = body.lower()
@@ -114,12 +113,12 @@ def _extract_insights(comments: List[Dict], limit: int = 7) -> List[str]:
             continue
 
         # Truncate to a meaningful excerpt
-        excerpt = body[:150]
+        excerpt = body[:180]
 
-        if len(body) > 150:
+        if len(body) > 180:
             found_boundary = False
             for i, ch in enumerate(excerpt):
-                if ch in '.!?' and i > 50:
+                if ch in '.!?;' and i > 65:
                     excerpt = excerpt[:i + 1]
                     found_boundary = True
                     break
@@ -168,13 +167,13 @@ def enrich(
 
     for comment in best:
         permalink = comment.get("permalink", "")
-        comment_url = f"https://reddit.com{permalink}" if permalink else ""
+        comment_url = f"https://www.reddit.com{permalink}" if permalink else ""
 
         item["top_comments"].append({
             "score": comment.get("score", 0),
             "date": dates.timestamp_to_date(comment.get("created_utc")),
             "author": comment.get("author", ""),
-            "excerpt": comment.get("body", "")[:200],
+            "excerpt": comment.get("body", "")[:250],
             "url": comment_url,
         })
 

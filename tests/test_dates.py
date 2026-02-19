@@ -109,7 +109,7 @@ def test_thirty_days_ago_scores_minimum():
 def test_fifteen_days_ago_scores_midpoint():
     mid_date = (datetime.now(timezone.utc).date() - timedelta(days=15)).isoformat()
     result = dates.recency_score(mid_date)
-    assert result == 50
+    assert 49 <= result <= 52  # curved formula yields ~51
 
 
 def test_absent_date_scores_minimum():

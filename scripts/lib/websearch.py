@@ -18,7 +18,7 @@ MONTHS = {
     "jun": 6, "june": 6,
     "jul": 7, "july": 7,
     "aug": 8, "august": 8,
-    "sep": 9, "sept": 9, "september": 9,
+    "sep": 9, "september": 9,
     "oct": 10, "october": 10,
     "nov": 11, "november": 11,
     "dec": 12, "december": 12,
@@ -27,25 +27,25 @@ MONTHS = {
 
 def _date_from_url(url: str) -> Optional[str]:
     """Try to extract a YYYY-MM-DD date embedded in the URL path."""
+    # /YYYYMMDD/ (compact)
+    m = re.search(r'/(\d{4})(\d{2})(\d{2})/', url)
+    if m:
+        y, mo, d = m.groups()
+        if 2019 <= int(y) <= 2032 and 1 <= int(mo) <= 12 and 1 <= int(d) <= 31:
+            return f"{y}-{mo}-{d}"
+
     # /YYYY/MM/DD/
     m = re.search(r'/(\d{4})/(\d{2})/(\d{2})/', url)
     if m:
         y, mo, d = m.groups()
-        if 2020 <= int(y) <= 2030 and 1 <= int(mo) <= 12 and 1 <= int(d) <= 31:
+        if 2019 <= int(y) <= 2032 and 1 <= int(mo) <= 12 and 1 <= int(d) <= 31:
             return f"{y}-{mo}-{d}"
 
     # /YYYY-MM-DD/ or /YYYY-MM-DD-
     m = re.search(r'/(\d{4})-(\d{2})-(\d{2})[-/]', url)
     if m:
         y, mo, d = m.groups()
-        if 2020 <= int(y) <= 2030 and 1 <= int(mo) <= 12 and 1 <= int(d) <= 31:
-            return f"{y}-{mo}-{d}"
-
-    # /YYYYMMDD/ (compact)
-    m = re.search(r'/(\d{4})(\d{2})(\d{2})/', url)
-    if m:
-        y, mo, d = m.groups()
-        if 2020 <= int(y) <= 2030 and 1 <= int(mo) <= 12 and 1 <= int(d) <= 31:
+        if 2019 <= int(y) <= 2032 and 1 <= int(mo) <= 12 and 1 <= int(d) <= 31:
             return f"{y}-{mo}-{d}"
 
     return None
@@ -68,7 +68,7 @@ def _date_from_text(text: str) -> Optional[str]:
     if m:
         month_str, day_str, year_str = m.groups()
         month_num = MONTHS.get(month_str[:3])
-        if month_num and 2020 <= int(year_str) <= 2030 and 1 <= int(day_str) <= 31:
+        if month_num and 2019 <= int(year_str) <= 2032 and 1 <= int(day_str) <= 31:
             return f"{year_str}-{month_num:02d}-{int(day_str):02d}"
 
     # DD Month YYYY (e.g. "24 January 2026")
@@ -82,14 +82,14 @@ def _date_from_text(text: str) -> Optional[str]:
     if m:
         day_str, month_str, year_str = m.groups()
         month_num = MONTHS.get(month_str[:3])
-        if month_num and 2020 <= int(year_str) <= 2030 and 1 <= int(day_str) <= 31:
+        if month_num and 2019 <= int(year_str) <= 2032 and 1 <= int(day_str) <= 31:
             return f"{year_str}-{month_num:02d}-{int(day_str):02d}"
 
     # YYYY-MM-DD (ISO format)
     m = re.search(r'\b(\d{4})-(\d{2})-(\d{2})\b', text)
     if m:
         y, mo, d = m.groups()
-        if 2020 <= int(y) <= 2030 and 1 <= int(mo) <= 12 and 1 <= int(d) <= 31:
+        if 2019 <= int(y) <= 2032 and 1 <= int(mo) <= 12 and 1 <= int(d) <= 31:
             return f"{y}-{mo}-{d}"
 
     # Relative dates
@@ -105,7 +105,7 @@ def _date_from_text(text: str) -> Optional[str]:
     m = re.search(r'\b(\d+)\s*days?\s*ago\b', lower)
     if m:
         n = int(m.group(1))
-        if n <= 60:
+        if n <= 90:
             return (now - timedelta(days=n)).strftime("%Y-%m-%d")
 
     # "N hours ago" -> today
@@ -117,9 +117,13 @@ def _date_from_text(text: str) -> Optional[str]:
     if "last week" in lower:
         return (now - timedelta(days=7)).strftime("%Y-%m-%d")
 
-    # "this week" -> ~3 days ago (midpoint)
+    # "this week" -> ~4 days ago (midpoint)
     if "this week" in lower:
-        return (now - timedelta(days=3)).strftime("%Y-%m-%d")
+        return (now - timedelta(days=4)).strftime("%Y-%m-%d")
+
+    # "last month" -> ~30 days ago
+    if "last month" in lower:
+        return (now - timedelta(days=30)).strftime("%Y-%m-%d")
 
     return None
 
@@ -135,15 +139,15 @@ def _detect_date(
     if url_date:
         return url_date, "high"
 
-    # Snippet next
+    # Title next
+    title_date = _date_from_text(title)
+    if title_date:
+        return title_date, "low"
+
+    # Snippet as last resort
     snippet_date = _date_from_text(snippet)
     if snippet_date:
         return snippet_date, "med"
-
-    # Title as last resort
-    title_date = _date_from_text(title)
-    if title_date:
-        return title_date, "med"
 
     return None, "low"
 
@@ -153,11 +157,12 @@ EXCLUDED_DOMAINS = {
     "reddit.com",
     "www.reddit.com",
     "old.reddit.com",
+    "m.reddit.com",
     "twitter.com",
     "www.twitter.com",
     "x.com",
     "www.x.com",
-    "mobile.twitter.com",
+    "nitter.net",
 }
 
 
@@ -228,18 +233,18 @@ def process_results(
             continue
 
         # Relevance
-        relevance = raw.get("relevance", 0.5)
+        relevance = raw.get("relevance", 0.45)
         try:
             relevance = min(1.0, max(0.0, float(relevance)))
         except (TypeError, ValueError):
-            relevance = 0.5
+            relevance = 0.45
 
         processed.append({
             "id": f"W{len(processed) + 1}",
-            "title": title[:200],
+            "title": title[:250],
             "url": url,
             "source_domain": _domain(url),
-            "snippet": snippet[:500],
+            "snippet": snippet[:400],
             "date": result_date,
             "date_confidence": confidence,
             "relevance": relevance,
@@ -266,7 +271,7 @@ def to_items(
             snippet=item_data["snippet"],
             date=item_data.get("date"),
             date_confidence=item_data.get("date_confidence", "low"),
-            relevance=item_data.get("relevance", 0.5),
+            relevance=item_data.get("relevance", 0.45),
             why_relevant=item_data.get("why_relevant", ""),
         ))
 
@@ -280,6 +285,10 @@ def dedup_urls(items: List[schema.WebSearchItem]) -> List[schema.WebSearchItem]:
 
     for item in items:
         normalised = item.url.lower().rstrip("/")
+        # Strip www. prefix for more aggressive dedup
+        normalised = re.sub(r'^(https?://)www\.', r'\1', normalised)
+        # Remove query parameters
+        normalised = normalised.split("?")[0]
         if normalised not in seen:
             seen.add(normalised)
             unique.append(item)

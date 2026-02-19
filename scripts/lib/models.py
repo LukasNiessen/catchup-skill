@@ -19,19 +19,21 @@ def _log(message: str):
 
 # OpenAI API configuration
 OPENAI_MODEL_LISTING_ENDPOINT = "https://api.openai.com/v1/models"
-OPENAI_DEFAULT_MODELS = ["gpt-5.2", "gpt-5.1", "gpt-5", "gpt-4o"]
+OPENAI_DEFAULT_MODELS = ["gpt-5.2", "gpt-5.1", "gpt-5", "gpt-4.1", "gpt-4o"]
 
 # xAI API configuration - Agent Tools API requires grok-4 family
 XAI_MODEL_LISTING_ENDPOINT = "https://api.x.ai/v1/models"
-XAI_HARDCODED_FALLBACK = "grok-4-1-fast"
+XAI_HARDCODED_FALLBACK = "grok-4-fast"
 
 # Preferred xAI models in priority order (first match wins).
 # Any grok-4+ model supports x_search, but we prefer fast variants.
 XAI_MODEL_PREFERENCE = [
+    "grok-4-fast",
     "grok-4-1-fast",
     "grok-4-1-fast-non-reasoning",
-    "grok-4-fast",
+    "grok-4-1-non-reasoning",
     "grok-4-1",
+    "grok-4-non-reasoning",
     "grok-4",
 ]
 
@@ -45,13 +47,13 @@ def extract_version_tuple(model_identifier: str) -> Optional[Tuple[int, ...]]:
         gpt-5.2 -> (5, 2)
         gpt-5.2.1 -> (5, 2, 1)
     """
-    version_pattern = re.search(r'(\d+(?:\.\d+)*)', model_identifier)
+    version_pattern = re.search(r'(\d+(?:[._]\d+)*)', model_identifier)
 
     if version_pattern is None:
         return None
 
     version_string = version_pattern.group(1)
-    version_components = version_string.split('.')
+    version_components = re.split(r'[._]', version_string)
     return tuple(int(component) for component in version_components)
 
 
@@ -59,8 +61,8 @@ def is_standard_gpt_model(model_identifier: str) -> bool:
     """
     Determines if a model is a mainline GPT model (not a specialized variant).
 
-    Excludes mini, nano, chat, codex, pro, preview, and turbo variants
-    to ensure selection of full-capability models.
+    Excludes mini, nano, chat, codex, preview, turbo, experimental, and snapshot
+    variants to ensure selection of full-capability models.
     """
     normalized_id = model_identifier.lower()
 
@@ -70,7 +72,7 @@ def is_standard_gpt_model(model_identifier: str) -> bool:
         return False
 
     # Check for excluded variant keywords
-    excluded_variants = ['mini', 'nano', 'chat', 'codex', 'pro', 'preview', 'turbo']
+    excluded_variants = ['mini', 'nano', 'chat', 'codex', 'preview', 'turbo', 'experimental', 'snapshot']
 
     for variant in excluded_variants:
         if variant in normalized_id:
@@ -138,6 +140,20 @@ def choose_openai_model(
     return optimal_model
 
 
+def discover_xai_models(api_credential: str) -> List[str]:
+    """Query the xAI /v1/models endpoint and return available model IDs.
+
+    Returns an empty list if the API call fails.
+    """
+    try:
+        authorization_headers = {"Authorization": "Bearer {}".format(api_credential)}
+        api_response = http.perform_get_request(XAI_MODEL_LISTING_ENDPOINT, request_headers=authorization_headers)
+        return [m.get("id", "") for m in api_response.get("data", []) if m.get("id")]
+    except http.HTTPError as err:
+        _log("discover_xai_models failed: {}".format(err))
+        return []
+
+
 def choose_xai_model(
     api_credential: str,
     selection_policy: str = "latest",
@@ -172,21 +188,17 @@ def choose_xai_model(
 
     # Query the API for actually available models
     if mock_model_list is not None:
-        available_models = mock_model_list
-        _log("  Using mock model list ({} models)".format(len(available_models)))
+        available_ids = {m.get("id", "") for m in mock_model_list}
+        _log("  Using mock model list ({} models)".format(len(available_ids)))
     else:
-        try:
-            authorization_headers = {"Authorization": "Bearer {}".format(api_credential)}
-            api_response = http.perform_get_request(XAI_MODEL_LISTING_ENDPOINT, request_headers=authorization_headers)
-            available_models = api_response.get("data", [])
-            _log("  Fetched {} models from xAI API".format(len(available_models)))
-        except http.HTTPError as err:
-            _log("  Failed to fetch models ({}), using hardcoded fallback: {}".format(
-                err, XAI_HARDCODED_FALLBACK))
+        discovered = discover_xai_models(api_credential)
+        if not discovered:
+            _log("  Failed to discover models, using hardcoded fallback: {}".format(
+                XAI_HARDCODED_FALLBACK))
             cache.set_cached_model("xai", XAI_HARDCODED_FALLBACK)
             return XAI_HARDCODED_FALLBACK
-
-    available_ids = {m.get("id", "") for m in available_models}
+        available_ids = set(discovered)
+        _log("  Fetched {} models from xAI API".format(len(available_ids)))
     _log("  Available model IDs: {}".format(sorted(available_ids)))
 
     # Pick the best model from the preference list

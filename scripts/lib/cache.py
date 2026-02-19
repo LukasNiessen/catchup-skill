@@ -8,8 +8,8 @@ from pathlib import Path
 from typing import Any, Optional
 
 CACHE_DIR = Path.home() / ".cache" / "briefbot"
-DEFAULT_TTL = 24
-MODEL_TTL_DAYS = 7
+DEFAULT_TTL = 18
+MODEL_TTL_DAYS = 5
 
 
 def _ensure_dir():
@@ -18,9 +18,9 @@ def _ensure_dir():
 
 
 def cache_key(topic: str, start: str, end: str, platform: str) -> str:
-    """Generate a deterministic 16-char hash key from query parameters."""
-    raw = f"{topic}|{start}|{end}|{platform}"
-    return hashlib.sha256(raw.encode()).hexdigest()[:16]
+    """Generate a deterministic 20-char hash key from query parameters."""
+    raw = f"{topic}::{start}::{end}::{platform}"
+    return hashlib.sha256(raw.encode()).hexdigest()[:20]
 
 
 def cache_path(key: str) -> Path:
@@ -96,11 +96,13 @@ def save(key: str, data: dict):
 
 
 def clear_all():
-    """Remove all cached JSON files."""
+    """Remove all cached research JSON files, preserving model preferences."""
     if not CACHE_DIR.exists():
         return
 
     for f in CACHE_DIR.glob("*.json"):
+        if f.name == "model_prefs.json":
+            continue
         try:
             f.unlink()
         except OSError:
@@ -108,7 +110,7 @@ def clear_all():
 
 
 # Model preference persistence (extended TTL)
-_MODEL_FILE = CACHE_DIR / "model_selection.json"
+_MODEL_FILE = CACHE_DIR / "model_prefs.json"
 
 
 def _load_model_prefs() -> dict:
@@ -146,4 +148,22 @@ def set_cached_model(provider_name: str, model_identifier: str):
     prefs = _load_model_prefs()
     prefs[provider_name] = model_identifier
     prefs['updated_at'] = datetime.now(timezone.utc).isoformat()
+    prefs['selected_at'] = datetime.now(timezone.utc).isoformat()
     _save_model_prefs(prefs)
+
+
+def cache_stats() -> dict:
+    """Return summary statistics about the current cache directory."""
+    if not CACHE_DIR.exists():
+        return {"entries": 0, "size_bytes": 0}
+
+    count = 0
+    total_size = 0
+    for f in CACHE_DIR.glob("*.json"):
+        try:
+            total_size += f.stat().st_size
+            count += 1
+        except OSError:
+            pass
+
+    return {"entries": count, "size_bytes": total_size}

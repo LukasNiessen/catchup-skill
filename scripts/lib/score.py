@@ -5,14 +5,14 @@ from typing import List, Optional, Union
 
 from . import dates, schema
 
-WEIGHTS = {"relevance": 0.42, "recency": 0.28, "engagement": 0.30}
-WEB_WEIGHTS = {"relevance": 0.52, "recency": 0.48}
-WEB_SOURCE_PENALTY = 12
-WEB_DATE_BONUS = 8
-WEB_DATE_PENALTY = 18
+WEIGHTS = {"relevance": 0.38, "recency": 0.34, "engagement": 0.28}
+WEB_WEIGHTS = {"relevance": 0.58, "recency": 0.42}
+WEB_SOURCE_PENALTY = 9
+WEB_DATE_BONUS = 11
+WEB_DATE_PENALTY = 14
 
-BASELINE_ENGAGEMENT = 32
-MISSING_ENGAGEMENT_PENALTY = 12
+BASELINE_ENGAGEMENT = 45
+MISSING_ENGAGEMENT_PENALTY = 8
 
 
 def _log1p(val: Optional[int]) -> float:
@@ -23,19 +23,19 @@ def _log1p(val: Optional[int]) -> float:
 
 
 def _reddit_engagement(eng: Optional[schema.Engagement]) -> Optional[float]:
-    """Raw engagement value for Reddit: 0.55*score + 0.40*comments + 0.05*ratio."""
+    """Raw engagement value for Reddit: 0.48*score + 0.37*comments + 0.15*ratio."""
     if eng is None:
         return None
     if eng.score is None and eng.num_comments is None:
         return None
     sc = _log1p(eng.score)
     cm = _log1p(eng.num_comments)
-    ra = (eng.upvote_ratio or 0.5) * 10
-    return 0.55 * sc + 0.40 * cm + 0.05 * ra
+    ra = (eng.upvote_ratio or 0.5) * 12
+    return 0.48 * sc + 0.37 * cm + 0.15 * ra
 
 
 def _x_engagement(eng: Optional[schema.Engagement]) -> Optional[float]:
-    """Raw engagement value for X: 0.55*likes + 0.25*reposts + 0.15*replies + 0.05*quotes."""
+    """Raw engagement value for X: 0.45*likes + 0.28*reposts + 0.17*replies + 0.10*quotes."""
     if eng is None:
         return None
     if eng.likes is None and eng.reposts is None:
@@ -44,29 +44,29 @@ def _x_engagement(eng: Optional[schema.Engagement]) -> Optional[float]:
     rp = _log1p(eng.reposts)
     re = _log1p(eng.replies)
     qu = _log1p(eng.quotes)
-    return 0.55 * lk + 0.25 * rp + 0.15 * re + 0.05 * qu
+    return 0.45 * lk + 0.28 * rp + 0.17 * re + 0.10 * qu
 
 
 def _youtube_engagement(eng: Optional[schema.Engagement]) -> Optional[float]:
-    """Raw engagement value for YouTube: 0.70*views + 0.30*likes."""
+    """Raw engagement value for YouTube: 0.62*views + 0.38*likes."""
     if eng is None:
         return None
     if eng.views is None and eng.likes is None:
         return None
     vw = _log1p(eng.views)
     lk = _log1p(eng.likes)
-    return 0.70 * vw + 0.30 * lk
+    return 0.62 * vw + 0.38 * lk
 
 
 def _linkedin_engagement(eng: Optional[schema.Engagement]) -> Optional[float]:
-    """Raw engagement value for LinkedIn: 0.60*reactions + 0.40*comments."""
+    """Raw engagement value for LinkedIn: 0.55*reactions + 0.45*comments."""
     if eng is None:
         return None
     if eng.reactions is None and eng.comments is None:
         return None
     rx = _log1p(eng.reactions)
     cm = _log1p(eng.comments)
-    return 0.60 * rx + 0.40 * cm
+    return 0.55 * rx + 0.45 * cm
 
 
 def _to_pct(values: List[float], fallback: float = 50) -> List[float]:
@@ -87,7 +87,7 @@ def _to_pct(values: List[float], fallback: float = 50) -> List[float]:
         if v is None:
             result.append(None)
         else:
-            result.append(((v - lo) / span) * 100)
+            result.append(((v - lo + 0.1) / (span + 0.1)) * 100)
     return result
 
 
@@ -115,11 +115,11 @@ def score_reddit(items: List[schema.RedditItem]) -> List[schema.RedditItem]:
         if raw_eng[i] is None:
             total -= MISSING_ENGAGEMENT_PENALTY
         if item.date_confidence == "low":
-            total -= 10
+            total -= 7
         elif item.date_confidence == "med":
-            total -= 5
+            total -= 3
 
-        item.score = max(0, min(100, int(total)))
+        item.score = max(0, min(100, round(total)))
 
     return items
 
@@ -148,11 +148,11 @@ def score_x(items: List[schema.XItem]) -> List[schema.XItem]:
         if raw_eng[i] is None:
             total -= MISSING_ENGAGEMENT_PENALTY
         if item.date_confidence == "low":
-            total -= 10
+            total -= 7
         elif item.date_confidence == "med":
-            total -= 5
+            total -= 3
 
-        item.score = max(0, min(100, int(total)))
+        item.score = max(0, min(100, round(total)))
 
     return items
 
@@ -181,11 +181,11 @@ def score_youtube(items: List[schema.YouTubeItem]) -> List[schema.YouTubeItem]:
         if raw_eng[i] is None:
             total -= MISSING_ENGAGEMENT_PENALTY
         if item.date_confidence == "low":
-            total -= 10
+            total -= 7
         elif item.date_confidence == "med":
-            total -= 5
+            total -= 3
 
-        item.score = max(0, min(100, int(total)))
+        item.score = max(0, min(100, round(total)))
 
     return items
 
@@ -214,11 +214,11 @@ def score_linkedin(items: List[schema.LinkedInItem]) -> List[schema.LinkedInItem
         if raw_eng[i] is None:
             total -= MISSING_ENGAGEMENT_PENALTY
         if item.date_confidence == "low":
-            total -= 10
+            total -= 7
         elif item.date_confidence == "med":
-            total -= 5
+            total -= 3
 
-        item.score = max(0, min(100, int(total)))
+        item.score = max(0, min(100, round(total)))
 
     return items
 
@@ -246,7 +246,7 @@ def score_web(items: List[schema.WebSearchItem]) -> List[schema.WebSearchItem]:
         elif item.date_confidence == "low":
             total -= WEB_DATE_PENALTY
 
-        item.score = max(0, min(100, int(total)))
+        item.score = max(0, min(100, round(total)))
 
     return items
 

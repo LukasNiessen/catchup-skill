@@ -165,8 +165,8 @@ SINGLE_KEY_HINTS_PLAIN = {
     "x": "\n\U0001f4a1 Tip: Add XAI_API_KEY to ~/.config/briefbot/.env for X/Twitter data with real likes & reposts!\n",
 }
 
-# Braille spinner frames
-SPIN_CHARS = ['\u280b', '\u2819', '\u2839', '\u2838', '\u283c', '\u2834', '\u2826', '\u2827', '\u2807', '\u280f']
+# Arrow cycle spinner frames
+SPIN_CHARS = ['\u2190', '\u2196', '\u2191', '\u2197', '\u2192', '\u2198', '\u2193', '\u2199']
 
 
 class Spinner:
@@ -187,7 +187,7 @@ class Spinner:
             sys.stderr.write(f"\r{self.style_code}{frame}{Style.NORMAL} {self.status_text}  ")
             sys.stderr.flush()
             self.frame_position += 1
-            time.sleep(0.08)
+            time.sleep(0.12)
 
     def start(self):
         """Begin spinning."""
@@ -197,7 +197,7 @@ class Spinner:
             self.animation_thread.start()
         else:
             if not self.static_displayed:
-                sys.stderr.write(f"{self.style_code}\u23f3{Style.NORMAL} {self.status_text}\n")
+                sys.stderr.write(f"{self.style_code}\u25cf{Style.NORMAL} {self.status_text}\n")
                 sys.stderr.flush()
                 self.static_displayed = True
 
@@ -205,16 +205,16 @@ class Spinner:
         """Change the displayed status text."""
         self.status_text = new_status
         if not IS_TTY and not self.static_displayed:
-            sys.stderr.write(f"{self.style_code}\u23f3{Style.NORMAL} {new_status}\n")
+            sys.stderr.write(f"{self.style_code}\u25cf{Style.NORMAL} {new_status}\n")
             sys.stderr.flush()
 
     def stop(self, completion_message: str = ""):
         """Stop spinning and optionally print a completion line."""
         self.active = False
         if self.animation_thread:
-            self.animation_thread.join(timeout=0.2)
+            self.animation_thread.join(timeout=0.35)
         if IS_TTY:
-            sys.stderr.write("\r" + " " * 80 + "\r")
+            sys.stderr.write("\r" + " " * 120 + "\r")
         if completion_message:
             sys.stderr.write(f"{Style.LIME}\u2713{Style.NORMAL} {completion_message}\n")
         sys.stderr.flush()
@@ -270,13 +270,13 @@ class Progress:
     def start_x(self):
         """Begin the X search phase."""
         msg = random.choice(X_MSGS)
-        self.indicator = Spinner(f"{Style.TEAL}X{Style.NORMAL} {msg}", Style.TEAL)
+        self.indicator = Spinner(f"{Style.AZURE}X{Style.NORMAL} {msg}", Style.AZURE)
         self.indicator.start()
 
     def end_x(self, item_count: int):
         """Finish the X search phase."""
         if self.indicator:
-            self.indicator.stop(f"{Style.TEAL}X{Style.NORMAL} Found {item_count} posts")
+            self.indicator.stop(f"{Style.AZURE}X{Style.NORMAL} Found {item_count} posts")
 
     def start_processing(self):
         """Begin the scoring/dedup phase."""
@@ -297,7 +297,7 @@ class Progress:
         sys.stderr.write(f"{Style.LIME}{Style.EMPHASIZED}\u2713 Research complete{Style.NORMAL} ")
         sys.stderr.write(f"{Style.SUBDUED}({elapsed:.1f}s){Style.NORMAL}\n")
         sys.stderr.write(f"  {Style.AMBER}Reddit:{Style.NORMAL} {reddit_count} threads  ")
-        sys.stderr.write(f"{Style.TEAL}X:{Style.NORMAL} {x_count} posts")
+        sys.stderr.write(f"{Style.AZURE}X:{Style.NORMAL} {x_count} posts")
         if youtube_count > 0:
             sys.stderr.write(f"  {Style.CRIMSON}YouTube:{Style.NORMAL} {youtube_count} videos")
         if linkedin_count > 0:
@@ -362,10 +362,12 @@ def phase_status(phase_name: str, status_text: str):
     """Print a single phase-status line to stderr."""
     phase_styles = {
         "reddit": Style.AMBER,
-        "x": Style.TEAL,
+        "x": Style.AZURE,
         "process": Style.MAGENTA,
         "done": Style.LIME,
         "error": Style.CRIMSON,
+        "youtube": Style.TEAL,
+        "linkedin": Style.AZURE,
     }
     color = phase_styles.get(phase_name, Style.NORMAL)
     sys.stderr.write(f"{color}\u25b8{Style.NORMAL} {status_text}\n")

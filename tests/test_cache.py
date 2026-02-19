@@ -24,7 +24,7 @@ class TestCacheKey(unittest.TestCase):
 
     def test_identifier_length(self):
         got = cache.cache_key("test", "2026-01-01", "2026-01-31", "both")
-        self.assertEqual(len(got), 16)
+        self.assertEqual(len(got), 20)
 
 
 class TestCachePath(unittest.TestCase):

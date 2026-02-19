@@ -48,6 +48,9 @@ def parse_dotenv(filepath: Path) -> Dict[str, str]:
                 if value[0] in ('"', "'") and value[-1] == value[0]:
                     value = value[1:-1]
 
+            # Strip any residual whitespace inside quotes
+            value = value.strip()
+
             if key and value:
                 parsed[key] = value
                 if "KEY" in key or "PASSWORD" in key or "TOKEN" in key:
@@ -72,6 +75,7 @@ def load_config() -> Dict[str, Any]:
     _log(f"OPENAI_API_KEY: env={f'SET ({len(env_openai)} chars)' if env_openai else 'NOT SET'}, file={f'SET ({len(file_openai)} chars)' if file_openai else 'NOT SET'}")
     _log(f"XAI_API_KEY: env={f'SET ({len(env_xai)} chars)' if env_xai else 'NOT SET'}, file={f'SET ({len(file_xai)} chars)' if file_xai else 'NOT SET'}")
 
+    # Environment variables take precedence over .env file values
     cfg = {
         "OPENAI_API_KEY": os.environ.get("OPENAI_API_KEY")
         or file_settings.get("OPENAI_API_KEY"),
@@ -122,7 +126,11 @@ def settings_file_exists() -> bool:
 
 
 def determine_available_platforms(configuration: Dict[str, Any]) -> str:
-    """Identify accessible platforms based on configured keys and Bird cookies."""
+    """Identify accessible platforms based on configured keys and Bird cookies.
+
+    Returns one of: "both", "reddit", "x", "web", or "all" (when both API
+    keys and Bird cookies are present simultaneously).
+    """
     _log("=== Determining available platforms ===")
     openai_ok = bool(configuration.get("OPENAI_API_KEY"))
     xai_ok = bool(configuration.get("XAI_API_KEY"))
@@ -247,7 +255,7 @@ def validate_sources(
             missing_provider = "xAI" if available_platforms == "reddit" else "OpenAI"
             return (
                 "none",
-                f"Cannot use both sources: {missing_provider} key not configured. Try --sources=auto to use whatever is available.",
+                f"Cannot use both sources: missing {missing_provider} credentials. Try --sources=auto for automatic fallback.",
             )
         if include_web_search:
             return "all", None
@@ -256,7 +264,7 @@ def validate_sources(
     # Reddit explicitly
     if requested_sources == "reddit":
         if available_platforms == "x":
-            return "none", "Reddit was requested but only an xAI key is configured."
+            return "none", "Reddit source requires an OpenAI API key, but only xAI credentials were found."
         if include_web_search:
             return "reddit-web", None
         return "reddit", None
@@ -264,7 +272,7 @@ def validate_sources(
     # X explicitly
     if requested_sources == "x":
         if available_platforms == "reddit":
-            return "none", "X was requested but only an OpenAI key is configured."
+            return "none", "X source requires xAI or Bird credentials, but only an OpenAI key was found."
         if include_web_search:
             return "x-web", None
         return "x", None

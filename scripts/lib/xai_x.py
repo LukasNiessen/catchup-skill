@@ -6,7 +6,7 @@ import re
 import sys
 from typing import Any, Dict, List, Optional
 
-from . import http
+from . import cache, http, models
 
 
 def _err(msg: str):
@@ -26,41 +26,41 @@ API_URL = "https://api.x.ai/v1/responses"
 
 # How many results to request per depth level
 DEPTH_SIZES = {
-    "quick": (8, 12),
-    "default": (20, 30),
-    "deep": (40, 60),
+    "quick": (10, 15),
+    "default": (18, 28),
+    "deep": (35, 55),
 }
 
-X_DISCOVERY_PROMPT = """Use your X search capability to find posts about: {topic}
+X_DISCOVERY_PROMPT = """Search X (formerly Twitter) for real-time discussion about: {topic}
 
-Date range: {from_date} through {to_date}. Aim for {min_items}-{max_items} quality posts.
+Window: {from_date} to {to_date}. Target {min_items}-{max_items} substantive posts.
 
-Return ONLY valid JSON -- no surrounding text:
+Respond with raw JSON only, no markdown fencing or explanation:
 {{
   "items": [
     {{
-      "text": "Post content (trim if lengthy)",
-      "url": "https://x.com/handle/status/...",
-      "author_handle": "handle_without_at",
-      "date": "YYYY-MM-DD or null",
+      "text": "Abbreviated post content",
+      "url": "https://x.com/user/status/1234567890",
+      "author_handle": "example_user",
+      "date": "2026-01-20",
       "engagement": {{
-        "likes": 100,
-        "reposts": 25,
-        "replies": 15,
-        "quotes": 5
+        "likes": 250,
+        "reposts": 40,
+        "replies": 30,
+        "quotes": 8
       }},
-      "why_relevant": "Short relevance note",
-      "relevance": 0.85
+      "why_relevant": "Provides firsthand perspective on the topic",
+      "relevance": 0.92
     }}
   ]
 }}
 
-Guidelines:
-- relevance: 0.0-1.0, higher means more on-topic
-- Dates must be YYYY-MM-DD or null
-- engagement may be null if unavailable
-- Favor substantive posts over link-only shares
-- Seek varied perspectives where possible"""
+Constraints:
+- relevance ranges from 0.0 (off-topic) to 1.0 (directly on-topic)
+- dates in YYYY-MM-DD format; use null when uncertain
+- engagement fields accept null when metrics are unavailable
+- prioritize original analysis and commentary over retweets or link-drops
+- surface a range of viewpoints when the topic is debated"""
 
 
 def _make_request(
@@ -112,13 +112,15 @@ def _make_request(
 
 
 # Fallback models to try when the primary model returns 403 (permission denied).
-# Ordered by preference: fast non-reasoning variants first, then full models.
+# Ordered by preference: reasoning models first, then non-reasoning variants.
 MODEL_FALLBACKS = [
     "grok-4-1-fast",
-    "grok-4-1-fast-non-reasoning",
-    "grok-4-fast",
     "grok-4-1",
+    "grok-4-fast",
     "grok-4",
+    "grok-4-1-fast-non-reasoning",
+    "grok-4-1-non-reasoning",
+    "grok-4-non-reasoning",
     "grok-3",
     "grok-3-fast",
     "grok-3-mini",
@@ -158,8 +160,8 @@ def search(
         "Content-Type": "application/json",
     }
 
-    timeout_map = {"quick": 90, "default": 120, "deep": 180}
-    timeout = timeout_map.get(depth, 120)
+    timeout_map = {"quick": 80, "default": 110, "deep": 150}
+    timeout = timeout_map.get(depth, 110)
     _log(f"  Timeout: {timeout}s")
 
     prompt_content = X_DISCOVERY_PROMPT.format(
@@ -171,6 +173,7 @@ def search(
     )
 
     # Try the primary model first
+    tried = {model}
     try:
         response = _make_request(key, model, prompt_content, headers, timeout)
         _log("=== search END ===")
@@ -180,17 +183,20 @@ def search(
             raise
         _err(f"Model '{model}' returned 403 (permission denied), trying fallbacks...")
         _log(f"  Primary model '{model}' returned 403, entering fallback loop")
+        # Invalidate the cached model so next run picks a working one
+        cache.set_cached_model("xai", "")
+        last_err = e
 
-    # Build fallback list: MODEL_FALLBACKS minus the model we already tried
-    fallbacks = [m for m in MODEL_FALLBACKS if m != model]
-    last_err = None
-
+    # Phase 1: Try hardcoded fallback list
+    fallbacks = [m for m in MODEL_FALLBACKS if m not in tried]
     for fallback_model in fallbacks:
+        tried.add(fallback_model)
         _log(f"  Trying fallback model: {fallback_model}")
         try:
             response = _make_request(key, fallback_model, prompt_content, headers, timeout)
             _err(f"Fallback succeeded with model '{fallback_model}'")
             _log(f"  Fallback model '{fallback_model}' succeeded!")
+            cache.set_cached_model("xai", fallback_model)
             _log("=== search END (via fallback) ===")
             return response
         except http.HTTPError as e:
@@ -198,11 +204,38 @@ def search(
                 _log(f"  Fallback model '{fallback_model}' also returned 403, skipping")
                 last_err = e
                 continue
-            # Non-permission errors propagate immediately
             raise
 
-    # All models exhausted
-    _err(f"All {len(fallbacks) + 1} models returned 403 — API key lacks x_search permission")
+    # Phase 2: Dynamic discovery — ask the API what models the key actually has
+    _log("  Hardcoded fallbacks exhausted, attempting dynamic model discovery...")
+    discovered = models.discover_xai_models(key)
+    dynamic_candidates = [
+        m for m in discovered
+        if m.startswith("grok-") and m not in tried
+    ]
+    _log(f"  Discovered {len(dynamic_candidates)} untried models: {dynamic_candidates}")
+
+    for fallback_model in dynamic_candidates:
+        tried.add(fallback_model)
+        _log(f"  Trying discovered model: {fallback_model}")
+        try:
+            response = _make_request(key, fallback_model, prompt_content, headers, timeout)
+            _err(f"Dynamic fallback succeeded with model '{fallback_model}'")
+            _log(f"  Discovered model '{fallback_model}' succeeded!")
+            cache.set_cached_model("xai", fallback_model)
+            _log("=== search END (via dynamic discovery) ===")
+            return response
+        except http.HTTPError as e:
+            if e.status_code == 403:
+                _log(f"  Discovered model '{fallback_model}' also returned 403, skipping")
+                last_err = e
+                continue
+            raise
+
+    # All options exhausted
+    total = len(tried)
+    _err(f"All {total} models returned 403 — API key lacks x_search permission")
+    _log(f"  Tried models: {sorted(tried)}")
     _log("=== search END (all fallbacks exhausted) ===")
     if last_err:
         raise last_err
@@ -282,7 +315,7 @@ def parse_x_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]]:
     _log(f"  Output content: {len(output_text)} chars, preview: '{output_text[:200].replace(chr(10), chr(92) + 'n')}'")
 
     # Pull JSON from the text
-    match = re.search(r'\{[\s\S]*"items"[\s\S]*\}', output_text)
+    match = re.search(r'\{[^{}]*"items"\s*:\s*\[[\s\S]*?\]\s*\}', output_text)
 
     if match:
         _log(f"  JSON pattern found ({len(match.group())} chars)")

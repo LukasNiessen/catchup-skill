@@ -1,5 +1,5 @@
 {
-  "id": "resp_xai_mock_rust_321",
+  "id": "resp_bb_rust_001",
   "object": "response",
   "created": 1708300800,
   "model": "grok-4-latest",
@@ -15,8 +15,8 @@
     }
   ],
   "usage": {
-    "prompt_tokens": 195,
-    "completion_tokens": 480,
-    "total_tokens": 675
+    "prompt_tokens": 217,
+    "completion_tokens": 501,
+    "total_tokens": 718
   }
 }

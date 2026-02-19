@@ -19,7 +19,7 @@ DISABLE_BIRD = True
 
 def _log(message: str):
     """Emit a debug log line to stderr, gated by BRIEFBOT_DEBUG."""
-    if os.environ.get("BRIEFBOT_DEBUG", "").lower() in ("1", "true", "yes"):
+    if os.environ.get("BRIEFBOT_DEBUG", "").lower() in ("1", "true", "yes", "on"):
         sys.stderr.write(f"[BRIEFBOT] {message}\n")
         sys.stderr.flush()
 
@@ -99,7 +99,7 @@ def _query_reddit(
     items = openai_reddit.parse_reddit_response(response or {})
 
     # Sparse results trigger automatic retry with simplified query
-    has_few_results = len(items) < 5
+    has_few_results = len(items) < 4
     should_retry = has_few_results and not mock and error is None
 
     if should_retry:
@@ -416,7 +416,7 @@ def run_research(
     linkedin_future = None
 
     # Execute all platform queries concurrently via thread pool
-    with ThreadPoolExecutor(max_workers=4) as thread_pool:
+    with ThreadPoolExecutor(max_workers=5) as thread_pool:
         # Dispatch Reddit query
         if should_query_reddit:
             if progress is not None:
@@ -792,17 +792,18 @@ def main():
 
     _log(f"Models picked: openai={models_picked.get('openai')}, xai={models_picked.get('xai')}")
 
-    # Translate platform to display mode
+    # Translate internal platform identifier to user-facing display mode string.
+    # Keys are platform codes used internally; values are the UI labels shown in reports.
     mode_mapping = {
-        "all": "all",
         "both": "both",
+        "all": "all",
         "reddit": "reddit-only",
-        "reddit-web": "reddit-web",
         "x": "x-only",
+        "reddit-web": "reddit-web",
         "x-web": "x-web",
+        "web": "web-only",
         "youtube": "youtube-only",
         "linkedin": "linkedin-only",
-        "web": "web-only",
     }
     display_mode = mode_mapping.get(platform, platform)
 
@@ -1121,17 +1122,17 @@ def output_report(
 
     # Append WebSearch instructions when supplemental search is needed
     if requires_web_search:
-        separator_line = "=" * 60
+        separator_line = "-" * 60
 
         print()
         print(separator_line)
-        print("### WEBSEARCH REQUIRED ###")
+        print("### WEB RESEARCH NEEDED ###")
         print(separator_line)
         print(f"Topic: {topic}")
         print(f"Date range: {start_date} to {end_date}")
         print()
-        print("Claude: Use your WebSearch tool to find 8-15 relevant web pages.")
-        print("EXCLUDE: reddit.com, x.com, twitter.com (already covered above)")
+        print("Use the WebSearch tool now to find 6-12 diverse web sources.")
+        print("Skip social media platforms (already covered above).")
         print(f"INCLUDE: blogs, docs, news, tutorials from the last {days} days")
         print()
         print("After searching, synthesize WebSearch results WITH the Reddit/X")
