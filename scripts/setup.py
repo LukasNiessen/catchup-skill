@@ -28,7 +28,7 @@ if sys.platform == "win32":
 MODULE_ROOT = Path(__file__).parent.resolve()
 sys.path.insert(0, str(MODULE_ROOT))
 
-from lib import env
+from briefbot_engine import config as bb_config
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -125,7 +125,7 @@ def _mask_value(value: str, is_secret: bool) -> str:
 def _read_current_env() -> dict:
     """
     Reads the raw .env file into a dict, preserving all keys
-    (including those with empty values, unlike env.parse_environment_file
+    (including those with empty values, unlike bb_config.parse_dotenv
     which skips empties).
     """
     values = {}
@@ -200,8 +200,8 @@ def _print_summary_table(values: dict):
     """
     Prints a full configuration summary table grouped by section.
     """
-    config = env.assemble_configuration()
-    available = env.determine_available_platforms(config)
+    config = bb_config.load_config()
+    available = bb_config.determine_available_platforms(config)
 
     mode_descriptions = {
         "both": "Full mode (Reddit + X + YouTube + LinkedIn + Web)",
@@ -355,7 +355,7 @@ def bot_start() -> tuple:
         return False, "Bot is already running (PID {})".format(pid)
 
     # Validate config
-    config = env.assemble_configuration()
+    config = bb_config.load_config()
     if not config.get("TELEGRAM_BOT_TOKEN"):
         return False, "TELEGRAM_BOT_TOKEN not set. Run setup first."
 
@@ -425,8 +425,8 @@ def show_config():
     Non-interactive — designed for Claude to read and present to the user.
     """
     current = _read_current_env()
-    config = env.assemble_configuration()
-    available = env.determine_available_platforms(config)
+    config = bb_config.load_config()
+    available = bb_config.determine_available_platforms(config)
 
     mode_descriptions = {
         "both": "Full mode (Reddit + X + YouTube + LinkedIn + Web)",

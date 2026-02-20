@@ -20,7 +20,8 @@ if sys.platform == "win32":
 MODULE_ROOT = Path(__file__).parent.resolve()
 sys.path.insert(0, str(MODULE_ROOT))
 
-from lib import email_sender, env, pdf, telegram_sender, tts
+from briefbot_engine import config as bb_config
+from briefbot_engine.delivery import email as email_delivery, telegram, audio, document
 
 
 def main():
@@ -71,7 +72,7 @@ def main():
         print("Error: Content file is empty: {}".format(content_path), file=sys.stderr)
         sys.exit(1)
 
-    config = env.assemble_configuration()
+    config = bb_config.load_config()
     audio_path = None
 
     # Generate audio first so it can be attached to the email
@@ -79,7 +80,7 @@ def main():
         try:
             output_dir = MODULE_ROOT.parent / "output"
             audio_path = output_dir / "briefbot.mp3"
-            tts.generate_audio(
+            audio.generate_audio(
                 briefing_text,
                 audio_path,
                 elevenlabs_api_key=config.get("ELEVENLABS_API_KEY"),
@@ -92,7 +93,7 @@ def main():
 
     # Send email (with auto-generated PDF attachment)
     if args.email:
-        smtp_error = email_sender.validate_smtp_config(config)
+        smtp_error = email_delivery.validate_smtp_config(config)
         if smtp_error:
             print("Error: {}".format(smtp_error), file=sys.stderr)
             sys.exit(1)
@@ -101,10 +102,10 @@ def main():
         output_dir = MODULE_ROOT.parent / "output"
         pdf_path = None
         try:
-            newsletter_html = email_sender.build_newsletter_html(
+            newsletter_html = email_delivery.build_newsletter_html(
                 args.subject, briefing_text
             )
-            pdf_path = pdf.generate_pdf(
+            pdf_path = document.generate_pdf(
                 newsletter_html, output_dir / "briefing.pdf"
             )
             if pdf_path:
@@ -113,7 +114,7 @@ def main():
             print("PDF generation failed: {}".format(err), file=sys.stderr)
 
         try:
-            email_sender.send_report_email(
+            email_delivery.send_report_email(
                 recipient=args.email,
                 subject=args.subject,
                 markdown_body=briefing_text,
@@ -121,7 +122,7 @@ def main():
                 audio_path=audio_path,
                 pdf_path=pdf_path,
             )
-            recipients = email_sender.parse_recipients(args.email)
+            recipients = email_delivery.parse_recipients(args.email)
             print("Email sent to {}".format(", ".join(recipients)))
         except Exception as err:
             print("Email failed: {}".format(err), file=sys.stderr)
@@ -129,7 +130,7 @@ def main():
 
     # Send via Telegram
     if args.telegram:
-        telegram_error = telegram_sender.validate_telegram_config(config)
+        telegram_error = telegram.validate_telegram_config(config)
         if telegram_error:
             print("Error: {}".format(telegram_error), file=sys.stderr)
             sys.exit(1)
@@ -153,17 +154,17 @@ def main():
         else:
             try:
                 output_dir = MODULE_ROOT.parent / "output"
-                newsletter_html = email_sender.build_newsletter_html(
+                newsletter_html = email_delivery.build_newsletter_html(
                     args.subject, briefing_text
                 )
-                tg_pdf_path = pdf.generate_pdf(
+                tg_pdf_path = document.generate_pdf(
                     newsletter_html, output_dir / "briefing.pdf"
                 )
             except Exception as err:
                 print("PDF generation for Telegram failed: {}".format(err), file=sys.stderr)
 
         try:
-            telegram_sender.send_telegram_message(
+            telegram.send_telegram_message(
                 chat_id=chat_id,
                 markdown_body=briefing_text,
                 subject=args.subject,

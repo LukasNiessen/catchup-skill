@@ -57,7 +57,7 @@ Common patterns:
 - "what is [topic]" or "tell me about [topic]" → QUERY_TYPE = KNOWLEDGE
 - "[topic] vs [topic]" or "difference between X and Y" → QUERY_TYPE = KNOWLEDGE
 
-**IMPORTANT: Do NOT ask about target tool before research.**
+**IMPORTANT: Do NOT ask a question about target tool before you do research.**
 
 - If tool is specified in the query, use it
 - If tool is NOT specified, run research first, then ask AFTER showing results
@@ -167,6 +167,7 @@ Here's your current BriefBot config:
 After showing the config, say:
 
 > What would you like to change? You can say things like:
+>
 > - "set OPENAI_API_KEY to sk-abc123"
 > - "clear SMTP_PASSWORD"
 > - "start the telegram bot"

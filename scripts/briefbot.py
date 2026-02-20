@@ -27,29 +27,27 @@ def _log(message: str):
 ROOT = Path(__file__).parent.resolve()
 sys.path.insert(0, str(ROOT))
 
-from lib import (
-    bird_x,
-    cron_parse,
-    dates,
-    dedupe,
-    email_sender,
-    env,
-    http,
-    jobs,
-    models,
-    normalize,
-    openai_linkedin,
-    openai_reddit,
-    openai_youtube,
-    reddit_enrich,
-    render,
-    scheduler,
-    schema,
-    score,
-    ui,
-    websearch,
-    xai_x,
+from briefbot_engine import (
+    config,
+    content,
+    net,
+    output,
+    ranking,
+    temporal,
+    terminal,
 )
+from briefbot_engine.providers import (
+    bird,
+    enrich,
+    linkedin,
+    reddit,
+    registry,
+    twitter,
+    web,
+    youtube,
+)
+from briefbot_engine.scheduling import cron, jobs, platform as sched_platform
+from briefbot_engine.delivery import email, telegram
 
 
 def load_fixture(name: str) -> dict:
@@ -65,7 +63,7 @@ def load_fixture(name: str) -> dict:
 
 def _query_reddit(
     topic: str,
-    config: dict,
+    cfg: dict,
     models_picked: dict,
     start_date: str,
     end_date: str,
@@ -77,18 +75,18 @@ def _query_reddit(
     error = None
 
     if mock:
-        response = load_fixture("openai_sample.json")
+        response = load_fixture("provider_reddit_response.json")
     else:
         try:
-            response = openai_reddit.search(
-                config["OPENAI_API_KEY"],
+            response = reddit.search(
+                cfg["OPENAI_API_KEY"],
                 models_picked["openai"],
                 topic,
                 start_date,
                 end_date,
                 depth=depth,
             )
-        except http.HTTPError as network_err:
+        except net.HTTPError as network_err:
             response = {"error": str(network_err)}
             error = f"API error: {network_err}"
         except Exception as generic_err:
@@ -96,45 +94,44 @@ def _query_reddit(
             error = f"{type(generic_err).__name__}: {generic_err}"
 
     # Transform raw response into structured items
-    items = openai_reddit.parse_reddit_response(response or {})
+    items = reddit.parse_reddit_response(response or {})
 
     # Sparse results trigger automatic retry with simplified query
     has_few_results = len(items) < 4
     should_retry = has_few_results and not mock and error is None
 
     if should_retry:
-        simplified_topic = openai_reddit._core_subject(topic)
+        simplified_topic = reddit._core_subject(topic)
         topics_differ = simplified_topic.lower() != topic.lower()
 
         if topics_differ:
             try:
-                supplemental_response = openai_reddit.search(
-                    config["OPENAI_API_KEY"],
+                supplemental_response = reddit.search(
+                    cfg["OPENAI_API_KEY"],
                     models_picked["openai"],
                     simplified_topic,
                     start_date,
                     end_date,
                     depth=depth,
                 )
-                supplemental_items = openai_reddit.parse_reddit_response(
+                supplemental_items = reddit.parse_reddit_response(
                     supplemental_response
                 )
 
-                # Merge unique items based on URL
                 known_urls = {entry.get("url") for entry in items}
 
                 for supplemental_entry in supplemental_items:
                     if supplemental_entry.get("url") not in known_urls:
                         items.append(supplemental_entry)
             except Exception:
-                pass  # Retry failure is non-critical
+                pass
 
     return items, response, error
 
 
 def _query_x(
     topic: str,
-    config: dict,
+    cfg: dict,
     models_picked: dict,
     start_date: str,
     end_date: str,
@@ -153,17 +150,16 @@ def _query_x(
 
     if mock:
         _log("  Using MOCK data for X search")
-        response = load_fixture("xai_sample.json")
-        items = xai_x.parse_x_response(response or {})
+        response = load_fixture("provider_x_response.json")
+        items = twitter.parse_x_response(response or {})
         _log(f"  Mock returned {len(items)} items")
         return items, response, error
 
-    # Determine which X backend to use: Bird (free) > xAI (paid)
-    use_bird = config.get("BIRD_X_AVAILABLE", False)
-    has_xai = bool(config.get("XAI_API_KEY"))
+    use_bird = cfg.get("BIRD_X_AVAILABLE", False)
+    has_xai = bool(cfg.get("XAI_API_KEY"))
     xai_key_preview = ""
     if has_xai:
-        xai_key = config["XAI_API_KEY"]
+        xai_key = cfg["XAI_API_KEY"]
         xai_key_preview = f"{xai_key[:8]}...{xai_key[-4:]} ({len(xai_key)} chars)"
 
     _log(f"  DISABLE_BIRD: {DISABLE_BIRD}")
@@ -172,10 +168,9 @@ def _query_x(
     _log(f"  xAI model: {models_picked.get('xai')}")
 
     if not DISABLE_BIRD and use_bird:
-        # Primary path: Bird search (browser cookies, no API key)
         _log("  PATH: Bird search (primary, free)")
         try:
-            response = bird_x.search_x(
+            response = bird.search_x(
                 topic,
                 start_date,
                 end_date,
@@ -187,34 +182,32 @@ def _query_x(
             error = f"Bird: {type(generic_err).__name__}: {generic_err}"
             _log(f"  Bird API call FAILED: {error}")
 
-        items = bird_x.parse_bird_response(response or {})
+        items = bird.parse_bird_response(response or {})
         _log(f"  Bird parsed {len(items)} items")
 
-        # If Bird returned 0 results and xAI is available, fall back
         if not items and has_xai and error is None:
             _log("  Bird returned 0 results, falling back to xAI API...")
             try:
-                response = xai_x.search(
-                    config["XAI_API_KEY"],
+                response = twitter.search(
+                    cfg["XAI_API_KEY"],
                     models_picked["xai"],
                     topic,
                     start_date,
                     end_date,
                     depth=depth,
                 )
-                items = xai_x.parse_x_response(response or {})
+                items = twitter.parse_x_response(response or {})
                 error = None
                 _log(f"  xAI fallback returned {len(items)} items")
             except Exception as fallback_err:
                 _log(f"  xAI fallback FAILED: {type(fallback_err).__name__}: {fallback_err}")
-                pass  # Keep Bird's (empty) result
+                pass
     elif has_xai:
-        # Fallback path: xAI API (paid)
         _log("  PATH: xAI API (paid, direct)")
-        _log(f"  Calling xai_x.search(key={xai_key_preview}, model={models_picked.get('xai')}, topic='{topic[:50]}', dates={start_date}->{end_date}, depth={depth})")
+        _log(f"  Calling twitter.search(key={xai_key_preview}, model={models_picked.get('xai')}, topic='{topic[:50]}', dates={start_date}->{end_date}, depth={depth})")
         try:
-            response = xai_x.search(
-                config["XAI_API_KEY"],
+            response = twitter.search(
+                cfg["XAI_API_KEY"],
                 models_picked["xai"],
                 topic,
                 start_date,
@@ -222,7 +215,7 @@ def _query_x(
                 depth=depth,
             )
             _log(f"  xAI API call succeeded, response keys: {list(response.keys()) if isinstance(response, dict) else type(response).__name__}")
-        except http.HTTPError as network_err:
+        except net.HTTPError as network_err:
             response = {"error": str(network_err)}
             error = f"API error: {network_err}"
             _log(f"  xAI API HTTP ERROR: {network_err} (status={getattr(network_err, 'status_code', '?')}, body={(getattr(network_err, 'body', '') or '')[:300]})")
@@ -231,10 +224,9 @@ def _query_x(
             error = f"{type(generic_err).__name__}: {generic_err}"
             _log(f"  xAI API EXCEPTION: {error}")
 
-        items = xai_x.parse_x_response(response or {})
+        items = twitter.parse_x_response(response or {})
         _log(f"  xAI parsed {len(items)} items")
     else:
-        # No X backend available
         _log("  PATH: NO X BACKEND AVAILABLE (no xAI key, Bird not authenticated)")
         response = {
             "error": "No X search backend available (no xAI key, Bird not authenticated)"
@@ -248,7 +240,7 @@ def _query_x(
 
 def _query_youtube(
     topic: str,
-    config: dict,
+    cfg: dict,
     models_picked: dict,
     start_date: str,
     end_date: str,
@@ -263,30 +255,29 @@ def _query_youtube(
         response = load_fixture("youtube_sample.json")
     else:
         try:
-            response = openai_youtube.search(
-                config["OPENAI_API_KEY"],
+            response = youtube.search(
+                cfg["OPENAI_API_KEY"],
                 models_picked["openai"],
                 topic,
                 start_date,
                 end_date,
                 depth=depth,
             )
-        except http.HTTPError as network_err:
+        except net.HTTPError as network_err:
             response = {"error": str(network_err)}
             error = f"API error: {network_err}"
         except Exception as generic_err:
             response = {"error": str(generic_err)}
             error = f"{type(generic_err).__name__}: {generic_err}"
 
-    # Transform raw response into structured items
-    items = openai_youtube.parse_youtube_response(response or {})
+    items = youtube.parse_youtube_response(response or {})
 
     return items, response, error
 
 
 def _query_linkedin(
     topic: str,
-    config: dict,
+    cfg: dict,
     models_picked: dict,
     start_date: str,
     end_date: str,
@@ -301,23 +292,22 @@ def _query_linkedin(
         response = load_fixture("linkedin_sample.json")
     else:
         try:
-            response = openai_linkedin.search(
-                config["OPENAI_API_KEY"],
+            response = linkedin.search(
+                cfg["OPENAI_API_KEY"],
                 models_picked["openai"],
                 topic,
                 start_date,
                 end_date,
                 depth=depth,
             )
-        except http.HTTPError as network_err:
+        except net.HTTPError as network_err:
             response = {"error": str(network_err)}
             error = f"API error: {network_err}"
         except Exception as generic_err:
             response = {"error": str(generic_err)}
             error = f"{type(generic_err).__name__}: {generic_err}"
 
-    # Transform raw response into structured items
-    items = openai_linkedin.parse_linkedin_response(response or {})
+    items = linkedin.parse_linkedin_response(response or {})
 
     return items, response, error
 
@@ -325,16 +315,15 @@ def _query_linkedin(
 def run_research(
     topic: str,
     platform: str,
-    config: dict,
+    cfg: dict,
     models_picked: dict,
     start_date: str,
     end_date: str,
     depth: str = "default",
     mock: bool = False,
-    progress: ui.Progress = None,
+    progress: terminal.Progress = None,
 ) -> tuple:
     """Orchestrate the full research pipeline across all platforms. Returns a 14-element tuple."""
-    # Initialize all result containers
     reddit_items = []
     x_items = []
     youtube_items = []
@@ -349,11 +338,9 @@ def run_research(
     youtube_error = None
     linkedin_error = None
 
-    # Determine if supplemental web search is warranted
     web_search_modes = ("all", "web", "reddit-web", "x-web")
     requires_web_search = platform in web_search_modes
 
-    # Web-only mode bypasses all API calls - Claude handles everything
     if platform == "web":
         if progress is not None:
             progress.start_web_only()
@@ -376,10 +363,9 @@ def run_research(
             linkedin_error,
         )
 
-    # Determine API availability based on configured keys and Bird
-    openai_available = bool(config.get("OPENAI_API_KEY"))
-    xai_available = bool(config.get("XAI_API_KEY"))
-    bird_available = bool(config.get("BIRD_X_AVAILABLE"))
+    openai_available = bool(cfg.get("OPENAI_API_KEY"))
+    xai_available = bool(cfg.get("XAI_API_KEY"))
+    bird_available = bool(cfg.get("BIRD_X_AVAILABLE"))
     x_available = xai_available or bird_available
 
     _log("=== run_research ===")
@@ -391,7 +377,6 @@ def run_research(
     _log(f"  Depth: {depth}")
     _log(f"  Models picked: {models_picked}")
 
-    # Compute which platform searches should execute
     reddit_platforms = ("both", "reddit", "all", "reddit-web")
     x_platforms = ("both", "x", "all", "x-web")
     youtube_platforms = ("all", "youtube")
@@ -404,20 +389,17 @@ def run_research(
         platform in linkedin_platforms and openai_available
     )
 
-    _log(f"  should_query_reddit: {should_query_reddit} (platform '{platform}' in {reddit_platforms} AND openai={openai_available})")
-    _log(f"  should_query_x: {should_query_x} (platform '{platform}' in {x_platforms} AND x={x_available})")
+    _log(f"  should_query_reddit: {should_query_reddit}")
+    _log(f"  should_query_x: {should_query_x}")
     _log(f"  should_query_youtube: {should_query_youtube}")
     _log(f"  should_query_linkedin: {should_query_linkedin}")
 
-    # Prepare future handles for concurrent execution
     reddit_future = None
     x_future = None
     youtube_future = None
     linkedin_future = None
 
-    # Execute all platform queries concurrently via thread pool
     with ThreadPoolExecutor(max_workers=5) as thread_pool:
-        # Dispatch Reddit query
         if should_query_reddit:
             if progress is not None:
                 progress.start_reddit()
@@ -425,7 +407,7 @@ def run_research(
             reddit_future = thread_pool.submit(
                 _query_reddit,
                 topic,
-                config,
+                cfg,
                 models_picked,
                 start_date,
                 end_date,
@@ -433,7 +415,6 @@ def run_research(
                 mock,
             )
 
-        # Dispatch X query
         if should_query_x:
             if progress is not None:
                 progress.start_x()
@@ -441,7 +422,7 @@ def run_research(
             x_future = thread_pool.submit(
                 _query_x,
                 topic,
-                config,
+                cfg,
                 models_picked,
                 start_date,
                 end_date,
@@ -449,12 +430,11 @@ def run_research(
                 mock,
             )
 
-        # Dispatch YouTube query
         if should_query_youtube:
             youtube_future = thread_pool.submit(
                 _query_youtube,
                 topic,
-                config,
+                cfg,
                 models_picked,
                 start_date,
                 end_date,
@@ -462,12 +442,11 @@ def run_research(
                 mock,
             )
 
-        # Dispatch LinkedIn query
         if should_query_linkedin:
             linkedin_future = thread_pool.submit(
                 _query_linkedin,
                 topic,
-                config,
+                cfg,
                 models_picked,
                 start_date,
                 end_date,
@@ -475,7 +454,6 @@ def run_research(
                 mock,
             )
 
-        # Harvest Reddit results
         if reddit_future is not None:
             try:
                 reddit_items, raw_openai, reddit_error = reddit_future.result()
@@ -491,7 +469,6 @@ def run_research(
             if progress is not None:
                 progress.end_reddit(len(reddit_items))
 
-        # Harvest X results
         if x_future is not None:
             try:
                 x_items, raw_xai, x_error = x_future.result()
@@ -507,7 +484,6 @@ def run_research(
             if progress is not None:
                 progress.end_x(len(x_items))
 
-        # Harvest YouTube results
         if youtube_future is not None:
             try:
                 youtube_items, raw_youtube, youtube_error = youtube_future.result()
@@ -520,7 +496,6 @@ def run_research(
                 if progress is not None:
                     progress.show_error(f"YouTube error: {exc}")
 
-        # Harvest LinkedIn results
         if linkedin_future is not None:
             try:
                 linkedin_items, raw_linkedin, linkedin_error = linkedin_future.result()
@@ -539,8 +514,6 @@ def run_research(
     _log(f"  YouTube: {len(youtube_items)} items, error={youtube_error}")
     _log(f"  LinkedIn: {len(linkedin_items)} items, error={linkedin_error}")
 
-    # Augment Reddit items with full thread content
-    # This runs sequentially since each item requires individual API call
     if len(reddit_items) > 0:
         if progress is not None:
             progress.start_reddit_enrich(1, len(reddit_items))
@@ -551,10 +524,10 @@ def run_research(
 
             try:
                 if mock:
-                    thread_data = load_fixture("reddit_thread_sample.json")
-                    reddit_items[i] = reddit_enrich.enrich(item, thread_data)
+                    thread_data = load_fixture("provider_reddit_thread.json")
+                    reddit_items[i] = enrich.enrich(item, thread_data)
                 else:
-                    reddit_items[i] = reddit_enrich.enrich(item)
+                    reddit_items[i] = enrich.enrich(item)
             except Exception as err:
                 if progress is not None:
                     url = item.get("url", "unknown")
@@ -678,14 +651,12 @@ def main():
 
     args = parser.parse_args()
 
-    # Handle setup wizard (exit early)
     if args.setup:
         from setup import run_setup
 
         run_setup()
         return
 
-    # Handle scheduling commands (exit early, no research)
     if args.list_jobs:
         _list_jobs()
         return
@@ -698,15 +669,10 @@ def main():
         _create_schedule(args)
         return
 
-    # Activate diagnostic output when requested
     if args.debug:
         os.environ["BRIEFBOT_DEBUG"] = "1"
-        # Force http module to recognize debug flag
-        from lib import http as http_module
+        net.DEBUG = True
 
-        http_module.DEBUG = True
-
-    # Resolve depth level (mutually exclusive options)
     if args.quick and args.deep:
         print("Error: Cannot use both --quick and --deep", file=sys.stderr)
         sys.exit(1)
@@ -717,83 +683,68 @@ def main():
     elif args.deep:
         depth = "deep"
 
-    # Validate topic was provided
     if args.topic is None:
         print("Error: Please provide a topic to research.", file=sys.stderr)
         print("Usage: python3 briefbot.py <topic> [options]", file=sys.stderr)
         sys.exit(1)
 
-    # Retrieve API configuration
     _log("=== main: Loading configuration ===")
-    config = env.load_config()
+    cfg = config.load_config()
 
-    # Detect Bird X search availability (browser cookies, free)
-    config["BIRD_X_AVAILABLE"] = env.is_bird_x_available()
-    _log(f"BIRD_X_AVAILABLE: {config['BIRD_X_AVAILABLE']}")
+    cfg["BIRD_X_AVAILABLE"] = config.is_bird_x_available()
+    _log(f"BIRD_X_AVAILABLE: {cfg['BIRD_X_AVAILABLE']}")
 
-    # Determine which platforms have valid credentials
-    platforms = env.determine_available_platforms(config)
+    platforms = config.determine_available_platforms(cfg)
     _log(f"Available platforms: '{platforms}'")
 
-    # Mock mode operates without API keys
     if args.mock:
         platform = "both" if args.sources == "auto" else args.sources
     else:
-        # Validate requested sources against available credentials
-        platform, src_err = env.validate_sources(
+        platform, src_err = config.validate_sources(
             args.sources, platforms, args.include_web
         )
 
         _log(f"Source validation: platform='{platform}', error={src_err}")
 
         if src_err is not None:
-            # WebSearch fallback is advisory, not fatal
             if "WebSearch fallback" in src_err:
                 print(f"Note: {src_err}", file=sys.stderr)
             else:
                 print(f"Error: {src_err}", file=sys.stderr)
                 sys.exit(1)
 
-    # Compute the date window based on --days argument
     days = args.days
-    start_date, end_date = dates.date_window(days)
+    start_date, end_date = temporal.window(days)
 
-    # Identify missing API keys for promotional messaging
-    missing_keys = env.identify_missing_credentials(config)
+    missing_keys = config.identify_missing_credentials(cfg)
 
-    # Initialize the progress display subsystem
-    progress = ui.Progress(args.topic, display_header=True)
+    progress = terminal.Progress(args.topic, display_header=True)
 
-    # Display promotional content for missing credentials before research begins
     if missing_keys != "none":
         progress.show_promo(missing_keys)
 
-    # Select appropriate models based on API availability
     if args.mock:
-        # Substitute mock model listings
-        mock_openai_models = load_fixture("models_openai_sample.json").get(
+        mock_openai_models = load_fixture("api_openai_models.json").get(
             "data", []
         )
-        mock_xai_models = load_fixture("models_xai_sample.json").get(
+        mock_xai_models = load_fixture("api_xai_models.json").get(
             "data", []
         )
 
-        models_picked = models.get_models(
+        models_picked = registry.get_models(
             {
                 "OPENAI_API_KEY": "mock",
                 "XAI_API_KEY": "mock",
-                **config,
+                **cfg,
             },
             mock_openai_models,
             mock_xai_models,
         )
     else:
-        models_picked = models.get_models(config)
+        models_picked = registry.get_models(cfg)
 
     _log(f"Models picked: openai={models_picked.get('openai')}, xai={models_picked.get('xai')}")
 
-    # Translate internal platform identifier to user-facing display mode string.
-    # Keys are platform codes used internally; values are the UI labels shown in reports.
     mode_mapping = {
         "both": "both",
         "all": "all",
@@ -807,7 +758,6 @@ def main():
     }
     display_mode = mode_mapping.get(platform, platform)
 
-    # Execute the research pipeline
     (
         reddit_items,
         x_items,
@@ -826,7 +776,7 @@ def main():
     ) = run_research(
         args.topic,
         platform,
-        config,
+        cfg,
         models_picked,
         start_date,
         end_date,
@@ -838,53 +788,29 @@ def main():
     # Begin post-processing phase
     progress.start_processing()
 
-    # Standardize item formats across platforms
-    normalized_reddit = normalize.to_reddit(
-        reddit_items, start_date, end_date
-    )
-    normalized_x = normalize.to_x(x_items, start_date, end_date)
-    normalized_youtube = normalize.to_youtube(
-        youtube_items, start_date, end_date
-    )
-    normalized_linkedin = normalize.to_linkedin(
-        linkedin_items, start_date, end_date
-    )
+    # Convert raw dicts to unified ContentItems
+    from briefbot_engine.content import Source, items_from_raw, filter_by_date
 
-    # Apply strict date filtering as final validation layer
-    # This ensures no content outside the window survives regardless of API behavior
-    filtered_reddit = normalize.filter_dates(
-        normalized_reddit, start_date, end_date
-    )
-    filtered_x = normalize.filter_dates(normalized_x, start_date, end_date)
-    filtered_youtube = normalize.filter_dates(
-        normalized_youtube, start_date, end_date
-    )
-    filtered_linkedin = normalize.filter_dates(
-        normalized_linkedin, start_date, end_date
-    )
+    normalized_reddit = items_from_raw(reddit_items, Source.REDDIT, start_date, end_date)
+    normalized_x = items_from_raw(x_items, Source.X, start_date, end_date)
+    normalized_youtube = items_from_raw(youtube_items, Source.YOUTUBE, start_date, end_date)
+    normalized_linkedin = items_from_raw(linkedin_items, Source.LINKEDIN, start_date, end_date)
 
-    # Compute relevance scores for ranking
-    scored_reddit = score.score_reddit(filtered_reddit)
-    scored_x = score.score_x(filtered_x)
-    scored_youtube = score.score_youtube(filtered_youtube)
-    scored_linkedin = score.score_linkedin(filtered_linkedin)
+    # Apply strict date filtering
+    filtered_reddit = filter_by_date(normalized_reddit, start_date, end_date)
+    filtered_x = filter_by_date(normalized_x, start_date, end_date)
+    filtered_youtube = filter_by_date(normalized_youtube, start_date, end_date)
+    filtered_linkedin = filter_by_date(normalized_linkedin, start_date, end_date)
 
-    # Order items by computed score
-    sorted_reddit = score.rank(scored_reddit)
-    sorted_x = score.rank(scored_x)
-    sorted_youtube = score.rank(scored_youtube)
-    sorted_linkedin = score.rank(scored_linkedin)
-
-    # Remove duplicate entries
-    deduped_reddit = dedupe.dedupe_reddit(sorted_reddit)
-    deduped_x = dedupe.dedupe_x(sorted_x)
-    deduped_youtube = dedupe.dedupe_youtube(sorted_youtube)
-    deduped_linkedin = dedupe.dedupe_linkedin(sorted_linkedin)
+    # Combine all items, score them together, then deduplicate
+    all_items = filtered_reddit + filtered_x + filtered_youtube + filtered_linkedin
+    scored_items = ranking.rank_items(all_items)
+    deduped_items = ranking.deduplicate(scored_items)
 
     progress.end_processing()
 
-    # Assemble the final report structure
-    report = schema.make_report(
+    # Assemble the final report
+    report = content.build_report(
         args.topic,
         start_date,
         end_date,
@@ -892,35 +818,28 @@ def main():
         models_picked.get("openai"),
         models_picked.get("xai"),
     )
-    report.reddit = deduped_reddit
-    report.x = deduped_x
-    report.youtube = deduped_youtube
-    report.linkedin = deduped_linkedin
+    report.items = deduped_items
     report.reddit_error = reddit_error
     report.x_error = x_error
     report.youtube_error = youtube_error
     report.linkedin_error = linkedin_error
 
-    # Generate the condensed context snippet
-    report.context_snippet_md = render.context_fragment(report)
+    report.context_snippet_md = output.context_fragment(report)
 
-    # Persist all output artifacts
-    render.save_artifacts(
+    output.save_artifacts(
         report, raw_openai, raw_xai, raw_reddit_enriched, raw_youtube, raw_linkedin
     )
 
-    # Display completion status
     if platform == "web":
         progress.show_web_only_complete()
     else:
         progress.show_complete(
-            len(deduped_reddit),
-            len(deduped_x),
-            len(deduped_youtube),
-            len(deduped_linkedin),
+            len(report.reddit),
+            len(report.x),
+            len(report.youtube),
+            len(report.linkedin),
         )
 
-    # Emit final result in requested format
     output_report(
         report,
         args.emit,
@@ -948,8 +867,8 @@ def _list_jobs():
 
     for job in all_jobs:
         try:
-            parsed = cron_parse.parse_cron_expression(job["schedule"])
-            schedule_desc = cron_parse.describe_schedule(parsed)
+            parsed = cron.parse_cron_expression(job["schedule"])
+            schedule_desc = cron.describe_schedule(parsed)
         except ValueError:
             schedule_desc = job["schedule"]
 
@@ -988,9 +907,8 @@ def _delete_job(job_id: str):
         print(f"Error: Job {job_id} not found.", file=sys.stderr)
         sys.exit(1)
 
-    # Remove from OS scheduler
     try:
-        scheduler_msg = scheduler.unregister_job(job)
+        scheduler_msg = sched_platform.unregister_job(job)
         print(scheduler_msg)
     except RuntimeError as err:
         print(
@@ -998,7 +916,6 @@ def _delete_job(job_id: str):
             file=sys.stderr,
         )
 
-    # Remove from registry
     deleted = jobs.delete_job(job_id)
     if deleted:
         print(f"Job {job_id} deleted from registry.")
@@ -1008,7 +925,6 @@ def _delete_job(job_id: str):
 
 def _create_schedule(args):
     """Create a new scheduled job from CLI arguments."""
-    # Validate required arguments
     if not args.topic:
         print("Error: Topic is required when creating a schedule.", file=sys.stderr)
         print(
@@ -1017,18 +933,16 @@ def _create_schedule(args):
         )
         sys.exit(1)
 
-    # Validate cron expression
     try:
-        parsed = cron_parse.parse_cron_expression(args.schedule)
-        schedule_desc = cron_parse.describe_schedule(parsed)
+        parsed = cron.parse_cron_expression(args.schedule)
+        schedule_desc = cron.describe_schedule(parsed)
     except ValueError as err:
         print(f"Error: Invalid schedule: {err}", file=sys.stderr)
         sys.exit(1)
 
-    # Validate SMTP configuration only when email is requested
     if args.email:
-        config = env.load_config()
-        smtp_error = email_sender.validate_smtp_config(config)
+        cfg = config.load_config()
+        smtp_error = email.validate_smtp_config(cfg)
         if smtp_error:
             print(f"Error: {smtp_error}", file=sys.stderr)
             sys.exit(1)
@@ -1040,7 +954,6 @@ def _create_schedule(args):
         )
         print("Consider adding --audio, --email, and/or --telegram.", file=sys.stderr)
 
-    # Capture current CLI arguments into the job record
     args_dict = {
         "quick": args.quick,
         "deep": args.deep,
@@ -1051,7 +964,6 @@ def _create_schedule(args):
         "telegram": args.telegram,
     }
 
-    # Create the job
     job = jobs.create_job(
         topic=args.topic,
         schedule=args.schedule,
@@ -1072,10 +984,9 @@ def _create_schedule(args):
     if args.audio:
         print("  Audio:    enabled")
 
-    # Register with OS scheduler
     runner_path = ROOT / "run_job.py"
     try:
-        scheduler_msg = scheduler.register_job(job, runner_path)
+        scheduler_msg = sched_platform.register_job(job, runner_path)
         print(f"  {scheduler_msg}")
     except RuntimeError as err:
         print(
@@ -1087,16 +998,15 @@ def _create_schedule(args):
             file=sys.stderr,
         )
 
-    # Show next occurrence
     try:
-        next_fire = cron_parse.next_occurrence(parsed)
+        next_fire = cron.next_occurrence(parsed)
         print(f"\n  Next run: {next_fire.strftime('%Y-%m-%d %H:%M')}")
     except ValueError:
         pass
 
 
 def output_report(
-    report: schema.Report,
+    report,
     output_format: str,
     requires_web_search: bool = False,
     topic: str = "",
@@ -1108,19 +1018,18 @@ def output_report(
     """Render and output the research report in the specified format."""
     format_handlers = {
         "compact": lambda: print(
-            render.compact(report, missing_keys=missing_keys)
+            output.compact(report, missing_keys=missing_keys)
         ),
         "json": lambda: print(json.dumps(report.to_dict(), indent=2)),
-        "md": lambda: print(render.full_report(report)),
+        "md": lambda: print(output.full_report(report)),
         "context": lambda: print(report.context_snippet_md),
-        "path": lambda: print(render.context_path()),
+        "path": lambda: print(output.context_path()),
     }
 
     handler = format_handlers.get(output_format)
     if handler is not None:
         handler()
 
-    # Append WebSearch instructions when supplemental search is needed
     if requires_web_search:
         separator_line = "-" * 60
 

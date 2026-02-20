@@ -35,7 +35,7 @@ from pathlib import Path
 MODULE_ROOT = Path(__file__).parent.resolve()
 sys.path.insert(0, str(MODULE_ROOT))
 
-from lib import cron_parse, jobs
+from briefbot_engine.scheduling import cron, jobs
 
 
 LOG_DIRECTORY = Path.home() / ".config" / "briefbot" / "logs"
@@ -150,8 +150,8 @@ def print_banner(job: dict, skill_command: str) -> None:
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     try:
-        parsed = cron_parse.parse_cron_expression(schedule_raw)
-        schedule_desc = cron_parse.describe_schedule(parsed)
+        parsed = cron.parse_cron_expression(schedule_raw)
+        schedule_desc = cron.describe_schedule(parsed)
     except ValueError:
         schedule_desc = schedule_raw
 

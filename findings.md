@@ -1,419 +1,384 @@
-# BriefBot vs Last30Days: Code Provenance Analysis
+# BriefBot vs Last30Days: Derivation Analysis
 
-**Date:** 2026-02-19
-**Methodology:** Exhaustive file-by-file comparison of all shared library modules (`scripts/lib/`), main orchestrator scripts, fixture data, vendored dependencies, and git history. Every function, constant, algorithm, regex pattern, and data structure was compared side-by-side.
-
----
-
-## Timeline
-
-| Project | Initial Commit | First Commit Date |
-|---------|---------------|-------------------|
-| **Last30Days** | `5ca4829` "Initial commit: last30days skill" | **2026-01-23** |
-| **BriefBot** | `02d0ec3` "Init" | **2026-02-04** |
-
-Last30Days predates BriefBot by **12 days**.
+> **Date**: 2026-02-19
+> **Method**: Side-by-side source code comparison of current repo states
+> **Scope**: All source files, tests, fixtures, configs, and skill definitions
 
 ---
 
 ## STRONG INDICATORS
 
-These findings, taken together, make it nearly certain that BriefBot was derived from Last30Days.
+These findings represent clear, unambiguous evidence that BriefBot was derived from Last30Days.
 
-### 1. Identical Engagement Formulas With Specific Non-Obvious Coefficient Choices
+### 1. Identical Directory and Module Structure
 
-`score.py` in both projects uses the exact same platform-specific engagement formulas with the same arbitrary coefficient choices:
+Both projects share the exact same `scripts/lib/` module layout, test file names, and fixture file names:
 
-**Reddit engagement** (both files):
-```
-0.55 * log1p(score) + 0.40 * log1p(comments) + 0.05 * (upvote_ratio or 0.5) * 10
-```
+| Module | Last30Days | BriefBot |
+|--------|-----------|----------|
+| schema.py | Yes | Yes |
+| score.py | Yes | Yes |
+| dates.py | Yes | Yes |
+| dedupe.py | Yes | Yes |
+| cache.py | Yes | Yes |
+| http.py | Yes | Yes |
+| models.py | Yes | Yes |
+| normalize.py | Yes | Yes |
+| openai_reddit.py | Yes | Yes |
+| xai_x.py | Yes | Yes |
+| reddit_enrich.py | Yes | Yes |
+| render.py | Yes | Yes |
+| websearch.py | Yes | Yes |
+| env.py | Yes | Yes |
+| ui.py | Yes | Yes |
+| bird_x.py | Yes | Yes |
 
-**X engagement** (both files):
-```
-0.55 * log1p(likes) + 0.25 * log1p(reposts) + 0.15 * log1p(replies) + 0.05 * log1p(quotes)
-```
+Tests: `test_cache.py`, `test_dates.py`, `test_dedupe.py`, `test_models.py`, `test_normalize.py`, `test_openai_reddit.py`, `test_render.py`, `test_score.py` -- all present in both with identical names.
 
-These are not standard formulas from any published source. The specific coefficient choices (0.55/0.40/0.05 for Reddit, 0.55/0.25/0.15/0.05 for X), the use of `log1p` for all terms, the `* 10` scaling on upvote_ratio, and the `or 0.5` default are all implementation-specific decisions that two independent developers would not arrive at independently.
+Fixtures: `models_openai_sample.json`, `models_xai_sample.json`, `openai_sample.json`, `reddit_thread_sample.json`, `xai_sample.json` -- all present in both, same file names, same JSON structure, only content values differ (different IDs, different topic nouns).
 
-The normalization/rescaling algorithm (`_to_pct` / `normalize_to_100`) is also functionally identical: filter valid values, find min/max, rescale to 0-100, return 50 for all-equal edge case, pass through None.
 
-### 2. Identical 8-Stage HTTP Error Handling Architecture
+### 2. Schema Dataclasses Are Structurally Identical
 
-`http.py` in both projects implements the exact same retry architecture with the same specific design decisions in the same order:
+`schema.py` is the data backbone. BriefBot's version is a near-exact copy with additions:
 
-1. Same `HTTPError` exception class with `status_code` and `body` attributes
-2. Same 4 exception handler types caught in the **same order**: `urllib.error.HTTPError` → `urllib.error.URLError` → `json.JSONDecodeError` → `(OSError, TimeoutError, ConnectionResetError)`
-3. Same "skip retry on 4xx except 429" rule
-4. Same linear backoff formula: `delay * (attempt + 1)` (not exponential, not jittered -- this specific choice is notable)
-5. Same immediate raise on `JSONDecodeError` (no retry)
-6. Same final fallback: `raise HTTPError("Request failed with no error details")`
-7. Same bare `except:` to catch read failures when reading HTTP error bodies
-8. Same unused `urlencode` import in both files (a dead import that was never cleaned up)
+**Engagement class**: Same 8 fields in same order (`score`, `num_comments`, `upvote_ratio`, `likes`, `reposts`, `replies`, `quotes`, `views`). BriefBot adds `reactions`, `comments`, `bookmarks`. The `to_dict()` method is identical line-for-line for shared fields.
 
-Constants: `timeout=30`, `max_retries=3`, `backoff=1.0` -- all identical.
+**Comment class**: Byte-for-byte identical (fields: `score`, `date`, `author`, `excerpt`, `url`; same `to_dict()` body).
 
-The Reddit JSON function uses identical URL construction: strip trailing `/`, prepend `/` if missing, append `.json`, add `?raw_json=1` query parameter.
+**SubScores class**: Byte-for-byte identical (fields: `relevance`, `recency`, `engagement`; same `to_dict()` body).
 
-### 3. Response Parsing Algorithm Is Structurally Identical Across 4 Files
+**RedditItem**: Same 13 fields, same types, same defaults (`relevance=0.5`, `date_confidence="low"`). BriefBot adds one extra field: `flair`. The `to_dict()` method is identical except for the added field.
 
-Both `openai_reddit.py` and `xai_x.py` in each project use the **exact same multi-branch output extraction algorithm** for parsing OpenAI/xAI Responses API output:
+**XItem**: Same 10 fields, same types, same defaults. BriefBot adds `is_repost` and `language`.
 
-1. Check `"output"` key
-2. If string → use directly
-3. If list → iterate elements:
-   - Check for `type == "message"` → iterate `content` blocks → check for `type == "output_text"`
-   - Check for `"text"` key in dict elements
-   - Handle bare string elements
-4. `break` on first found text
-5. Legacy `"choices"` format fallback
-6. Same regex for JSON extraction: `r'\{[\s\S]*"items"[\s\S]*\}'`
-7. Same item validation loop with same field processing, same date regex `r'^\d{4}-\d{2}-\d{2}$'`, same ID prefix patterns (`R{n}`, `X{n}`)
+**WebSearchItem**: Byte-for-byte identical structure (same fields, same defaults). BriefBot adds `language`.
 
-This is a highly specific parsing algorithm with non-obvious design decisions (the 5-level nested check, the specific `break` behavior, the legacy fallback). Two independent implementations would not produce this exact same structure.
+**YouTubeItem**: Same structure, BriefBot renames `transcript_snippet` to `description` and changes default `date_confidence` from `"high"` to `"low"` and default `relevance` from `0.7` to `0.5`. BriefBot adds `duration_seconds`.
 
-### 4. Identical Data Class Hierarchy With Same Fields, Types, and Serialization
+**Report class**: Same core fields (`topic`, `range_from`, `range_to`, `generated_at`, `mode`, `openai_model_used`, `xai_model_used`, `reddit`, `x`, `youtube`, `web`, `best_practices`, `prompt_pack`, `context_snippet_md`, `*_error`, `from_cache`, `cache_age_hours`). BriefBot adds `linkedin`, `linkedin_error`, `search_duration_seconds`, `item_count`. The `to_dict()` and `from_dict()` methods follow the exact same logic pattern.
 
-`schema.py` defines the same class hierarchy in both projects:
+**Factory function**: Last30Days has `create_report()`, BriefBot renamed to `make_report()` -- same logic, different parameter names (`from_date`→`start`, `to_date`→`end`).
 
-| Class | Shared Fields | Verdict |
-|-------|--------------|---------|
-| `Engagement` | 8 identical fields (score, num_comments, upvote_ratio, likes, reposts, replies, quotes, views) | Functionally identical |
-| `Comment` | 5 identical fields (score, date, author, excerpt, url) | Functionally identical |
-| `SubScores` | 3 identical fields (relevance, recency, engagement) | Functionally identical |
-| `RedditItem` | All 13 fields identical with same types and defaults | Functionally identical |
-| `XItem` | All 11 fields identical | Functionally identical |
-| `WebSearchItem` | All 11 fields identical | Functionally identical |
-| `Report` | Same structure, same `to_dict()`/`from_dict()` pattern | Functionally identical |
 
-The `to_dict()` methods use the same serialization pattern throughout: check each field for `not None`, add to dict, return `None` when all empty (for `Engagement`). The `from_dict()` classmethod uses the same reconstruction strategy: parse range section, loop-reconstruct each item type, handle nested `Engagement` and `Comment` objects.
+### 3. Tests Use the Same Test Data and Assertions
 
-The only differences are: BriefBot adds `LinkedInItem` and two extra `Engagement` fields (`reactions`, `comments`); factory function is named `make_report` vs `create_report`; docstrings say "Canonical" vs "Normalized".
+**test_score.py**: Both test suites test the same functions with the same test data:
+- Both use `Engagement(score=100, num_comments=50, upvote_ratio=0.9)` for Reddit engagement tests
+- Both use `Engagement(likes=100, reposts=25, replies=15, quotes=5)` for X engagement tests
+- Both use the same RedditItem with `url="https://reddit.com/r/test/1"`, `relevance=0.9` vs a second item with `url="https://reddit.com/r/test/2"`, `relevance=0.5`
+- Both assert `result[0].score > result[1].score` with the same comment: "Higher relevance and engagement should score higher"
+- Rank/sort test uses identical items: `id="R1", title="Low", score=30`, `id="R2", title="High", score=90`, `id="R3", title="Mid", score=60`
 
-### 5. Identical Reddit Enrichment Pipeline With Same Constants and Regex
+**test_dedupe.py**: Both test suites use:
+- Normalize test: `"HELLO World"` → `"hello world"`, `"Hello, World!"`, `"hello    world"`
+- N-gram test: `"ab"` with n=3, `"hello"` with n=3 checking for `"hel"`, `"ell"`, `"llo"`
+- Jaccard test: `{"a","b","c"}` vs itself, vs `{"d","e","f"}`, vs `{"b","c","d"}` with comment `# 2 overlap / 4 union`
+- Duplicate detection: `"Completely different topic A"` / `"Another unrelated subject B"` for no-dupes, and `"Best practices for Claude Code skills"` / `"Best practices for Claude Code skills guide"` for finding dupes
+- Deduplication: `"Best practices for skills"` (score=90) vs `"Best practices for skills guide"` (score=50); `"Topic about apples"` vs `"Discussion of oranges"`
 
-`reddit_enrich.py` shares the same enrichment pipeline:
+These test strings are too specific and numerous to be coincidental.
 
-- Same URL parsing: `urlparse(url)`, check `"reddit.com" in parsed.netloc`, return `parsed.path`
-- Same thread structure parsing: `data[0]` for submission, `data[1]` for comments, same 7 submission fields, same 5 comment fields
-- Same top-comments filtering: limit=10, exclusion set `{"[deleted]", "[removed]"}`, sort by score descending
-- Same insight extraction: limit=7, candidate pool = `limit * 2`, minimum body length = 30 chars
-- Same 4 low-value comment regex patterns (character-for-character identical):
-  ```
-  r'^(this|same|agreed|exactly|yep|nope|yes|no|thanks|thank you)\.?$'
-  r'^lol|lmao|haha'
-  r'^\[deleted\]'
-  r'^\[removed\]'
-  ```
-- Same truncation: 150 chars with sentence boundary detection (search for `.!?` after position 50), else append `"..."`
-- Same engagement output dict keys: `score`, `num_comments`, `upvote_ratio`
-- Same comment output: `body[:200]` as excerpt, URL prefix `"https://reddit.com"`
-- Same Reddit selftext truncation: `[:500]`
-- Same comment body truncation: `[:300]`
 
-### 6. Model Fixture Files Have Timestamps Offset by Exactly +86400 Seconds
+### 4. API Response Parsing Logic Is Functionally Identical
 
-`models_openai_sample.json` and `models_xai_sample.json` contain the **same models in the same order** with every timestamp offset by exactly **+86400 seconds (1 day)**:
+`parse_reddit_response()` and `parse_x_response()` in both projects follow the exact same control flow:
 
-| Model | BriefBot `created` | Last30Days `created` | Delta |
-|-------|-------------------|---------------------|-------|
-| gpt-5.2 | 1704153600 | 1704067200 | +86400 |
-| gpt-5.1 | 1701475200 | 1701388800 | +86400 |
-| gpt-5 | 1698796800 | 1698710400 | +86400 |
-| gpt-5-mini | 1704153600 | 1704067200 | +86400 |
-| gpt-4o | 1683244800 | 1683158400 | +86400 |
-| gpt-4-turbo | 1680652800 | 1680566400 | +86400 |
+1. Check `api_response.get("error")` → extract error message the same way
+2. Initialize `output_text = ""`
+3. Check `"output"` in response → if string, use directly; if list, iterate looking for `type == "message"` → iterate `content` for `type == "output_text"`; also check for `"text"` key or string elements
+4. Fallback to `"choices"` format (legacy)
+5. Regex extract JSON: `r'\{[^{}]*"items"\s*:\s*\[[\s\S]*?\]\s*\}'` (BriefBot) vs `r'\{[\s\S]*"items"[\s\S]*\}'` (Last30Days) -- slightly different regex but same intent
+6. Validate items: check `isinstance(raw, dict)`, check URL contains `"reddit.com"`, build clean dict with `f"R{i+1}"` IDs
+7. Same validation: strip subreddit prefix `lstrip("r/")`, clamp relevance `min(1.0, max(0.0, ...))`, validate date format `r'^\d{4}-\d{2}-\d{2}$'`
 
-The xAI fixture shows the same +86400 pattern across all 3 models (`grok-4-latest`, `grok-4`, `grok-3`).
+Even the warning message is identical: `f"[REDDIT WARNING] No output text found in OpenAI response. Keys present: {list(response.keys())}"` appears verbatim in both.
 
-This is a forensic fingerprint: someone took the original fixtures and added exactly 1 day to every timestamp to make them "different" while preserving the structure. This degree of mechanical precision is a hallmark of automated or deliberate derivation.
 
-### 7. Identical Websearch Date Extraction System
+### 5. Fixture Files Have Identical Structure
 
-`websearch.py` shares the same date extraction system across both projects:
+All 5 fixture files exist in both projects with the same JSON schema and same number of lines. The diffs show only cosmetic changes: different response IDs (e.g., `"resp_bb_zigbee_001"` vs `"resp_mock123"`), different topic nouns, and slightly different timestamps. The structural scaffolding (nesting, key names, array layout) is preserved exactly.
 
-- Same 3 URL regex patterns: `/YYYY/MM/DD/`, `/YYYY-MM-DD-/`, `/YYYYMMDD/`
-- Same year validation range: `2020 <= year <= 2030`
-- Same 3 text date patterns: "Month DD, YYYY", "DD Month YYYY", ISO "YYYY-MM-DD"
-- Same 25-entry month mapping dict (including uncommon aliases like `"sept"` for 9)
-- Same relative date handling: "yesterday" (-1), "today" (0), "N days ago" (limit: 60), "N hours ago" (→ today), "last week" (-7), "this week" (-3)
-- Same detection priority: URL ("high") → snippet ("med") → title ("med") → fallback `(None, "low")`
-- Same 8 excluded domains: `reddit.com`, `www.reddit.com`, `old.reddit.com`, `twitter.com`, `www.twitter.com`, `x.com`, `www.x.com`, `mobile.twitter.com`
-- Same domain extraction: `urlparse().netloc.lower()`, strip `"www."` prefix
-- Same result processing pipeline with same truncation limits (title: 200, snippet: 500)
-- Same URL deduplication: `.lower().rstrip("/")`
 
-### 8. Identical Deduplication Algorithm With Same Parameters
+### 6. SKILL.md Intent Parsing Is Heavily Derived
 
-`dedupe.py` implements the same n-gram Jaccard similarity algorithm:
+Both SKILL.md files contain the same intent-parsing framework:
+- Same variable scheme: `TOPIC`, `TARGET_TOOL`, `QUERY_TYPE`
+- Same query types: PROMPTING, RECOMMENDATIONS, NEWS, GENERAL (BriefBot adds KNOWLEDGE)
+- Same common patterns section with near-identical wording: `"[topic] for [tool]"`, `"[topic] prompts for [tool]"`, `"Just [topic]"`, `"best [topic]"`, `"what are the best [topic]"`
+- Same instruction: "**IMPORTANT: Do NOT ask about target tool before research.**"
+- Same display format template with `TOPIC`, `TARGET_TOOL`, `QUERY_TYPE`
+- Same "2-8 minutes" time estimate
+- BriefBot's intro text: "I'll **investigate** {TOPIC}..." vs Last30Days: "I'll **research** {TOPIC}..." (verb change, otherwise identical template)
 
-- Same text normalization: `re.sub(r'[^\w\s]', ' ', text.lower())` then `re.sub(r'\s+', ' ', ...).strip()`
-- Same character n-gram extraction with default `n=3`
-- Same Jaccard coefficient: `|intersection| / |union|` with zero-union guard
-- Same O(n^2) pairwise comparison with default threshold `0.7`
-- Same tie-breaking: keep higher-scored item, discard the other
-- Same early return: `if len(items) <= 1: return items`
-- Same platform-specific convenience wrappers: `dedupe_reddit()`, `dedupe_x()`, `dedupe_youtube()`
 
-### 9. Prompts Are Semantically Identical With Systematic Rewording
+### 7. Websearch Date Extraction Uses Same 3-Pattern Stack
 
-The discovery prompts in `openai_reddit.py` and `xai_x.py` request the same information, use the same placeholder variables (`{topic}`, `{from_date}`, `{to_date}`, `{min_items}`, `{max_items}`), specify the same JSON schema with the same fields, and contain the same rules -- but every sentence is reworded:
+Both `websearch.py` files use the same three URL date patterns in the same order:
+1. `/YYYYMMDD/` compact
+2. `/YYYY/MM/DD/` slashed
+3. `/YYYY-MM-DD-` hyphenated
 
-**Reddit prompt comparison (selected lines):**
-| BriefBot | Last30Days |
-|----------|------------|
-| `"Search Reddit for discussions about: {topic}"` | `"Find Reddit discussion threads about: {topic}"` |
-| `"Target {min_items}-{max_items} threads. Err on the side of more."` | `"Find {min_items}-{max_items} threads. Return MORE rather than fewer."` |
-| `"must contain /r/ and /comments/"` | same rule, labeled `REQUIRED:` |
-| `"Skip any developers.reddit.com or business.reddit.com links"` | same rule, labeled `REJECT:` |
+Both use the same text date extraction with the same month regex pattern, the same relative date parsing ("yesterday", "today", "N days ago", "N hours ago", "last week", "this week", "last month"), and the same confidence hierarchy (URL→high, snippet→med, title→low/med).
 
-**X prompt comparison (selected lines):**
-| BriefBot | Last30Days |
-|----------|------------|
-| `"Use your X search capability to find posts about: {topic}"` | `"You have access to real-time X (Twitter) data. Search for posts about: {topic}"` |
-| `"Return ONLY valid JSON -- no surrounding text:"` | `"IMPORTANT: Return ONLY valid JSON in this exact format, no other text:"` |
-| `"Favor substantive posts over link-only shares"` | `"Prefer posts with substantive content, not just links"` |
-| `"Seek varied perspectives where possible"` | `"Include diverse voices/accounts if applicable"` |
-
-Every rule has a 1:1 counterpart. The JSON schemas are identical in structure and field names. The semantic equivalence combined with systematic rewording is consistent with LLM-assisted paraphrasing.
-
-### 10. Main Orchestrator Pipeline Follows Same 20+ Step Sequence
-
-Both `briefbot.py` and `last30days.py` follow the same pipeline in the same order:
-
-```
-parse args → set debug env var → determine depth → load config → detect platforms →
-validate sources → compute date range → identify missing keys → init progress UI →
-show promo → select models → determine mode string → call run_research() →
-normalize items → date filter → score per-platform → sort/rank → dedupe per-platform →
-create Report object → generate context snippet → write artifacts → show completion →
-emit output
-```
-
-Both use `ThreadPoolExecutor` for concurrent platform queries with the same future-submission pattern. Both have the same `load_fixture()` helper function. Both have the same sparse-results retry logic (threshold: `< 5` items, retry with simplified query via core subject extraction, merge by URL dedup).
-
-The argument parser shares: `--mock`, `--emit` (same 5 choices), `--sources`, `--quick`, `--deep`, `--debug`, `--days` (default 30), `--include-web`. The WebSearch fallback instruction block printed to stdout is nearly word-for-word identical.
-
-### 11. Identical Cache Architecture
-
-`cache.py` shares the same caching system:
-
-- Same SHA-256 key generation with `[:16]` truncation
-- Same pipe-delimited key format: `topic|from_date|to_date|sources`
-- Same `~/.cache/<name>/` storage layout with `.json` files
-- Same `st_mtime`-based TTL validation: `(now_utc - mtime_utc).total_seconds() / 3600`
-- Same TTL values: 24 hours (standard), 7 days (model selection)
-- Same `model_selection.json` file with `updated_at` ISO timestamp and per-provider keys
-- Same error swallowing pattern: `except OSError: pass` on cache write failures, `except (json.JSONDecodeError, OSError)` on cache reads
-- Same `load_with_age` returning `(data, hours)` or `(None, None)` tuple
-- Same `clear_all`/`clear_cache` using glob `*.json` + unlink
-
-All 12 cache functions map 1:1 with identical logic.
-
-### 12. Identical Date Utility Functions
-
-`dates.py` shares 6 identical functions:
-
-- Same 5 date format strings in the same order (including the uncommon `"%Y-%m-%dT%H:%M:%S.%f%z"`)
-- Same `parse_date()` algorithm: try `float()` first (with comment about Reddit timestamps), then loop through format strings with `strptime`
-- Same exception tuple: `(ValueError, TypeError, OSError)` -- the inclusion of `OSError` is non-obvious
-- Same `timestamp_to_date()`: `datetime.fromtimestamp(ts, timezone.utc).date().isoformat()`
-- Same `recency_score()` formula: `int(100 * (1 - age / max_days))` with same edge cases (None→0, negative→100, >=max→0)
-- Same `date_window()`/`get_date_range()`: `today - timedelta(days=days)` with default 30
+The excluded domains list is nearly identical: both exclude `reddit.com`, `www.reddit.com`, `old.reddit.com`, `twitter.com`, `www.twitter.com`, `x.com`, `www.x.com`. BriefBot adds `m.reddit.com` and `nitter.net`; Last30Days has `mobile.twitter.com`.
 
 ---
 
 ## MEDIOCRE INDICATORS
 
-These findings are consistent with derivation but could theoretically arise from shared inspiration, common patterns, or similar requirements.
+These findings show a systematic pattern of renaming and minor tweaking consistent with creating a fork intended to look different while preserving the same logic.
 
-### 13. Scoring Algorithm Has Same Structure but Tweaked Constants
+### 8. Systematic Function Renaming Across Every Module
 
-While the engagement formulas are identical (Strong Indicator #1), the top-level scoring weights differ slightly:
+Every module shows the same pattern: functions are renamed but the logic, parameter handling, and return types remain the same.
 
-| Weight | BriefBot | Last30Days |
-|--------|----------|------------|
-| Relevance (social) | 0.42 | 0.45 |
-| Recency (social) | 0.28 | 0.25 |
-| Engagement (social) | 0.30 | 0.30 |
-| Relevance (web) | 0.52 | 0.55 |
-| Recency (web) | 0.48 | 0.45 |
-| Web source penalty | 12 | 15 |
-| Missing engagement penalty | 12 | 3 |
-| Date "low" penalty | 10 | 5 |
-| Date "med" penalty | 5 | 2 |
-| Baseline engagement | 32 | 35 |
+| Last30Days | BriefBot | Module |
+|-----------|----------|--------|
+| `log1p_safe()` | `_log1p()` | score.py |
+| `compute_reddit_engagement_raw()` | `_reddit_engagement()` | score.py |
+| `compute_x_engagement_raw()` | `_x_engagement()` | score.py |
+| `compute_youtube_engagement_raw()` | `_youtube_engagement()` | score.py |
+| `normalize_to_100()` | `_to_pct()` | score.py |
+| `score_reddit_items()` | `score_reddit()` | score.py |
+| `score_x_items()` | `score_x()` | score.py |
+| `score_youtube_items()` | `score_youtube()` | score.py |
+| `score_websearch_items()` | `score_web()` | score.py |
+| `sort_items()` | `rank()` | score.py |
+| `normalize_text()` | `normalize()` | dedupe.py |
+| `get_ngrams()` | `ngrams()` | dedupe.py |
+| `jaccard_similarity()` | `jaccard()` | dedupe.py |
+| `get_item_text()` | `_text_of()` | dedupe.py |
+| `find_duplicates()` | `find_dupes()` | dedupe.py |
+| `dedupe_items()` | `deduplicate()` | dedupe.py |
+| `get_date_range()` | `date_window()` | dates.py |
+| `get_date_confidence()` | `date_confidence()` | dates.py |
+| `load_env_file()` | `parse_dotenv()` | env.py |
+| `get_config()` | `load_config()` | env.py |
+| `get_available_sources()` | `determine_available_platforms()` | env.py |
+| `get_missing_keys()` | `identify_missing_credentials()` | env.py |
+| `select_openai_model()` | `choose_openai_model()` | models.py |
+| `select_xai_model()` | `choose_xai_model()` | models.py |
+| `parse_version()` | `extract_version_tuple()` | models.py |
+| `is_mainline_openai_model()` | `is_standard_gpt_model()` | models.py |
+| `search_reddit()` | `search()` | openai_reddit.py |
+| `_extract_core_subject()` | `_core_subject()` | openai_reddit.py |
+| `_is_model_access_error()` | `_is_access_err()` | openai_reddit.py |
+| `_log_error()` | `_err()` | openai_reddit.py / xai_x.py |
+| `_log_info()` | `_info()` | openai_reddit.py |
+| `search_x()` | `search()` | xai_x.py |
+| `extract_reddit_path()` | `_parse_url()` | reddit_enrich.py |
+| `fetch_thread_data()` | `_fetch_thread()` | reddit_enrich.py |
+| `parse_thread_data()` | `_parse_thread()` | reddit_enrich.py |
+| `get_top_comments()` | `_top_comments()` | reddit_enrich.py |
+| `extract_comment_insights()` | `_extract_insights()` | reddit_enrich.py |
+| `enrich_reddit_item()` | `enrich()` | reddit_enrich.py |
+| `ensure_cache_dir()` | `_ensure_dir()` | cache.py |
+| `get_cache_key()` | `cache_key()` | cache.py |
+| `get_cache_path()` | `cache_path()` | cache.py |
+| `is_cache_valid()` | `is_valid()` | cache.py |
+| `load_cache()` | `load()` | cache.py |
+| `save_cache()` | `save()` | cache.py |
+| `load_cache_with_age()` | `load_with_age()` | cache.py |
+| `get_cache_age_hours()` | `age_hours()` | cache.py |
+| `clear_cache()` | `clear_all()` | cache.py |
+| `load_model_cache()` | `_load_model_prefs()` | cache.py |
+| `save_model_cache()` | `_save_model_prefs()` | cache.py |
+| `filter_by_date_range()` | `filter_dates()` | normalize.py |
+| `normalize_reddit_items()` | `to_reddit()` | normalize.py |
+| `normalize_x_items()` | `to_x()` | normalize.py |
+| `normalize_youtube_items()` | `to_youtube()` | normalize.py |
+| `items_to_dicts()` | `as_dicts()` | normalize.py |
+| `extract_date_from_url()` | `_date_from_url()` | websearch.py |
+| `extract_date_from_snippet()` | `_date_from_text()` | websearch.py |
+| `extract_date_signals()` | `_detect_date()` | websearch.py |
+| `extract_domain()` | `_domain()` | websearch.py |
+| `is_excluded_domain()` | `_is_excluded()` | websearch.py |
+| `parse_websearch_results()` | `process_results()` | websearch.py |
+| `normalize_websearch_items()` | `to_items()` | websearch.py |
+| `dedupe_websearch()` | `dedup_urls()` | websearch.py |
 
-The overall scoring algorithm structure is identical (compute raw engagement → normalize to 0-100 → weighted sum → apply penalties → clamp), but every tunable constant has been shifted by small amounts. This is consistent with someone taking the original constants and deliberately tweaking them to create surface-level differentiation.
+This is not two independent implementations arriving at similar names. This is a systematic bulk rename across the entire codebase.
 
-### 14. Content Fixture Files Have Different Data but Same Schema
 
-The content fixture files (`openai_sample.json`, `xai_sample.json`, `reddit_thread_sample.json`) contain completely different sample data (BriefBot uses Zigbee/home automation topics; Last30Days uses Claude Code topics) but follow the **exact same JSON structure** -- same keys, same nesting, same field names, same response format. This suggests the fixtures were regenerated with different content rather than written independently.
+### 9. Config Paths Follow Exact Same Pattern
 
-### 15. Identical Module Architecture (15+ 1:1 Module Mappings)
+| Aspect | Last30Days | BriefBot |
+|--------|-----------|----------|
+| Config dir | `~/.config/last30days/` | `~/.config/briefbot/` |
+| Config file | `~/.config/last30days/.env` | `~/.config/briefbot/.env` |
+| Cache dir | `~/.cache/last30days/` | `~/.cache/briefbot/` |
+| Debug env var | `LAST30DAYS_DEBUG` | `BRIEFBOT_DEBUG` |
+| User-Agent | `last30days-skill/2.1 (Assistant Skill)` | `briefbot-skill/1.0 (Claude Code Skill)` |
 
-Both projects have the same `scripts/lib/` directory with these modules mapping 1:1:
+Same `os.environ.get("...DEBUG", "").lower() in ("1", "true", "yes")` check in both.
 
-`schema.py`, `score.py`, `normalize.py`, `dedupe.py`, `dates.py`, `cache.py`, `http.py`, `render.py`, `ui.py`, `env.py`, `models.py`, `openai_reddit.py`, `xai_x.py`, `reddit_enrich.py`, `websearch.py`, `bird_x.py`
 
-This is not just similar file names -- each module serves the same purpose, exports the same function set (renamed), and uses the same internal algorithms.
+### 10. Scoring Weights Are Slightly Tweaked From the Same Formula
 
-### 16. Identical Depth/Quantity Configuration Tuples
+| Weight | Last30Days | BriefBot |
+|--------|-----------|----------|
+| Relevance (engagement sources) | 0.45 | 0.38 |
+| Recency (engagement sources) | 0.25 | 0.34 |
+| Engagement (engagement sources) | 0.30 | 0.28 |
+| WebSearch relevance | 0.55 | 0.58 |
+| WebSearch recency | 0.45 | 0.42 |
+| Unknown engagement penalty | 3 | 8 |
+| Low date confidence penalty | 5 | 7 |
+| Med date confidence penalty | 2 | 3 |
+| Web source penalty | 15 | 9 |
+| Web verified date bonus | 10 | 11 |
+| Web no-date penalty | 20 | 14 |
+| Baseline engagement | 35 | 45 |
 
-Both projects use the same specific depth presets:
+The formula `total = W_rel * relevance + W_rec * recency + W_eng * engagement` is identical in structure. The small weight adjustments look like deliberate tuning to differentiate.
 
-| Platform | Quick | Default | Deep |
-|----------|-------|---------|------|
-| Reddit | (15, 25) | (30, 50) | (70, 100) |
-| X | (8, 12) | (20, 30) | (40, 60) |
-| Timeouts | 90s | 120s | 180s |
 
-These specific numeric tuples (why 15/25 and not 10/20 or 20/30?) appear in both `openai_reddit.py` and `xai_x.py`.
+### 11. Reddit Engagement Formula: Same Structure, Different Coefficients
 
-### 17. Identical Config Key Management
+| Component | Last30Days | BriefBot |
+|-----------|-----------|----------|
+| score weight | 0.55 | 0.48 |
+| comments weight | 0.40 | 0.37 |
+| ratio multiplier | × 10 | × 12 |
+| ratio weight | 0.05 | 0.15 |
 
-`env.py` shares the same config architecture:
-- Same config file location pattern: `~/.config/<name>/.env`
-- Same dotenv parsing algorithm: skip blanks, skip `#` comments, skip lines without `=`, `partition("=")`, strip quotes
-- Same merge strategy: environment variables override file values via `os.environ.get(KEY) or file.get(KEY)`
-- Same config key names: `OPENAI_API_KEY`, `XAI_API_KEY`, `OPENAI_MODEL_POLICY` (default `"auto"`), `OPENAI_MODEL_PIN`, `XAI_MODEL_POLICY` (default `"latest"`), `XAI_MODEL_PIN`
-- Same platform detection logic: check `has_openai` / `has_xai` booleans → return `"both"`, `"reddit"`, `"x"`, or `"web"` via same if/elif chain
-- Same `validate_sources()` function with identical error message strings:
-  - `"Requested Reddit but only xAI key is available."`
-  - `"Requested X but only OpenAI key is available."`
+Same formula: `a * log1p(score) + b * log1p(comments) + c * (ratio * k)`. Same None/null guard pattern. Same conditional: `if eng.score is None and eng.num_comments is None: return None`.
 
-### 18. Identical Markdown Rendering Templates
 
-`render.py` shares the same rendering architecture:
-- Same freshness assessment algorithm: count recent items per source, compute `is_sparse` (threshold: `< 5`), compute `mostly_evergreen` (threshold: `< 0.3 * total`)
-- Same compact markdown structure: header → sparse warning → cache indicator → date range/mode/models → per-source sections
-- Same per-item format: `**{item.id}** (score:{item.score}) source_identifier{date_str}{conf}{eng}`
-- Same engagement formatting: `{value}pts`, `{value}cmt`, `{value}likes`, `{value}rt`
-- Same date display: `" ({item.date})"` or `" (date unknown)"`
-- Same confidence display: `" [date:{conf}]"` only when not `"high"`
-- Same X text truncation at 200 chars, web snippets at 150 chars
-- Same context snippet: aggregate items as `(score, source_name, text, url)` tuples, sort by `-score`, take top 7
-- Same artifact saving: `report.json`, `report.md`, context file, optional raw response files
+### 12. X Engagement Formula: Same Structure, Different Coefficients
 
-### 19. Identical Spinner and Progress System
+| Component | Last30Days | BriefBot |
+|-----------|-----------|----------|
+| likes weight | 0.55 | 0.45 |
+| reposts weight | 0.25 | 0.28 |
+| replies weight | 0.15 | 0.17 |
+| quotes weight | 0.05 | 0.10 |
 
-`ui.py` shares the same terminal UI architecture:
-- Same braille spinner frames: `['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']`
-- Same ANSI color codes (9 codes mapping to the same escape sequences, just renamed: `MAGENTA`↔`PURPLE`, `AZURE`↔`BLUE`, `TEAL`↔`CYAN`, `LIME`↔`GREEN`, `AMBER`↔`YELLOW`, `CRIMSON`↔`RED`)
-- Same `IS_TTY` detection via `sys.stderr.isatty()`
-- Same spinner algorithm: `\r` + color + frame + reset + message, `time.sleep(0.08)`, threaded on TTY, static with hourglass on non-TTY
-- Same thread-join timeout: 0.2 seconds
-- Same line-clear width: 80 spaces
-- Same Progress class structure: `start_reddit`/`end_reddit`, `start_x`/`end_x`, `start_processing`/`end_processing`, `show_cached`, `show_error`, `show_promo` -- method for method
-- Same phase color mapping: `reddit`→YELLOW, `x`→CYAN, `process`→PURPLE, `done`→GREEN, `error`→RED
+Same formula: `a * log1p(likes) + b * log1p(reposts) + c * log1p(replies) + d * log1p(quotes)`.
 
-### 20. Identical OpenAI Model Selection Algorithm
 
-`models.py` shares the same OpenAI model selection flow:
-1. Check for `"pinned"` policy → return pin immediately
-2. Check cache via `cache.get_cached_model("openai")`
-3. Query `https://api.openai.com/v1/models` (same URL in both)
-4. Fall back to hardcoded model list on `HTTPError`
-5. Filter to mainline models using exclude list: `['mini', 'nano', 'chat', 'codex', 'pro', 'preview', 'turbo']` (identical)
-6. Sort by `(version_tuple, created)` descending
-7. Pick first, cache it, return it
+### 13. Backward-Compatibility Aliases Reveal Renaming Process
 
-Same version extraction regex: `r'(\d+(?:\.\d+)*)'` with tuple conversion.
+BriefBot's `env.py` ends with:
+```python
+# -- Backward-compatible aliases for external callers --
+SETTINGS_DIRECTORY = CONFIG_DIR
+SETTINGS_FILEPATH = CONFIG_FILE
+parse_environment_file = parse_dotenv
+assemble_configuration = load_config
+```
 
-### 21. Identical Filler Word Sets
+BriefBot's `http.py` ends with:
+```python
+# Backward compat aliases for out-of-scope callers (models.py etc.)
+def perform_get_request(url, request_headers=None, **kw):
+    return get(url, headers=request_headers, **kw)
+def perform_post_request(url, json_payload=None, request_headers=None, **kw):
+    return post(url, json_payload, headers=request_headers, **kw)
+fetch_reddit_thread_data = reddit_json
+```
 
-The `_core_subject` / `_extract_core_subject` function in `openai_reddit.py` uses the same set of filler words to strip from queries (same 18 words: "best", "top", "tips", "how to", "guide", etc.). The same function in `bird_x.py`'s `_extract_core_subject` uses the same aggressive stripping with same max 3-word limit.
+These aliases suggest an intermediate rename phase where function names were changed but not all callers were updated simultaneously. This is consistent with a fork-and-rename workflow.
 
-### 22. Systematic Renaming Pattern Across All Files
 
-Every shared module shows a consistent renaming pattern. While the direction isn't uniform (sometimes BriefBot is more terse, sometimes more verbose), the pattern is clearly systematic:
+### 14. HTTP Client Is the Same Stdlib-Only Approach
 
-| Module | BriefBot | Last30Days |
-|--------|----------|------------|
-| cache.py | `cache_key`, `load`, `save`, `is_valid`, `clear_all` | `get_cache_key`, `load_cache`, `save_cache`, `is_cache_valid`, `clear_cache` |
-| dates.py | `date_window`, `date_confidence` | `get_date_range`, `get_date_confidence` |
-| dedupe.py | `normalize`, `ngrams`, `jaccard`, `find_dupes` | `normalize_text`, `get_ngrams`, `jaccard_similarity`, `find_duplicates` |
-| http.py | `_debug`, `reddit_json` | `log`, `get_reddit_json` |
-| score.py | `_log1p`, `_to_pct`, `score_reddit`, `rank` | `log1p_safe`, `normalize_to_100`, `score_reddit_items`, `sort_items` |
-| normalize.py | `filter_dates`, `to_reddit`, `to_x`, `as_dicts` | `filter_by_date_range`, `normalize_reddit_items`, `normalize_x_items`, `items_to_dicts` |
-| render.py | `compact`, `context_fragment`, `save_artifacts` | `render_compact`, `render_context_snippet`, `write_outputs` |
-| schema.py | `make_report` | `create_report` |
+Both use `urllib.request` (no `requests` library) with:
+- Custom `HTTPError` class with `status_code` and `body` attributes
+- Same `request()` function signature: `method, url, headers, json_body/json_data, timeout, retries`
+- Same retry logic: don't retry 4xx except 429 (BriefBot also retries 503)
+- Same error handling chain: HTTPError → URLError → JSONDecodeError → OSError/TimeoutError
+- Same convenience wrappers: `get()`, `post()`, `reddit_json()`/`get_reddit_json()`
+- Same reddit URL normalization: strip trailing slash, append `.json`, add `?raw_json=1`
 
-The sheer breadth and consistency of this renaming across 15+ modules strongly suggests a deliberate transformation pass rather than organic independent development.
+
+### 15. Reddit Enrichment Pipeline Is the Same 5-Step Process
+
+Both `reddit_enrich.py`:
+1. Extract path from URL (same `urlparse` check for `"reddit.com"`)
+2. Fetch thread JSON (same `http.reddit_json(path)` call)
+3. Parse into `{"submission": {...}, "comments": [...]}` (same Reddit JSON structure: `data.children[0].data` for submission, `data.children` + `kind == "t1"` for comments)
+4. Get top N comments sorted by score, excluding `[deleted]`/`[removed]`
+5. Extract insights: skip short (<25/30 chars), skip low-value patterns (same regex list: "yep", "nope", "same", "agreed", "lol", etc.), truncate at sentence boundary (same logic: look for `.!?` after position 50/65)
+
+BriefBot's `_extract_insights()` uses `limit * 3` candidates, Last30Days uses `limit * 2` -- minor tweak.
 
 ---
 
 ## LIGHT INDICATORS
 
-These are consistent with the overall pattern but individually could arise from common conventions or similar requirements.
+These are differences or additions in BriefBot that could represent genuine new development on top of the derived base, or could also be part of a differentiation effort.
 
-### 23. Same Default Values Throughout
+### 16. BriefBot Adds LinkedIn as a Source
 
-Both projects use the same defaults across multiple modules:
-- Default research window: 30 days
-- Default relevance: 0.5 (Reddit, X, Web)
-- Default n-gram size: 3 (dedupe.py)
-- Default dedup threshold: 0.7 (dedupe.py)
-- Default max top comments: 10 (reddit_enrich.py)
-- Default max insights: 7 (reddit_enrich.py)
-- Insight candidate pool: `limit * 2`
-- Cache TTL: 24 hours standard, 7 days for model selection
-- Minimum comment length for insight: 30 chars
-- Insight sentence boundary search start: position 50
+BriefBot includes `LinkedInItem` dataclass, `openai_linkedin.py` module, `_linkedin_engagement()` scoring, `to_linkedin()` normalization, and `dedupe_linkedin()`. Last30Days has no LinkedIn support. This is new functionality.
 
-### 24. Same Sort Tiebreaking Strategy
+### 17. BriefBot Adds Delivery Features
 
-Both `rank`/`sort_items` functions use the same 4-tuple sort key:
-```python
-(-score, -int(date.replace("-", "")), source_priority, text)
-```
-With the same source priority: Reddit=0, X=1, YouTube=2, Web=3/4. Same date fallback: `"0000-00-00"`. Same text extraction: `getattr(item, "title", "") or getattr(item, "text", "")`.
+BriefBot includes modules not present in Last30Days:
+- `email_sender.py` -- SMTP email delivery
+- `telegram_sender.py` / `telegram_bot.py` -- Telegram delivery and listener
+- `deliver.py` -- Unified delivery dispatch
+- `scheduler.py` / `jobs.py` -- Scheduled job management
+- `run_job.py` -- Cron job executor
+- `setup.py` -- Interactive configuration wizard
+- `cron_parse.py` -- Cron expression parser
+- `tts.py` -- Text-to-speech audio generation
+- `pdf.py` -- PDF generation
+- `chrome_cookies.py` -- Chrome cookie extraction
+- `claude_search.py` -- Claude search integration
 
-### 25. Same ID Prefix Conventions
+### 18. BriefBot Adds a KNOWLEDGE Query Type
 
-Both use the same ID prefix patterns: Reddit items → `R{n}`, X items → `X{n}`, Web items → `W{n}`.
+BriefBot's SKILL.md includes a 5th query type: KNOWLEDGE ("explain [topic]", "what is [topic]"). Last30Days only has PROMPTING, RECOMMENDATIONS, NEWS, GENERAL.
 
-### 26. BriefBot Extends Last30Days' Architecture With New Features
+### 19. Dedupe Uses Different N-Gram Size and Threshold
 
-BriefBot adds features that build naturally on top of Last30Days' foundation:
-- **LinkedIn** platform support (new `openai_linkedin.py`, additions to schema/score/normalize/render/dedupe)
-- **Email delivery** via SMTP (`email_sender.py`)
-- **Telegram delivery** via Bot API (`telegram_sender.py`)
-- **Audio/TTS** via ElevenLabs or edge-tts (`tts.py`)
-- **PDF generation** with 3 backend fallbacks (`pdf.py`)
-- **Cron scheduling** with cross-platform support (`scheduler.py`, `cron_parse.py`, `jobs.py`)
-- **Setup wizard** (`--setup` flag)
-- **Cookie bridge** Chrome extension for X auth (`scripts/lib/cookie-bridge/`)
+| Parameter | Last30Days | BriefBot |
+|-----------|-----------|----------|
+| N-gram size | 3 | 4 |
+| Default threshold | 0.7 | 0.65 |
+| Stop word removal | No | Yes |
+| Jaccard denominator | `intersection / union` | `intersection / (union + 1e-10)` |
 
-These additions follow the same architectural patterns established in Last30Days (dataclass schemas, per-platform modules, progressive enhancement), suggesting familiarity with the original codebase's design philosophy.
+Same algorithm, different tuning parameters. BriefBot adds stop word removal to the normalization step.
 
-### 27. Same bird_x.py Vendored Dependency
+### 20. Recency Score Formula Differs Slightly
 
-`bird_x.py` is ~95% identical between both projects. Same `_extract_core_subject()` function, same `is_bird_installed()`, same `is_bird_authenticated()`, same `search_x()`, same `search_handles()`, same `parse_bird_response()`. The vendored `bird-search.mjs` Node.js module is the same version from the same source (`@steipete/bird v0.8.0`).
+- **Last30Days**: `int(100 * (1 - age / max_days))` (linear decay)
+- **BriefBot**: `int(100 * ((max_days - age) / max_days) ** 0.95)` (slightly sub-linear decay)
 
-### 28. Same WebSearch Fallback Instruction Block
+Same 0-100 range, same edge cases (None→0, negative→100, ≥max_days→0).
 
-Both main orchestrators print nearly identical multi-line instructions when web search is needed:
-```
-============================================================
-### WEBSEARCH REQUIRED ###
-============================================================
-Topic: {topic}
-Date range: {start} to {end}
-[instructions to find 8-15 web pages, exclude reddit/x, include blogs/news]
-============================================================
-```
+### 21. Different Model Fallback Lists in xai_x.py
 
-Only difference: BriefBot says "Claude" while Last30Days says "Assistant".
+BriefBot's xai_x.py has a more sophisticated fallback strategy: hardcoded list → dynamic API discovery via `models.discover_xai_models()` → dynamic candidates. Last30Days's version is simpler with no 403 fallback chain in xai_x.py (though the model selection is done in models.py).
+
+### 22. BriefBot's models.py Has More Verbose Logging
+
+BriefBot's model selection functions include extensive `_log()` debug output for every step. Last30Days's version is more concise with fewer debug lines.
+
+### 23. BriefBot Adds `cache_stats()` and `clear_all()` Preserves Model Prefs
+
+BriefBot's cache.py adds a `cache_stats()` function and its `clear_all()` preserves `model_prefs.json`. Last30Days's `clear_cache()` deletes everything.
 
 ---
 
 ## Summary
 
-| Category | Count | Key Evidence |
-|----------|-------|-------------|
-| **Strong** | 12 | Identical engagement formulas, identical HTTP error architecture, identical response parsing algorithm, identical data class hierarchy, identical enrichment pipeline, mechanically offset fixture timestamps, identical websearch date extraction, identical dedup algorithm, semantically identical prompts, identical orchestrator pipeline, identical cache system, identical date utilities |
-| **Mediocre** | 10 | Tweaked scoring weights, regenerated fixtures, identical module architecture, identical depth tuples, identical config management, identical rendering templates, identical progress UI, identical model selection, identical filler words, systematic renaming across all files |
-| **Light** | 6 | Same defaults, same sort tiebreaking, same ID prefixes, features extend original architecture, same vendored dependency, same WebSearch fallback text |
+| Category | Count |
+|----------|-------|
+| Strong indicators | 7 |
+| Mediocre indicators | 8 |
+| Light indicators | 8 |
 
-**Overall Assessment:** The evidence overwhelmingly indicates that BriefBot was created by taking the Last30Days codebase and applying a transformation pass that included: renaming functions/variables/constants, rewording prompts and docstrings, slightly tweaking scoring constants, regenerating content fixtures with different topics (while keeping model fixtures nearly identical), and then adding new features (LinkedIn, email, Telegram, TTS, scheduling). The forensic fingerprint of the model fixture timestamps being offset by exactly +86400 seconds is particularly telling -- it reveals a mechanical derivation process rather than independent development.
+The evidence overwhelmingly indicates that **BriefBot is a systematic fork of Last30Days** with three types of modifications applied:
+
+1. **Bulk rename**: Every function, variable, constant, config path, and error message has been renamed following a consistent pattern (shorter names, underscore-prefixed private functions, different verb choices).
+
+2. **Coefficient tweaks**: Scoring weights, thresholds, penalties, and algorithm parameters have been adjusted by small amounts (e.g., 0.45→0.38, 0.55→0.48, 0.7→0.65) to differentiate numerically while preserving the same formulas.
+
+3. **Feature additions**: LinkedIn support, delivery mechanisms (email/Telegram/TTS/PDF), scheduled jobs, knowledge query type, and a configuration wizard have been added on top of the derived base.
+
+The core research pipeline -- schema, scoring, deduplication, date handling, caching, HTTP client, API integrations (OpenAI Reddit + xAI X), Reddit enrichment, web search processing, and the SKILL.md routing framework -- is functionally identical between the two projects.

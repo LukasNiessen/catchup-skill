@@ -44,7 +44,8 @@ if sys.platform == "win32":
 MODULE_ROOT = Path(__file__).parent.resolve()
 sys.path.insert(0, str(MODULE_ROOT))
 
-from lib import env, telegram_sender
+from briefbot_engine import config
+from briefbot_engine.delivery import telegram
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -259,7 +260,7 @@ def _remove_chat_id_from_env(chat_id: str) -> None:
 
 def _load_allowed_chat_ids() -> set:
     """Reads the current whitelist from .env (live reload)."""
-    config = env.assemble_configuration()
+    config = config.load_config()
     raw = config.get("TELEGRAM_CHAT_ID", "")
     return {cid.strip() for cid in raw.split(",") if cid.strip()}
 
@@ -384,7 +385,7 @@ def cli_pair_approve(code: str) -> None:
     print("\nThe bot will pick up the new whitelist automatically.")
 
     # Try to notify the user on Telegram
-    config = env.assemble_configuration()
+    config = config.load_config()
     token = config.get("TELEGRAM_BOT_TOKEN")
     if token:
         try:
@@ -498,7 +499,7 @@ def _get_updates(token: str, offset: int) -> list:
 
 def _send_message(token: str, chat_id: str, text: str) -> None:
     """Sends a plain-text message to a Telegram chat."""
-    telegram_sender._call_telegram_api(
+    telegram._call_telegram_api(
         token,
         "sendMessage",
         {
@@ -749,7 +750,7 @@ def run_research_lite(topic: str, flags: str, chat_id: str, config: dict) -> Non
         raise RuntimeError("briefbot.py produced no output")
 
     # Deliver via Telegram
-    telegram_sender.send_telegram_message(
+    telegram.send_telegram_message(
         chat_id=chat_id,
         markdown_body=md_output,
         subject="BriefBot: {}".format(topic),
@@ -804,7 +805,7 @@ def handle_research(
                             len(response),
                             chat_id,
                         )
-                        telegram_sender.send_telegram_message(
+                        telegram.send_telegram_message(
                             chat_id=chat_id,
                             markdown_body=response,
                             subject="Follow-up: {}".format(
@@ -897,7 +898,7 @@ def main() -> None:
     log.info("Wrote PID file: %s (pid=%d)", PID_FILE, _os.getpid())
 
     # Load config
-    config = env.assemble_configuration()
+    config = config.load_config()
     token = config.get("TELEGRAM_BOT_TOKEN")
 
     if not token:
