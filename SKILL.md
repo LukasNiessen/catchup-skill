@@ -1,6 +1,7 @@
 ---
 name: briefbot
-description: Perform cross-source, last-30-day intelligence gathering (Reddit, X, YouTube, LinkedIn, Web), then synthesize action-ready guidance and prompts, or answer knowledge-only requests directly.
+version: "1.0"
+description: Perform in-depth research on any topic. Uses Reddit, X, YouTube, LinkedIn, Web, then synthesizes action-ready guidance and prompts, or answer knowledge-only requests directly.
 argument-hint: "nano banana pro prompts, Anthropic news, best AI claude code skills, explain RAG"
 context: fork
 disable-model-invocation: true
@@ -23,31 +24,27 @@ Treat the full user input as: `$ARGUMENTS`
 
 ---
 
-Research any topic across Reddit, X, YouTube, LinkedIn, and the web. Surface what people are discussing, recommending, and debating now, or answer knowledge questions directly.
+Research any topic in depth. BriefBot looks into X, Google, Reddit, YouTube, LinkedIn. Set up a CRON job to get daily or weekly briefings. Know more than anyone else in the room.
 
-Primary scenarios:
-
-- **Prompting**: "Flux portrait workflows", "Stable Diffusion prompts", "ChatGPT image generation tips" → learn techniques, get copy-paste prompts
-- **Recommendations**: "best VS Code AI extensions", "top coding fonts", "recommended Figma plugins" → get a LIST of specific things people mention
-- **News**: "what's happening with OpenAI", "latest AI announcements", "new React features" → current events and updates
-- **General**: any subject you're curious about → understand what the community is saying
-- **Knowledge**: "explain how attention works", "what is RAG", "CNNs vs transformers" → get a thorough expert answer without live research
-
-## ESSENTIAL: Request Classification
+## MUST DO: Request Classification
 
 Before any tool calls, classify the request into three internal fields:
 
 1. **FOCUS_AREA**: The thing they want to explore (e.g., "dashboard wireframes", "open-source LLMs")
 2. **USAGE_TARGET** (optional): Tool/product where output will be used (e.g., "Midjourney", "ChatGPT", "Figma AI")
-3. **REQUEST_STYLE**: Which response mode matches best:
-  - **PROMPTING** - "X prompts", "prompting for X", "X best practices"
-  - **RECOMMENDATIONS** - "best X", "top X", "what X should I use", "recommended X"
-  - **NEWS** - "what's happening with X", "X news", "latest on X"
-  - **GENERAL** - community research requests not covered above
-  - **KNOWLEDGE** - direct explanation requests ("what is", "how does", "X vs Y", etc.)
+3. **TURNED_OFF_SEARCH** (optional): Tool/product where output will be used (e.g., "Midjourney", "ChatGPT", "Figma AI")
+4. **REQUEST_STYLE**: Which response mode matches best:
+
+- **PROMPTING** - "X prompts", "prompting for X", "X best practices"
+- **RECOMMENDATIONS** - "best X", "top X", "what X should I use", "recommended X"
+- **NEWS** - "what's happening with X", "X news", "latest on X"
+- **GENERAL** - community research requests not covered above
+- **KNOWLEDGE** - direct explanation requests ("what is", "how does", "X vs Y", etc.)
 
 Fast intent heuristics:
 
+- `dont search. [...]` → "dont search. LLM algorithm basics" → TURNED_OFF_SEARCH IS true
+- `use only knowledge. [...]` → "use only knowledge. How does inflation work?" → TURNED_OFF_SEARCH IS true
 - `[topic] for [tool]` → "portrait lighting for Midjourney" → TOOL IS SPECIFIED
 - `[topic] prompts for [tool]` → "UI layout prompts for Figma AI" → TOOL IS SPECIFIED
 - Just `[topic]` → "iOS onboarding flows" → TOOL NOT SPECIFIED, that's OK
@@ -57,28 +54,26 @@ Fast intent heuristics:
 - "what is [topic]" or "tell me about [topic]" → REQUEST_STYLE = KNOWLEDGE
 - "[topic] vs [topic]" or "difference between X and Y" → REQUEST_STYLE = KNOWLEDGE
 
-**IMPORTANT: Do not ask tool-selection questions before the first research pass.**
+**MUST DO: Store these internal variables:**
 
-- If tool is specified in the query, use it
-- If tool is NOT specified, run research first, then ask AFTER showing results
-
-**Store these internal variables:**
-
-- `FOCUS_AREA = [extracted topic]`
-- `USAGE_TARGET = [extracted tool, or "unknown" if not specified]`
+- `TURNED_OFF_SEARCH = [true/false]`
+- `FOCUS_AREA = [determined topic]`
+- `USAGE_TARGET = [determined tool or "unknown"]`
 - `REQUEST_STYLE = [RECOMMENDATIONS | NEWS | PROMPTING | GENERAL | KNOWLEDGE]`
 
-**Show your parsing to the user.** Before running tools, print:
+**NEXT ACTION - MUST DO:** Before anything else, print to the user:
 
-````
-I'll map the current conversation around {FOCUS_AREA} across Reddit, X, and the web from the last 30 days.
+```
+🐉🤖 BriefBot here! 🤖🐉
 
-Parsed request:
-- FOCUS_AREA = {FOCUS_AREA}
-- USAGE_TARGET = {USAGE_TARGET or "unknown"}
-- REQUEST_STYLE = {REQUEST_STYLE}
+[SENTENCE LIKE: I see you want to talk about FOCUS_AREA, with USAGE_TARGET, and REQUEST_STYLE.] [A NICE WARM SENTENCE; EG: This is a very interesting topic (EMOJI) Let's look into it, I'm excited.]
 
-Investigation typically takes 2-8 minutes (niche subjects take longer). Starting now.
+I will start [COOL FUNKY WORD DESCRIBING "RESEARCH" BUT IN A METAPHORIC WAY]("researching") now. This may take somewhere between 1 and 10 minutes...
+```
+
+IMPORTANT: Add emojis that fit the topic, focus, mood. If TURNED_OFF_SEARCH is true, add to the very bottom:
+
+`⚠️ As you wished, I will NOT search the internet! ⚠️`
 
 ---
 
@@ -124,7 +119,7 @@ ENVEOF
 chmod 600 ~/.config/briefbot/.env
 echo "Config created at ~/.config/briefbot/.env"
 echo "Edit to add your API keys for enhanced research."
-````
+```
 
 **DO NOT stop if no keys are configured.** Proceed with web-only mode.
 
@@ -202,9 +197,9 @@ After applying changes, run `--show` again, present the refreshed config, and as
 
 ---
 
-## If REQUEST_STYLE = KNOWLEDGE: 🧠 Direct Answer Path
+## If TURNED_OFF_SEARCH: 🧠 Direct Answer Path
 
-**If the user's query is a knowledge question, skip the research pipeline and answer directly.**
+### CRITICAL: If TURNED_OFF_SEARCH is true, skip the research pipeline and answer directly!
 
 **Step 1: Decide whether supplemental search helps**
 
@@ -243,9 +238,11 @@ The `> **Try next:**` line MUST be the very last line. It becomes the grey auto-
 
 ## Research Execution Flow
 
-**If REQUEST_STYLE = KNOWLEDGE, skip this entire section.**
+**If TURNED_OFF_SEARCH or REQUEST_STYLE = KNOWLEDGE, skip this entire section.**
 
 **IMPORTANT: API key detection is automatic.** Run the script, then determine mode from output.
+
+### CRITICAL: This command MUST be in the FOREGROUND. Do NOT use run_in_background. You will need the data it returns.
 
 **Step 1: Run the research script**
 
@@ -253,13 +250,15 @@ The `> **Try next:**` line MUST be the very last line. It becomes the grey auto-
 PY=$(python3 -c "" 2>/dev/null && echo python3 || echo python) && $PY ~/.claude/skills/briefbot/scripts/briefbot.py "$ARGUMENTS" --emit=compact 2>&1
 ```
 
-The script will automatically:
+Use a timeout of 10 minutes on this bash call. The script does:
 
-- Detect available API keys
-- Run Reddit/X searches if keys exist
+- Detect API keys
+- Search through Reddit/X if keys exist
 - Signal if WebSearch is needed
 
 **Schedule-only mode:** If `$ARGUMENTS` contains both `--schedule` and `--skip-immediate-run`, the script will create the scheduled job and exit. In this case, **STOP HERE** — do not proceed with WebSearch, synthesis, or delivery. Just report the scheduling result from the script output to the user and you're done.
+
+**MUST DO:** Read the FULL output. All of it is critical for you to know.
 
 **Step 2: Read run mode**
 
@@ -271,53 +270,57 @@ Interpret run mode from script output:
 
 **Step 3: Run WebSearch**
 
-For **ALL modes**, perform WebSearch to supplement (or provide all data in web-only mode).
+**MUST DO:** IMPORTANT: Before you do a websearch, WAIT FOR THE SCRIPT TO FINISH.
 
-Tailor your search queries to match the REQUEST_STYLE:
+This step, running the WebSearch, is ALWAYS NEEDED. In other words, RUN THE WEBSEARCH REGARDLESS OF WHICH REQUEST_STYLE.
 
-**If RECOMMENDATIONS** ("best X", "top X", "what X should I use"):
+However, tailor your search queries to match the REQUEST_STYLE:
 
-- Query: `top {FOCUS_AREA} recommendations`
-- Query: `{FOCUS_AREA} examples list`
-- Query: `most widely used {FOCUS_AREA}`
-- Objective: Surface ACTUAL NAMED items, not vague guidance
-
-**If NEWS** ("what's happening with X", "X news"):
+**If NEWS**:
 
 - Query: `{FOCUS_AREA} latest news 2026`
 - Query: `{FOCUS_AREA} recent announcement`
 - Objective: Capture breaking stories and recent happenings
 
-**If PROMPTING** ("X prompts", "prompting for X"):
+**If RECOMMENDATIONS**:
 
-- Query: `{FOCUS_AREA} prompt examples 2026`
-- Query: `{FOCUS_AREA} tips techniques`
-- Objective: Gather real prompting strategies and ready-to-use examples
+- Query: `{FOCUS_AREA} examples list`
+- Query: `most widely used {FOCUS_AREA}`
+- Query: `best {FOCUS_AREA} recommendations`
+- Objective: Surface ACTUAL NAMED items, not vague guidance
 
-**If GENERAL** (default):
+**If GENERAL**:
 
 - Query: `{FOCUS_AREA} 2026`
 - Query: `{FOCUS_AREA} community discussion`
 - Objective: Discover what people are genuinely talking about
 
+**If PROMPTING**:
+
+- Query: `{FOCUS_AREA} prompt examples 2026`
+- Query: `{FOCUS_AREA} tips techniques`
+- Objective: Gather real prompting strategies and ready-to-use examples
+
+### MUST DO, IMPORTANT
+
 Apply these rules regardless of query class:
 
 - **PRESERVE THE USER'S EXACT WORDING** — do not swap in or append technology names from your own knowledge
-  - If the user typed "Flux LoRA training", search exactly that phrase
-  - Do NOT inject related terms like "Stable Diffusion", "ComfyUI", etc. on your own
   - The user's terminology may reflect newer usage than your training data — defer to it
 - SKIP reddit.com, x.com, twitter.com (the script already covers those)
 - PRIORITIZE: blogs, tutorials, documentation, news sites, GitHub repositories
-- **SUPPRESS any "Sources:" list in output** — that's clutter; stats appear at the end
+- **SUPPRESS any "Sources:" list in output**
+  - If the user typed "Flux LoRA training", search exactly that phrase
+  - Do NOT inject related terms like "Stable Diffusion", "ComfyUI", etc. on your own
 
 **Step 4: Wait for background script to complete**
 Read TaskOutput and wait for script completion before synthesis.
 
-**Depth options** (passed through from user's command):
+**Depth options** (from the user's command):
 
-- `--quick` → Faster, fewer sources (8-12 each)
-- (default) → Balanced (20-30 each)
-- `--deep` → Comprehensive (50-70 Reddit, 40-60 X)
+- (default) → Use about 30-40 sources
+- `--deep` → Use about 50-80 sources
+- `--quick` → Use about 6-10 sources
 
 **Time range options:**
 
@@ -395,25 +398,25 @@ Multiple recipients: `--email alice@example.com,bob@example.com`
 
 ## Synthesis Stage: Merge Evidence
 
-**After all searches complete, internally consolidate (don't display stats yet):**
+When ALL searches are finished, internally consolidate. Synthesis requirements:
 
-Synthesis requirements:
-
-1. Weight Reddit/X sources HIGHER (they carry engagement signals: upvotes, likes)
-2. Weight WebSearch sources LOWER (no engagement data)
-3. Identify patterns that surface across ALL three sources (strongest signals)
-4. Flag any contradictions between sources
-5. Distill the top 3-5 actionable insights
-
-**Do NOT display stats here - they come at the end, right before the invitation.**
+1. Weight WebSearch sources LOW
+2. Weight X and Reddit sources HIGH
+3. If something is on all sources, that's a VERY HIGH weight
+4. Distill the top 2-6 actionable insights
+5. Flag any contradictions between sources
+6. Note some key takeaways
+7. Come up with metaphors for the key takeaways and use emojis in them
 
 ---
 
-## FIRST: Anchor To Retrieved Evidence
+##HEREBRO##
 
-**NON-NEGOTIABLE: Base your synthesis ENTIRELY on what the research returned, not on background knowledge you already had.**
+## Process the retrieved data
 
-Read returned evidence carefully. Focus on:
+**HIGHLY IMPORTANT: Base your synthesis ENTIRELY on what the research returned, not on background knowledge you already had.**
+
+**STEP 1:** Read all retrieved data
 
 - **Exact names of products and tools** as they appear (e.g., if the data references "PixelForge" or "@pixelforge_ai", treat that as its own distinct entity — do not merge it with a different product you happen to know about)
 - **Direct quotes and concrete findings** from the sources — lean on THESE rather than falling back to general knowledge
@@ -497,7 +500,7 @@ _Why this is better: The mental model ("reasoning-first, treat it like a design 
 
 ---
 
-## THEN: Present Findings And Invite Next Action
+## NEXT STEP: Present Findings And Invite Next Action
 
 **CRITICAL: Do not print a standalone "Sources:" block. Keep presentation clean.**
 
@@ -516,7 +519,7 @@ _Why this is better: The mental model ("reasoning-first, treat it like a design 
 4. **[Specific name]** - mentioned {n}x (sources)
 5. **[Specific name]** - mentioned {n}x (sources)
 
-**Notable mentions:** [other specific things with 1-2 mentions]
+**Notable mentions:** [other stuff with 1 or 2 mentions]
 ```
 
 **If PROMPTING/NEWS/GENERAL** - Show mental model + techniques (TWO distinct sections):
@@ -594,6 +597,8 @@ For **web-only mode** (no API keys):
 **LAST - Invitation (research-driven examples + suggested prompt):**
 
 **Do NOT use a generic numbered menu.** Instead, offer 2-3 **specific, vivid example prompts** that showcase the techniques you just presented. These examples must be grounded in the research findings — they should demonstrate the key techniques in action.
+
+**MUST DO:** use an emoji that fits the topic in the invitation
 
 ```
 ---
