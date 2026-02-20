@@ -1,6 +1,6 @@
 ---
 name: briefbot
-description: Investigate a topic from the last 30 days on Reddit + X + YouTube + LinkedIn + Web, become an expert, and write copy-paste-ready prompts — or answer knowledge questions directly.
+description: Perform cross-source, last-30-day intelligence gathering (Reddit, X, YouTube, LinkedIn, Web), then synthesize action-ready guidance and prompts, or answer knowledge-only requests directly.
 argument-hint: "nano banana pro prompts, Anthropic news, best AI claude code skills, explain RAG"
 context: fork
 disable-model-invocation: true
@@ -9,23 +9,23 @@ allowed-tools: Bash, Read, Write, AskUserQuestion, WebSearch
 
 # 🔎 BriefBot
 
-## ROUTING — Read this first, skip to the correct section
+## ROUTING - Entry Rules
 
-The user's input is: `$ARGUMENTS`
+Treat the full user input as: `$ARGUMENTS`
 
-**If the input is `--setup` or `setup`:** Skip everything below. Go DIRECTLY to the section titled **"Configuration Wizard"** and follow those instructions. Do NOT determine intent. Do NOT run research. Do NOT parse a topic.
+**If input is `--setup` or `setup`:** Jump directly to **"Configuration Wizard"** and execute only that flow. Skip intent parsing and skip research.
 
-**If the input is `--list-jobs` or `list-jobs`:** Run `PY=$(python3 -c "" 2>/dev/null && echo python3 || echo python) && $PY ~/.claude/skills/briefbot/scripts/briefbot.py --list-jobs 2>&1`, show the output, and STOP.
+**If input is `--list-jobs` or `list-jobs`:** Run `PY=$(python3 -c "" 2>/dev/null && echo python3 || echo python) && $PY ~/.claude/skills/briefbot/scripts/briefbot.py --list-jobs 2>&1`, print output, then stop.
 
-**If the input starts with `--delete-job` or `delete-job`:** Run `PY=$(python3 -c "" 2>/dev/null && echo python3 || echo python) && $PY ~/.claude/skills/briefbot/scripts/briefbot.py $ARGUMENTS 2>&1`, show the output, and STOP.
+**If input starts with `--delete-job` or `delete-job`:** Run `PY=$(python3 -c "" 2>/dev/null && echo python3 || echo python) && $PY ~/.claude/skills/briefbot/scripts/briefbot.py $ARGUMENTS 2>&1`, print output, then stop.
 
-**Otherwise:** The input is a research topic. Continue to "Determine User Intent" below.
+**Otherwise:** Treat input as a research topic and continue with intent classification.
 
 ---
 
-Investigate ANY subject across Reddit, X, YouTube, LinkedIn, and the web. Surface what people are actually discussing, recommending, and debating right now — or answer knowledge questions directly from expertise.
+Research any topic across Reddit, X, YouTube, LinkedIn, and the web. Surface what people are discussing, recommending, and debating now, or answer knowledge questions directly.
 
-Supported scenarios:
+Primary scenarios:
 
 - **Prompting**: "Flux portrait workflows", "Stable Diffusion prompts", "ChatGPT image generation tips" → learn techniques, get copy-paste prompts
 - **Recommendations**: "best VS Code AI extensions", "top coding fonts", "recommended Figma plugins" → get a LIST of specific things people mention
@@ -33,9 +33,9 @@ Supported scenarios:
 - **General**: any subject you're curious about → understand what the community is saying
 - **Knowledge**: "explain how attention works", "what is RAG", "CNNs vs transformers" → get a thorough expert answer without live research
 
-## ESSENTIAL: Intent Triage
+## ESSENTIAL: Request Classification
 
-Before doing anything, classify the request into three internal fields:
+Before any tool calls, classify the request into three internal fields:
 
 1. **FOCUS_AREA**: The thing they want to explore (e.g., "dashboard wireframes", "open-source LLMs")
 2. **USAGE_TARGET** (optional): Tool/product where output will be used (e.g., "Midjourney", "ChatGPT", "Figma AI")
@@ -46,7 +46,7 @@ Before doing anything, classify the request into three internal fields:
   - **GENERAL** - community research requests not covered above
   - **KNOWLEDGE** - direct explanation requests ("what is", "how does", "X vs Y", etc.)
 
-Common patterns:
+Fast intent heuristics:
 
 - `[topic] for [tool]` → "portrait lighting for Midjourney" → TOOL IS SPECIFIED
 - `[topic] prompts for [tool]` → "UI layout prompts for Figma AI" → TOOL IS SPECIFIED
@@ -57,18 +57,18 @@ Common patterns:
 - "what is [topic]" or "tell me about [topic]" → REQUEST_STYLE = KNOWLEDGE
 - "[topic] vs [topic]" or "difference between X and Y" → REQUEST_STYLE = KNOWLEDGE
 
-**IMPORTANT: Do NOT ask a question about target tool before you do research.**
+**IMPORTANT: Do not ask tool-selection questions before the first research pass.**
 
 - If tool is specified in the query, use it
 - If tool is NOT specified, run research first, then ask AFTER showing results
 
-**Store these variables:**
+**Store these internal variables:**
 
 - `FOCUS_AREA = [extracted topic]`
 - `USAGE_TARGET = [extracted tool, or "unknown" if not specified]`
 - `REQUEST_STYLE = [RECOMMENDATIONS | NEWS | PROMPTING | GENERAL | KNOWLEDGE]`
 
-**DISPLAY your parsing to the user.** Before running any tools, output:
+**Show your parsing to the user.** Before running tools, print:
 
 ````
 I'll map the current conversation around {FOCUS_AREA} across Reddit, X, and the web from the last 30 days.
@@ -82,18 +82,18 @@ Investigation typically takes 2-8 minutes (niche subjects take longer). Starting
 
 ---
 
-## Initial Configuration (Optional but Encouraged)
+## Initial Configuration (Optional)
 
-The skill operates in multiple modes based on available API keys:
+Execution mode is selected from available keys/cookies:
 
 1. **Full Mode** (both keys): Reddit + X + YouTube + LinkedIn + WebSearch - best results with engagement metrics
 2. **OpenAI Only** (OPENAI_API_KEY): Reddit + YouTube + LinkedIn + WebSearch
 3. **xAI Only** (XAI_API_KEY): X-only + WebSearch
 4. **Web-Only Mode** (no keys): WebSearch only - still useful, but no engagement metrics
 
-**API keys are OPTIONAL.** The skill will function without them using WebSearch fallback.
+**API keys are optional.** Without them, the workflow uses WebSearch fallback.
 
-### First-Time Setup (Optional but Encouraged)
+### First-Time Setup (Optional)
 
 If the user wants to configure API keys, email, Telegram, or other settings, run the interactive setup wizard:
 
@@ -103,7 +103,7 @@ PY=$(python3 -c "" 2>/dev/null && echo python3 || echo python) && $PY ~/.claude/
 
 The wizard walks through all settings (API keys, audio, email/SMTP, Telegram, X cookies) and for each one shows the current value (masked for secrets) with options to keep, update, or clear it. It also offers to start/stop the Telegram bot listener.
 
-Alternatively, users can manually create the config file:
+Users can also create config manually:
 
 ```bash
 mkdir -p ~/.config/briefbot
@@ -130,11 +130,11 @@ echo "Edit to add your API keys for enhanced research."
 
 ---
 
-## Configuration Wizard (triggered by `/briefbot setup`)
+## Configuration Wizard (trigger: `/briefbot setup`)
 
 **If the user invoked `/briefbot setup` (or `/briefbot --setup`), follow the steps below and STOP.**
 
-The Bash tool cannot handle interactive stdin, so we drive the wizard conversationally.
+Because stdin interaction is unavailable in Bash, orchestrate this as a conversational step loop.
 
 ### Step 1: Read current config
 
@@ -142,9 +142,9 @@ The Bash tool cannot handle interactive stdin, so we drive the wizard conversati
 PY=$(python3 -c "" 2>/dev/null && echo python3 || echo python) && $PY ~/.claude/skills/briefbot/scripts/setup.py --show
 ```
 
-### Step 2: Show the user their current config
+### Step 2: Present current config
 
-Display a clean summary grouped by section. For each setting show the key, its current value (the `--show` output already masks secrets), and whether it's set or not. Example:
+Show a grouped summary. For each setting, include key name, masked value from `--show`, and set/unset state. Example:
 
 ```
 Here's your current BriefBot config:
@@ -162,7 +162,7 @@ Here's your current BriefBot config:
 - TELEGRAM_CHAT_ID: -5195114281,... (set)
 ```
 
-### Step 3: Ask what to change
+### Step 3: Ask for requested changes
 
 After showing the config, say:
 
@@ -175,7 +175,7 @@ After showing the config, say:
 
 Then **STOP and wait** for the user to respond.
 
-### Step 4: Apply changes
+### Step 4: Apply updates
 
 When the user tells you what to change, apply each change using:
 
@@ -196,13 +196,13 @@ PY=$(python3 -c "" 2>/dev/null && echo python3 || echo python) && $PY ~/.claude/
 PY=$(python3 -c "" 2>/dev/null && echo python3 || echo python) && $PY ~/.claude/skills/briefbot/scripts/setup.py --stop-bot
 ```
 
-After applying changes, re-run `--show` and display the updated config. Ask if they want to change anything else. Repeat until the user says they're done.
+After applying changes, run `--show` again, present the refreshed config, and ask for any additional edits. Repeat until user confirms completion.
 
-**Do not proceed to Research Execution.**
+**Do not continue into research execution.**
 
 ---
 
-## If INTENT_CLASS = KNOWLEDGE: 🧠 Direct Answer Path
+## If REQUEST_STYLE = KNOWLEDGE: 🧠 Direct Answer Path
 
 **If the user's query is a knowledge question, skip the research pipeline and answer directly.**
 
@@ -223,7 +223,7 @@ After applying changes, re-run `--show` and display the updated config. Ask if t
 End with:
 
 ```
-Want me to go deeper on any part of this, or research what the community is currently saying about {SUBJECT}?
+Want me to go deeper on any part of this, or research what the community is currently saying about {FOCUS_AREA}?
 
 > **Try next:** [a concrete follow-up question about the topic — e.g., "research what people are saying about RAG vs fine-tuning right now"]
 ```
@@ -234,18 +234,18 @@ The `> **Try next:**` line MUST be the very last line. It becomes the grey auto-
 
 - No stats blocks, no source counts, no research invitation
 - No Python script execution
-- If the user then asks for community research or "what people are saying", switch to INTENT_CLASS = GENERAL and run the full research pipeline below
+- If the user then asks for community research or "what people are saying", switch to REQUEST_STYLE = GENERAL and run the full research pipeline below
 - Keep the tone expert but accessible
 
 **After answering, STOP. Do not proceed to Research Execution.**
 
 ---
 
-## Research Execution
+## Research Execution Flow
 
-**If INTENT_CLASS = KNOWLEDGE, skip this entire section.**
+**If REQUEST_STYLE = KNOWLEDGE, skip this entire section.**
 
-**IMPORTANT: The script handles API key detection automatically.** Run it and check the output to determine mode.
+**IMPORTANT: API key detection is automatic.** Run the script, then determine mode from output.
 
 **Step 1: Run the research script**
 
@@ -261,46 +261,46 @@ The script will automatically:
 
 **Schedule-only mode:** If `$ARGUMENTS` contains both `--schedule` and `--skip-immediate-run`, the script will create the scheduled job and exit. In this case, **STOP HERE** — do not proceed with WebSearch, synthesis, or delivery. Just report the scheduling result from the script output to the user and you're done.
 
-**Step 2: Check the output mode**
+**Step 2: Read run mode**
 
-The script output will indicate the mode:
+Interpret run mode from script output:
 
 - **"Mode: all"**: Full mode with Reddit + X + YouTube + LinkedIn
 - **"Mode: both"** or **"Mode: reddit-only"** or **"Mode: x-only"**: Script found results, WebSearch is supplementary
 - **"Mode: web-only"**: No API keys, Claude must do ALL research via WebSearch
 
-**Step 3: Perform WebSearch**
+**Step 3: Run WebSearch**
 
 For **ALL modes**, perform WebSearch to supplement (or provide all data in web-only mode).
 
-Tailor your search queries to match the INTENT_CLASS:
+Tailor your search queries to match the REQUEST_STYLE:
 
 **If RECOMMENDATIONS** ("best X", "top X", "what X should I use"):
 
-- Query: `top {SUBJECT} recommendations`
-- Query: `{SUBJECT} examples list`
-- Query: `most widely used {SUBJECT}`
+- Query: `top {FOCUS_AREA} recommendations`
+- Query: `{FOCUS_AREA} examples list`
+- Query: `most widely used {FOCUS_AREA}`
 - Objective: Surface ACTUAL NAMED items, not vague guidance
 
 **If NEWS** ("what's happening with X", "X news"):
 
-- Query: `{SUBJECT} latest news 2026`
-- Query: `{SUBJECT} recent announcement`
+- Query: `{FOCUS_AREA} latest news 2026`
+- Query: `{FOCUS_AREA} recent announcement`
 - Objective: Capture breaking stories and recent happenings
 
 **If PROMPTING** ("X prompts", "prompting for X"):
 
-- Query: `{SUBJECT} prompt examples 2026`
-- Query: `{SUBJECT} tips techniques`
+- Query: `{FOCUS_AREA} prompt examples 2026`
+- Query: `{FOCUS_AREA} tips techniques`
 - Objective: Gather real prompting strategies and ready-to-use examples
 
 **If GENERAL** (default):
 
-- Query: `{SUBJECT} 2026`
-- Query: `{SUBJECT} community discussion`
+- Query: `{FOCUS_AREA} 2026`
+- Query: `{FOCUS_AREA} community discussion`
 - Objective: Discover what people are genuinely talking about
 
-Across ALL query types, follow these rules:
+Apply these rules regardless of query class:
 
 - **PRESERVE THE USER'S EXACT WORDING** — do not swap in or append technology names from your own knowledge
   - If the user typed "Flux LoRA training", search exactly that phrase
@@ -311,7 +311,7 @@ Across ALL query types, follow these rules:
 - **SUPPRESS any "Sources:" list in output** — that's clutter; stats appear at the end
 
 **Step 4: Wait for background script to complete**
-Use TaskOutput to get the script results before proceeding to synthesis.
+Read TaskOutput and wait for script completion before synthesis.
 
 **Depth options** (passed through from user's command):
 
@@ -393,11 +393,11 @@ Multiple recipients: `--email alice@example.com,bob@example.com`
 
 ---
 
-## Synthesis Agent: Consolidate All Sources
+## Synthesis Stage: Merge Evidence
 
 **After all searches complete, internally consolidate (don't display stats yet):**
 
-The Synthesis Agent must:
+Synthesis requirements:
 
 1. Weight Reddit/X sources HIGHER (they carry engagement signals: upvotes, likes)
 2. Weight WebSearch sources LOWER (no engagement data)
@@ -409,11 +409,11 @@ The Synthesis Agent must:
 
 ---
 
-## FIRST: Internalize the Research
+## FIRST: Anchor To Retrieved Evidence
 
 **NON-NEGOTIABLE: Base your synthesis ENTIRELY on what the research returned, not on background knowledge you already had.**
 
-Study the research output with precision. Focus on:
+Read returned evidence carefully. Focus on:
 
 - **Exact names of products and tools** as they appear (e.g., if the data references "PixelForge" or "@pixelforge_ai", treat that as its own distinct entity — do not merge it with a different product you happen to know about)
 - **Direct quotes and concrete findings** from the sources — lean on THESE rather than falling back to general knowledge
@@ -422,7 +422,7 @@ Study the research output with precision. Focus on:
 
 **COMMON MISTAKE TO GUARD AGAINST**: If the user queries "pixelforge workflows" and the research returns content about PixelForge (a standalone design tool), do NOT reframe the synthesis as being about Photoshop just because both deal with "workflows". Stick to what the research actually contains.
 
-### If INTENT_CLASS = RECOMMENDATIONS
+### If REQUEST_STYLE = RECOMMENDATIONS
 
 **CRITICAL: Extract SPECIFIC NAMES, not generic patterns.**
 
@@ -441,7 +441,7 @@ When user asks "best X" or "top X", they want a LIST of specific things:
 
 > "Most mentioned: Continue (7 mentions), Cline (5x), Copilot (4x), Cursor Tab (3x). The Continue launch post hit 2K upvotes on r/programming."
 
-### For all INTENT_CLASS values
+### For all REQUEST_STYLE values
 
 Identify from the ACTUAL RESEARCH OUTPUT:
 
@@ -497,13 +497,13 @@ _Why this is better: The mental model ("reasoning-first, treat it like a design 
 
 ---
 
-## THEN: Present the Summary and Invite Direction
+## THEN: Present Findings And Invite Next Action
 
-**CRITICAL: Do NOT output any "Sources:" lists. The final display should be clean.**
+**CRITICAL: Do not print a standalone "Sources:" block. Keep presentation clean.**
 
-**Display in this EXACT sequence:**
+**Follow this exact output order:**
 
-**FIRST - Key findings (based on INTENT_CLASS):**
+**FIRST - Key findings (based on REQUEST_STYLE):**
 
 **If RECOMMENDATIONS** - Show specific things mentioned:
 
@@ -603,21 +603,21 @@ What do you want to make? For example:
 - [Specific vivid example applying technique 2 — e.g., "A miniature/diorama scene exploiting {tool}'s scale logic strength"]
 - [Specific vivid example applying a unique finding — e.g., "A complex scene with embedded text using structured prompts"]
 
-Just describe your vision and I'll write a prompt you can paste straight into {DESTINATION or best-guess tool from research}.
+Just describe your vision and I'll write a prompt you can paste straight into {USAGE_TARGET or best-guess tool from research}.
 ```
 
 **Rules for the invitation examples:**
 
 - Each example must reference a specific technique or finding from your research
 - Use concrete, visual language — the user should be able to picture the output
-- If DESTINATION is unknown, infer the most likely tool from the research context and use that
+- If USAGE_TARGET is unknown, infer the most likely tool from the research context and use that
 - These examples replace any generic "1. Gemini 2. Midjourney 3. Other" menu — NEVER show a generic tool-choice list
 
 **Use real numbers from the research output.** The patterns should be actual insights from the research, not generic advice.
 
 **SELF-CHECK before displaying**: Re-read your key findings section. Does it match what the research ACTUALLY says? If the research was about ClawdBot (a self-hosted AI agent), your summary should be about ClawdBot, not Claude Code. If you catch yourself projecting your own knowledge instead of the research, rewrite it.
 
-**IF DESTINATION is still unknown**, infer from context. If research is clearly about an image generation tool, default to that tool. If genuinely ambiguous, ask briefly at the end: "What tool will you paste this into?" — but NEVER as a numbered multiple-choice menu.
+**IF USAGE_TARGET is still unknown**, infer from context. If research is clearly about an image generation tool, default to that tool. If genuinely ambiguous, ask briefly at the end: "What tool will you paste this into?" — but NEVER as a numbered multiple-choice menu.
 
 **CRITICAL — Suggested prompt for grey suggestion:**
 
@@ -635,11 +635,11 @@ Pick the most compelling example from your invitation list — the one that best
 
 ---
 
-## Output Delivery (Email and Audio)
+## Delivery (Email + Audio)
 
 **After showing the summary above**, check if `$ARGUMENTS` contained `--email`, `--audio`, or `--telegram`. If none of these flags are present, skip this section entirely.
 
-If delivery is requested:
+If any delivery flags are present:
 
 1. **Write the full synthesis** (everything you displayed above — key findings, patterns, stats) to a file using the Write tool:
 
@@ -674,7 +674,7 @@ Build the `[FLAGS]` from `$ARGUMENTS`:
 
 ---
 
-## AWAIT THE USER'S DIRECTION
+## WAIT FOR USER DECISION
 
 After showing the stats summary with your invitation, **STOP and wait** for the user to tell you what they want to create.
 
@@ -682,7 +682,7 @@ When they respond with their direction (e.g., "I need an onboarding email sequen
 
 ---
 
-## WHEN THE USER SHARES THEIR DIRECTION: Compose ONE Refined Prompt
+## WHEN USER PROVIDES DIRECTION: Compose a Single Refined Prompt
 
 Based on what they want to create, compose a **single, highly-tailored prompt** using your research expertise.
 
@@ -700,7 +700,7 @@ Based on what they want to create, compose a **single, highly-tailored prompt** 
 ### Output Format:
 
 ```
-Here's your prompt for {DESTINATION}:
+Here's your prompt for {USAGE_TARGET}:
 
 ---
 
@@ -711,23 +711,23 @@ Here's your prompt for {DESTINATION}:
 This applies [brief 1-line explanation of what research insight you used].
 ```
 
-### Pre-Delivery Quality Check:
+### Prompt Validation Checklist:
 
 - [ ] **PROMPT FORMAT ALIGNS WITH RESEARCH** — If the research pointed to JSON, structured params, or another specific format, the prompt must use that exact format
 - [ ] Speaks directly to the user's stated creative goal
 - [ ] Incorporates the concrete patterns, terminology, and keywords surfaced during research
 - [ ] Can be pasted as-is with no modification (or has clearly labeled [PLACEHOLDER] markers where customization is needed)
-- [ ] Length and tone are suited to DESTINATION's conventions
+- [ ] Length and tone are suited to USAGE_TARGET's conventions
 
 ---
 
-## IF THE USER REQUESTS ALTERNATIVES
+## IF USER REQUESTS ALTERNATIVES
 
 Only if they request alternatives or additional prompts, provide 2-3 variations. Don't dump a prompt pack unless asked.
 
 ---
 
-## AFTER EACH PROMPT: Remain in Expert Mode + Suggest Next
+## AFTER EACH PROMPT: Stay In Expert Mode And Suggest Next
 
 After delivering a prompt, suggest a concrete next prompt the user might want. Pick something that:
 
@@ -743,8 +743,8 @@ End every prompt delivery with the `> **Try next:**` line so the user always has
 
 Keep the following in working memory for the entire conversation:
 
-- **SUBJECT**: {subject}
-- **DESTINATION**: {tool}
+- **FOCUS_AREA**: {focus_area}
+- **USAGE_TARGET**: {usage_target}
 - **KEY PATTERNS**: {the top 3-5 patterns you extracted}
 - **RESEARCH FINDINGS**: The essential facts and insights gathered during investigation
 
@@ -769,7 +769,7 @@ For **full/partial mode**:
 
 ```
 ---
-**Expertise:** {SUBJECT} for {DESTINATION}
+**Expertise:** {FOCUS_AREA} for {USAGE_TARGET}
 **Grounded in:** {n} Reddit threads ({sum} upvotes) + {n} X posts ({sum} likes) + {n} YouTube videos + {n} LinkedIn posts + {n} web pages
 
 > **Try next:** [a short, concrete, vivid prompt exploring a different angle of the topic — e.g., "a product flat-lay on marble with dramatic side lighting"]
@@ -779,7 +779,7 @@ For **web-only mode**:
 
 ```
 ---
-**Expertise:** {SUBJECT} for {DESTINATION}
+**Expertise:** {FOCUS_AREA} for {USAGE_TARGET}
 **Grounded in:** {n} web pages from {domains}
 
 > **Try next:** [a short, concrete, vivid prompt exploring a different angle of the topic]
