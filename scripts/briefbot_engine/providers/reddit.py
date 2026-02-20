@@ -42,10 +42,10 @@ def _is_access_err(err: net.HTTPError) -> bool:
 API_URL = "https://api.openai.com/v1/responses"
 
 # How many results to request per depth level (over-fetch for date filtering)
-DEPTH_SIZES = {
-    "quick": (12, 20),
-    "default": (25, 45),
-    "deep": (55, 85),
+DEPTH_SPECS = {
+    "quick": {"min": 11, "max": 19},
+    "default": {"min": 24, "max": 44},
+    "deep": {"min": 50, "max": 82},
 }
 
 REDDIT_DISCOVERY_PROMPT = """Investigate Reddit community discussions related to: {topic}
@@ -88,6 +88,8 @@ _FILLER_PATTERNS = (
     r"\btips?\s+for\b",
     r"\bbest\b",
     r"\btop\b",
+    r"\bultimate\b",
+    r"\bcomplete\b",
     r"\breview(s)?\b",
     r"\bfeatures?\b",
     r"\bcomparison(s)?\b",
@@ -107,7 +109,9 @@ def _core_subject(verbose_query: str) -> str:
     for pattern in _FILLER_PATTERNS:
         lowered = re.sub(pattern, " ", lowered)
     tokens = [tok for tok in re.findall(r"[a-z0-9][a-z0-9.+_-]*", lowered) if tok not in _STOPWORDS]
-    return " ".join(tokens[:4]) or verbose_query
+    if len(tokens) <= 3:
+        return " ".join(tokens) or verbose_query
+    return " ".join(tokens[:3])
 
 
 def _iter_text_chunks(output: Any) -> Iterable[str]:
@@ -215,7 +219,9 @@ def search(
     if mock_response is not None:
         return mock_response
 
-    min_items, max_items = DEPTH_SIZES.get(depth, DEPTH_SIZES["default"])
+    depth_spec = DEPTH_SPECS.get(depth, DEPTH_SPECS["default"])
+    min_items = depth_spec["min"]
+    max_items = depth_spec["max"]
     headers = {"Authorization": f"Bearer {key}"}
     timeout = {"quick": 75, "default": 105, "deep": 160}.get(depth, 105)
     model_candidates = [model] + [candidate for candidate in FALLBACK_MODELS if candidate != model]

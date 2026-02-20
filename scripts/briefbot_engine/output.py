@@ -19,8 +19,11 @@ def _freshness_check(report: Report) -> dict:
     counts = {}
     for src in Source:
         counts[src.value] = sum(
-            1 for item in report.items
-            if item.source == src and item.published and item.published >= report.range_start
+            1
+            for item in report.items
+            if item.source == src
+            and item.published
+            and item.published >= report.range_start
         )
 
     total_recent = sum(counts.values())
@@ -39,75 +42,45 @@ def _freshness_check(report: Report) -> dict:
     }
 
 
-def compact(report: Report, max_per_source: int = 15, missing_keys: str = "none") -> str:
-    """Produce condensed markdown for Claude to synthesize."""
-    lines = []
-
-    lines.append(f"## Findings: {report.topic}")
-    lines.append("")
+def compact(
+    report: Report, max_per_source: int = 15, missing_keys: str = "none"
+) -> str:
+    """Produce condensed markdown for synthesis."""
+    lines = [f"## Research Snapshot: {report.topic}", ""]
 
     freshness = _freshness_check(report)
     if freshness["is_sparse"]:
-        lines.append("**\u26a0\ufe0f LIMITED RECENT DATA** - Few discussions from the last 30 days.")
-        lines.append(f"Only {freshness['total_recent']} item(s) confirmed from {report.range_start} to {report.range_end}.")
-        lines.append("Results below may include older/evergreen content. Be transparent with the user about this.")
-        lines.append("")
-
-    if report.mode == "web-only":
-        lines.append("**\U0001f310 WEB SEARCH MODE** - Claude will search blogs, docs & news")
-        lines.append("")
-        lines.append("---")
-        lines.append("**\u26a1 Want better results?** Add API keys to unlock Reddit & X data:")
-        lines.append("- `OPENAI_API_KEY` \u2192 Reddit threads with real upvotes & comments")
-        lines.append("- `XAI_API_KEY` \u2192 X posts with real likes & reposts")
-        lines.append("- Edit `~/.config/briefbot/.env` to add keys")
-        lines.append("---")
+        lines.append("**Sparse recent activity detected.**")
+        lines.append(
+            f"Found {freshness['total_recent']} in-range item(s) between {report.range_start} and {report.range_end}."
+        )
+        if freshness["mostly_evergreen"]:
+            lines.append("Most results appear evergreen rather than newly published.")
         lines.append("")
 
     if report.from_cache:
         age_display = f"{report.cache_age_hours:.1f}h old" if report.cache_age_hours else "cached"
-        lines.append(f"**\u26a1 CACHED RESULTS** ({age_display}) - use `--refresh` for fresh data")
+        lines.append(f"**Cache:** {age_display} (`--refresh` for a new run)")
         lines.append("")
 
-    lines.append(f"**Date Range:** {report.range_start} to {report.range_end}")
-    lines.append(f"**Mode:** {report.mode}")
+    summary_bits = [f"Window: {report.range_start} to {report.range_end}", f"Mode: {report.mode}"]
     if report.openai_model_used:
-        lines.append(f"**OpenAI Model:** {report.openai_model_used}")
+        summary_bits.append(f"OpenAI={report.openai_model_used}")
     if report.xai_model_used:
-        lines.append(f"**xAI Model:** {report.xai_model_used}")
+        summary_bits.append(f"xAI={report.xai_model_used}")
+    lines.append(" | ".join(summary_bits))
     lines.append("")
 
-    # Platform status summary
-    if report.mode != "web-only":
-        status_parts = []
-        if report.mode in ("both", "reddit-only", "all", "reddit-web"):
-            if report.reddit_error:
-                status_parts.append(f"Reddit=ERROR ({report.reddit_error})")
-            else:
-                status_parts.append(f"Reddit=OK ({len(report.reddit)} threads)")
-        if report.mode in ("both", "x-only", "all", "x-web"):
-            if report.x_error:
-                status_parts.append(f"X=ERROR ({report.x_error})")
-            else:
-                status_parts.append(f"X=OK ({len(report.x)} posts)")
-        if report.mode in ("all",):
-            if report.youtube_error:
-                status_parts.append(f"YouTube=ERROR")
-            elif report.youtube:
-                status_parts.append(f"YouTube=OK ({len(report.youtube)} videos)")
-            if report.linkedin_error:
-                status_parts.append(f"LinkedIn=ERROR")
-            elif report.linkedin:
-                status_parts.append(f"LinkedIn=OK ({len(report.linkedin)} posts)")
-        if status_parts:
-            lines.append(f"**Platform Status:** {' | '.join(status_parts)}")
-            lines.append("")
+    if report.mode == "web-only":
+        lines.append("Web-only execution: supplement with external sources where possible.")
+        lines.append("Add `OPENAI_API_KEY` and/or `XAI_API_KEY` in `~/.config/briefbot/.env` for richer platform data.")
+        lines.append("")
 
     if report.mode == "reddit-only" and missing_keys == "x":
-        lines.append("*\U0001f4a1 Tip: Add XAI_API_KEY for X/Twitter data and better triangulation.*")
+        lines.append("*Tip: add `XAI_API_KEY` to cross-check findings on X.*")
         lines.append("")
     elif report.mode == "x-only" and missing_keys == "reddit":
-        lines.append("*\U0001f4a1 Tip: Add OPENAI_API_KEY for Reddit data and better triangulation.*")
+        lines.append("*Tip: add `OPENAI_API_KEY` to include Reddit/YouTube/LinkedIn evidence.*")
         lines.append("")
 
     # Reddit
@@ -140,7 +113,9 @@ def compact(report: Report, max_per_source: int = 15, missing_keys: str = "none"
             conf = f" [{item.date_trust}]" if item.date_trust != "high" else ""
             subreddit = item.meta.get("subreddit", item.author)
 
-            lines.append(f"**{item.item_id}** [{item.score}] r/{subreddit}{date_str}{conf}{eng}")
+            lines.append(
+                f"**{item.item_id}** [{item.score}] r/{subreddit}{date_str}{conf}{eng}"
+            )
             lines.append(f"  {item.headline}")
             lines.append(f"  {item.permalink}")
             lines.append(f"  *{item.rationale}*")
@@ -181,7 +156,9 @@ def compact(report: Report, max_per_source: int = 15, missing_keys: str = "none"
             date_str = f" ({item.published})" if item.published else " (no date)"
             conf = f" [{item.date_trust}]" if item.date_trust != "high" else ""
 
-            lines.append(f"**{item.item_id}** [{item.score}] @{item.author}{date_str}{conf}{eng}")
+            lines.append(
+                f"**{item.item_id}** [{item.score}] @{item.author}{date_str}{conf}{eng}"
+            )
             lines.append(f"  {item.headline[:180]}...")
             lines.append(f"  {item.permalink}")
             lines.append(f"  *{item.rationale}*")
@@ -211,7 +188,9 @@ def compact(report: Report, max_per_source: int = 15, missing_keys: str = "none"
             date_str = f" ({item.published})" if item.published else " (no date)"
             conf = f" [{item.date_trust}]" if item.date_trust != "high" else ""
 
-            lines.append(f"**{item.item_id}** [{item.score}] {item.author}{date_str}{conf}{eng}")
+            lines.append(
+                f"**{item.item_id}** [{item.score}] {item.author}{date_str}{conf}{eng}"
+            )
             lines.append(f"  {item.headline}")
             lines.append(f"  {item.permalink}")
             lines.append(f"  *{item.rationale}*")
@@ -245,7 +224,9 @@ def compact(report: Report, max_per_source: int = 15, missing_keys: str = "none"
             if author_title:
                 author += f" ({author_title})"
 
-            lines.append(f"**{item.item_id}** [{item.score}] {author}{date_str}{conf}{eng}")
+            lines.append(
+                f"**{item.item_id}** [{item.score}] {author}{date_str}{conf}{eng}"
+            )
             lines.append(f"  {item.headline[:200]}...")
             lines.append(f"  {item.permalink}")
             lines.append(f"  *{item.rationale}*")
@@ -266,7 +247,9 @@ def compact(report: Report, max_per_source: int = 15, missing_keys: str = "none"
             conf = f" [{item.date_trust}]" if item.date_trust != "high" else ""
             domain = item.meta.get("source_domain", item.author)
 
-            lines.append(f"**{item.item_id}** [WEB] [{item.score}] {domain}{date_str}{conf}")
+            lines.append(
+                f"**{item.item_id}** [WEB] [{item.score}] {domain}{date_str}{conf}"
+            )
             lines.append(f"  {item.headline}")
             lines.append(f"  {item.permalink}")
             lines.append(f"  {item.body[:120]}...")
@@ -278,43 +261,39 @@ def compact(report: Report, max_per_source: int = 15, missing_keys: str = "none"
 
 def context_fragment(report: Report) -> str:
     """Build a reusable context snippet for embedding."""
-    lines = []
-    lines.append(f"# Context: {report.topic} (Last 30 Days)")
-    lines.append("")
-    lines.append(f"*Generated: {report.generated_at[:10]} | Sources: {report.mode}*")
-    lines.append("")
-
-    lines.append("## Key Sources")
-    lines.append("")
+    lines = [
+        f"# Brief Context: {report.topic}",
+        "",
+        f"*Generated: {report.generated_at[:10]} | Mode: {report.mode}*",
+        "",
+        "## Signal Highlights",
+        "",
+    ]
 
     aggregated = []
-
     for item in report.reddit[:5]:
-        aggregated.append((item.score, "Reddit", item.headline, item.permalink))
-
+        aggregated.append((item.score, "Reddit", item.headline))
     for item in report.x[:5]:
-        aggregated.append((item.score, "X", f"{item.headline[:50]}...", item.permalink))
-
+        aggregated.append((item.score, "X", item.headline[:60]))
     for item in report.youtube[:5]:
-        aggregated.append((item.score, "YouTube", f"{item.headline[:50]}...", item.permalink))
-
+        aggregated.append((item.score, "YouTube", item.headline[:60]))
     for item in report.linkedin[:5]:
-        aggregated.append((item.score, "LinkedIn", f"{item.headline[:50]}...", item.permalink))
-
+        aggregated.append((item.score, "LinkedIn", item.headline[:60]))
     for item in report.web[:5]:
-        aggregated.append((item.score, "Web", f"{item.headline[:50]}...", item.permalink))
+        aggregated.append((item.score, "Web", item.headline[:60]))
 
-    aggregated.sort(key=lambda entry: -entry[0])
+    for _score, source, text in sorted(aggregated, key=lambda entry: -entry[0])[:10]:
+        lines.append(f"- `{source}` {text}")
 
-    for score_val, source, text, url in aggregated[:10]:
-        lines.append(f"- [{source}] {text}")
-
-    lines.append("")
-    lines.append("## Summary")
-    lines.append("")
-    lines.append("*See full report for best practices, prompt pack, and detailed sources.*")
-    lines.append("")
-
+    lines.extend(
+        [
+            "",
+            "## Note",
+            "",
+            "*Open the full report for detailed item analysis and prompt-ready synthesis.*",
+            "",
+        ]
+    )
     return "\n".join(lines)
 
 
@@ -322,7 +301,7 @@ def full_report(report: Report) -> str:
     """Produce the complete markdown report with all details."""
     lines = []
 
-    lines.append(f"# {report.topic} - Last 30 Days Research Report")
+    lines.append(f"# {report.topic} - Intelligence Brief")
     lines.append("")
     lines.append(f"**Generated:** {report.generated_at}")
     lines.append(f"**Date Range:** {report.range_start} to {report.range_end}")
@@ -331,10 +310,10 @@ def full_report(report: Report) -> str:
 
     lines.append("## Models Used")
     lines.append("")
-    if report.openai_model_used:
-        lines.append(f"- **OpenAI:** {report.openai_model_used}")
     if report.xai_model_used:
         lines.append(f"- **xAI:** {report.xai_model_used}")
+    if report.openai_model_used:
+        lines.append(f"- **OpenAI:** {report.openai_model_used}")
     lines.append("")
 
     # Reddit detailed
@@ -348,12 +327,16 @@ def full_report(report: Report) -> str:
             subreddit = item.meta.get("subreddit", item.author)
             lines.append(f"- **Subreddit:** r/{subreddit}")
             lines.append(f"- **URL:** {item.permalink}")
-            lines.append(f"- **Date:** {item.published or 'Unknown'} (confidence: {item.date_trust})")
+            lines.append(
+                f"- **Date:** {item.published or 'Unknown'} (confidence: {item.date_trust})"
+            )
             lines.append(f"- **Score:** {item.score}/100")
             lines.append(f"- **Relevance:** {item.rationale}")
 
             if item.signals:
-                lines.append(f"- **Engagement:** {item.signals.upvotes or '?'} points, {item.signals.comments or '?'} comments")
+                lines.append(
+                    f"- **Engagement:** {item.signals.upvotes or '?'} points, {item.signals.comments or '?'} comments"
+                )
 
             if item.thread_insights:
                 lines.append("")
@@ -372,12 +355,16 @@ def full_report(report: Report) -> str:
             lines.append(f"### {item.item_id}: @{item.author}")
             lines.append("")
             lines.append(f"- **URL:** {item.permalink}")
-            lines.append(f"- **Date:** {item.published or 'Unknown'} (confidence: {item.date_trust})")
+            lines.append(
+                f"- **Date:** {item.published or 'Unknown'} (confidence: {item.date_trust})"
+            )
             lines.append(f"- **Score:** {item.score}/100")
             lines.append(f"- **Relevance:** {item.rationale}")
 
             if item.signals:
-                lines.append(f"- **Engagement:** {item.signals.likes or '?'} likes, {item.signals.reposts or '?'} reposts")
+                lines.append(
+                    f"- **Engagement:** {item.signals.likes or '?'} likes, {item.signals.reposts or '?'} reposts"
+                )
 
             lines.append("")
             lines.append(f"> {item.headline}")
@@ -393,12 +380,16 @@ def full_report(report: Report) -> str:
             lines.append("")
             lines.append(f"- **Channel:** {item.author}")
             lines.append(f"- **URL:** {item.permalink}")
-            lines.append(f"- **Date:** {item.published or 'Unknown'} (confidence: {item.date_trust})")
+            lines.append(
+                f"- **Date:** {item.published or 'Unknown'} (confidence: {item.date_trust})"
+            )
             lines.append(f"- **Score:** {item.score}/100")
             lines.append(f"- **Relevance:** {item.rationale}")
 
             if item.signals:
-                lines.append(f"- **Engagement:** {item.signals.views or '?'} views, {item.signals.likes or '?'} likes")
+                lines.append(
+                    f"- **Engagement:** {item.signals.views or '?'} views, {item.signals.likes or '?'} likes"
+                )
 
             if item.body:
                 lines.append("")
@@ -419,12 +410,16 @@ def full_report(report: Report) -> str:
             lines.append(f"### {item.item_id}: {author}")
             lines.append("")
             lines.append(f"- **URL:** {item.permalink}")
-            lines.append(f"- **Date:** {item.published or 'Unknown'} (confidence: {item.date_trust})")
+            lines.append(
+                f"- **Date:** {item.published or 'Unknown'} (confidence: {item.date_trust})"
+            )
             lines.append(f"- **Score:** {item.score}/100")
             lines.append(f"- **Relevance:** {item.rationale}")
 
             if item.signals:
-                lines.append(f"- **Engagement:** {item.signals.reactions or '?'} reactions, {item.signals.comments or '?'} comments")
+                lines.append(
+                    f"- **Engagement:** {item.signals.reactions or '?'} reactions, {item.signals.comments or '?'} comments"
+                )
 
             lines.append("")
             lines.append(f"> {item.headline}")
@@ -441,7 +436,9 @@ def full_report(report: Report) -> str:
             domain = item.meta.get("source_domain", item.author)
             lines.append(f"- **Source:** {domain}")
             lines.append(f"- **URL:** {item.permalink}")
-            lines.append(f"- **Date:** {item.published or 'Unknown'} (confidence: {item.date_trust})")
+            lines.append(
+                f"- **Date:** {item.published or 'Unknown'} (confidence: {item.date_trust})"
+            )
             lines.append(f"- **Score:** {item.score}/100")
             lines.append(f"- **Relevance:** {item.rationale}")
             lines.append("")
@@ -449,14 +446,14 @@ def full_report(report: Report) -> str:
             lines.append("")
 
     # Placeholder sections
-    lines.append("## Best Practices")
+    lines.append("## Applied Practices")
     lines.append("")
-    lines.append("*To be synthesized by Claude*")
+    lines.append("*Pending synthesis layer.*")
     lines.append("")
 
-    lines.append("## Prompt Pack")
+    lines.append("## Prompt Drafts")
     lines.append("")
-    lines.append("*To be synthesized by Claude*")
+    lines.append("*Pending synthesis layer.*")
     lines.append("")
 
     return "\n".join(lines)
@@ -482,25 +479,18 @@ def save_artifacts(
     with open(OUTPUT_DIR / "briefbot.context.md", "w", encoding="utf-8") as fh:
         fh.write(context_fragment(report))
 
-    if raw_openai_response:
-        with open(OUTPUT_DIR / "raw_openai.json", "w", encoding="utf-8") as fh:
-            json.dump(raw_openai_response, fh, indent=2, ensure_ascii=False)
-
-    if raw_xai_response:
-        with open(OUTPUT_DIR / "raw_xai.json", "w", encoding="utf-8") as fh:
-            json.dump(raw_xai_response, fh, indent=2, ensure_ascii=False)
-
-    if raw_enriched_reddit:
-        with open(OUTPUT_DIR / "raw_reddit_threads_enriched.json", "w", encoding="utf-8") as fh:
-            json.dump(raw_enriched_reddit, fh, indent=2, ensure_ascii=False)
-
-    if raw_youtube_response:
-        with open(OUTPUT_DIR / "raw_youtube.json", "w", encoding="utf-8") as fh:
-            json.dump(raw_youtube_response, fh, indent=2, ensure_ascii=False)
-
-    if raw_linkedin_response:
-        with open(OUTPUT_DIR / "raw_linkedin.json", "w", encoding="utf-8") as fh:
-            json.dump(raw_linkedin_response, fh, indent=2, ensure_ascii=False)
+    raw_payloads = {
+        "raw_openai.json": raw_openai_response,
+        "raw_xai.json": raw_xai_response,
+        "raw_reddit_threads_enriched.json": raw_enriched_reddit,
+        "raw_youtube.json": raw_youtube_response,
+        "raw_linkedin.json": raw_linkedin_response,
+    }
+    for filename, payload in raw_payloads.items():
+        if not payload:
+            continue
+        with open(OUTPUT_DIR / filename, "w", encoding="utf-8") as fh:
+            json.dump(payload, fh, indent=2, ensure_ascii=False)
 
 
 def context_path() -> str:

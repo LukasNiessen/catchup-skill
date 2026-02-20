@@ -37,9 +37,9 @@ Supported scenarios:
 
 Before doing anything, classify the request into three internal fields:
 
-1. **SUBJECT**: The thing they want to explore (e.g., "dashboard wireframes", "open-source LLMs")
-2. **DESTINATION** (optional): Tool/product where output will be used (e.g., "Midjourney", "ChatGPT", "Figma AI")
-3. **INTENT_CLASS**: Which response mode matches best:
+1. **FOCUS_AREA**: The thing they want to explore (e.g., "dashboard wireframes", "open-source LLMs")
+2. **USAGE_TARGET** (optional): Tool/product where output will be used (e.g., "Midjourney", "ChatGPT", "Figma AI")
+3. **REQUEST_STYLE**: Which response mode matches best:
   - **PROMPTING** - "X prompts", "prompting for X", "X best practices"
   - **RECOMMENDATIONS** - "best X", "top X", "what X should I use", "recommended X"
   - **NEWS** - "what's happening with X", "X news", "latest on X"
@@ -51,11 +51,11 @@ Common patterns:
 - `[topic] for [tool]` → "portrait lighting for Midjourney" → TOOL IS SPECIFIED
 - `[topic] prompts for [tool]` → "UI layout prompts for Figma AI" → TOOL IS SPECIFIED
 - Just `[topic]` → "iOS onboarding flows" → TOOL NOT SPECIFIED, that's OK
-- "best [topic]" or "top [topic]" → INTENT_CLASS = RECOMMENDATIONS
-- "what are the best [topic]" → INTENT_CLASS = RECOMMENDATIONS
-- "explain [topic]" or "how does [topic] work" → INTENT_CLASS = KNOWLEDGE
-- "what is [topic]" or "tell me about [topic]" → INTENT_CLASS = KNOWLEDGE
-- "[topic] vs [topic]" or "difference between X and Y" → INTENT_CLASS = KNOWLEDGE
+- "best [topic]" or "top [topic]" → REQUEST_STYLE = RECOMMENDATIONS
+- "what are the best [topic]" → REQUEST_STYLE = RECOMMENDATIONS
+- "explain [topic]" or "how does [topic] work" → REQUEST_STYLE = KNOWLEDGE
+- "what is [topic]" or "tell me about [topic]" → REQUEST_STYLE = KNOWLEDGE
+- "[topic] vs [topic]" or "difference between X and Y" → REQUEST_STYLE = KNOWLEDGE
 
 **IMPORTANT: Do NOT ask a question about target tool before you do research.**
 
@@ -64,19 +64,19 @@ Common patterns:
 
 **Store these variables:**
 
-- `SUBJECT = [extracted topic]`
-- `DESTINATION = [extracted tool, or "unknown" if not specified]`
-- `INTENT_CLASS = [RECOMMENDATIONS | NEWS | PROMPTING | GENERAL | KNOWLEDGE]`
+- `FOCUS_AREA = [extracted topic]`
+- `USAGE_TARGET = [extracted tool, or "unknown" if not specified]`
+- `REQUEST_STYLE = [RECOMMENDATIONS | NEWS | PROMPTING | GENERAL | KNOWLEDGE]`
 
 **DISPLAY your parsing to the user.** Before running any tools, output:
 
 ````
-I'll map the current conversation around {SUBJECT} across Reddit, X, and the web from the last 30 days.
+I'll map the current conversation around {FOCUS_AREA} across Reddit, X, and the web from the last 30 days.
 
 Parsed request:
-- SUBJECT = {SUBJECT}
-- DESTINATION = {DESTINATION or "unknown"}
-- INTENT_CLASS = {INTENT_CLASS}
+- FOCUS_AREA = {FOCUS_AREA}
+- USAGE_TARGET = {USAGE_TARGET or "unknown"}
+- REQUEST_STYLE = {REQUEST_STYLE}
 
 Investigation typically takes 2-8 minutes (niche subjects take longer). Starting now.
 

@@ -1,4 +1,4 @@
-"""Unified time utilities: date windowing, parsing, freshness scoring, date extraction."""
+"""Temporal helpers: range windows, parsing, freshness, and date detection."""
 
 import re
 from datetime import datetime, timedelta, timezone
@@ -38,12 +38,16 @@ def _utc_today():
     return datetime.now(timezone.utc).date()
 
 
+def _as_iso_date(value) -> str:
+    return value.isoformat()
+
+
 def window(days: int = 30) -> Tuple[str, str]:
     """Return (start, end) ISO date strings for a rolling window of N calendar days."""
     end_date = _utc_today()
-    span_days = max(0, int(days))
+    span_days = max(0, int(days or 0))
     begin_date = end_date - timedelta(days=span_days)
-    return begin_date.isoformat(), end_date.isoformat()
+    return _as_iso_date(begin_date), _as_iso_date(end_date)
 
 
 def interpret(date_input: Optional[str]) -> Optional[datetime]:
@@ -51,17 +55,17 @@ def interpret(date_input: Optional[str]) -> Optional[datetime]:
     if not date_input:
         return None
 
-    try:
-        return datetime.fromtimestamp(float(date_input), tz=timezone.utc)
-    except (ValueError, TypeError):
-        pass
-
     for fmt in PARSE_FORMATS:
         try:
             parsed = datetime.strptime(date_input, fmt)
             return parsed.replace(tzinfo=timezone.utc)
         except ValueError:
             continue
+
+    try:
+        return datetime.fromtimestamp(float(date_input), tz=timezone.utc)
+    except (ValueError, TypeError):
+        pass
 
     return None
 
@@ -113,9 +117,12 @@ def freshness_score(date_input: Optional[str], max_days: int = 30) -> int:
         return 0
     if age < 0:
         return 100
-    if age >= max_days:
+    cap = max(1, int(max_days))
+    if age >= cap:
         return 0
-    return int(100 * ((max_days - age) / max_days) ** 0.95)
+    ratio = (cap - age) / cap
+    curved = ratio ** 0.93
+    return int(100 * curved)
 
 
 # ---------------------------------------------------------------------------

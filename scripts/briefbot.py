@@ -99,12 +99,12 @@ def _query_reddit(
     items = reddit.parse_reddit_response(response or {})
 
     # Sparse results trigger automatic retry with simplified query
-    has_few_results = len(items) < 4
+    has_few_results = len(items) <= 3
     should_retry = has_few_results and not mock and error is None
 
     if should_retry:
         simplified_topic = reddit._core_subject(topic)
-        topics_differ = simplified_topic.lower() != topic.lower()
+        topics_differ = simplified_topic.strip().lower() != topic.strip().lower()
 
         if topics_differ:
             try:
@@ -120,11 +120,19 @@ def _query_reddit(
                     supplemental_response
                 )
 
-                known_urls = {entry.get("url") for entry in items}
-
+                deduped_by_url = {
+                    str(entry.get("url", "")).strip(): entry
+                    for entry in items
+                    if entry.get("url")
+                }
                 for supplemental_entry in supplemental_items:
-                    if supplemental_entry.get("url") not in known_urls:
-                        items.append(supplemental_entry)
+                    url = str(supplemental_entry.get("url", "")).strip()
+                    if not url:
+                        continue
+                    if url not in deduped_by_url:
+                        deduped_by_url[url] = supplemental_entry
+                if deduped_by_url:
+                    items = list(deduped_by_url.values())
             except Exception:
                 pass
 
@@ -396,17 +404,13 @@ def run_research(
     _log(f"  should_query_youtube: {should_query_youtube}")
     _log(f"  should_query_linkedin: {should_query_linkedin}")
 
-    reddit_future = None
-    x_future = None
-    youtube_future = None
-    linkedin_future = None
-
     with ThreadPoolExecutor(max_workers=5) as thread_pool:
+        futures = {}
         if should_query_reddit:
             if progress is not None:
                 progress.start_reddit()
 
-            reddit_future = thread_pool.submit(
+            future = thread_pool.submit(
                 _query_reddit,
                 topic,
                 cfg,
@@ -416,12 +420,13 @@ def run_research(
                 depth,
                 mock,
             )
+            futures[future] = "reddit"
 
         if should_query_x:
             if progress is not None:
                 progress.start_x()
 
-            x_future = thread_pool.submit(
+            future = thread_pool.submit(
                 _query_x,
                 topic,
                 cfg,
@@ -431,9 +436,10 @@ def run_research(
                 depth,
                 mock,
             )
+            futures[future] = "x"
 
         if should_query_youtube:
-            youtube_future = thread_pool.submit(
+            future = thread_pool.submit(
                 _query_youtube,
                 topic,
                 cfg,
@@ -443,9 +449,10 @@ def run_research(
                 depth,
                 mock,
             )
+            futures[future] = "youtube"
 
         if should_query_linkedin:
-            linkedin_future = thread_pool.submit(
+            future = thread_pool.submit(
                 _query_linkedin,
                 topic,
                 cfg,
@@ -455,60 +462,45 @@ def run_research(
                 depth,
                 mock,
             )
+            futures[future] = "linkedin"
 
-        if reddit_future is not None:
+        for future in as_completed(futures):
+            source = futures[future]
             try:
-                reddit_items, raw_openai, reddit_error = reddit_future.result()
-
-                if reddit_error is not None and progress is not None:
-                    progress.show_error(f"Reddit error: {reddit_error}")
+                items, raw_response, source_error = future.result()
             except Exception as exc:
-                reddit_error = f"{type(exc).__name__}: {exc}"
+                items = []
+                raw_response = None
+                source_error = f"{type(exc).__name__}: {exc}"
 
+            if source == "reddit":
+                reddit_items = items
+                raw_openai = raw_response
+                reddit_error = source_error
                 if progress is not None:
-                    progress.show_error(f"Reddit error: {exc}")
-
-            if progress is not None:
-                progress.end_reddit(len(reddit_items))
-
-        if x_future is not None:
-            try:
-                x_items, raw_xai, x_error = x_future.result()
-
-                if x_error is not None and progress is not None:
-                    progress.show_error(f"X error: {x_error}")
-            except Exception as exc:
-                x_error = f"{type(exc).__name__}: {exc}"
-
+                    if reddit_error:
+                        progress.show_error(f"Reddit error: {reddit_error}")
+                    progress.end_reddit(len(reddit_items))
+            elif source == "x":
+                x_items = items
+                raw_xai = raw_response
+                x_error = source_error
                 if progress is not None:
-                    progress.show_error(f"X error: {exc}")
-
-            if progress is not None:
-                progress.end_x(len(x_items))
-
-        if youtube_future is not None:
-            try:
-                youtube_items, raw_youtube, youtube_error = youtube_future.result()
-
-                if youtube_error is not None and progress is not None:
+                    if x_error:
+                        progress.show_error(f"X error: {x_error}")
+                    progress.end_x(len(x_items))
+            elif source == "youtube":
+                youtube_items = items
+                raw_youtube = raw_response
+                youtube_error = source_error
+                if progress is not None and youtube_error:
                     progress.show_error(f"YouTube error: {youtube_error}")
-            except Exception as exc:
-                youtube_error = f"{type(exc).__name__}: {exc}"
-
-                if progress is not None:
-                    progress.show_error(f"YouTube error: {exc}")
-
-        if linkedin_future is not None:
-            try:
-                linkedin_items, raw_linkedin, linkedin_error = linkedin_future.result()
-
-                if linkedin_error is not None and progress is not None:
+            elif source == "linkedin":
+                linkedin_items = items
+                raw_linkedin = raw_response
+                linkedin_error = source_error
+                if progress is not None and linkedin_error:
                     progress.show_error(f"LinkedIn error: {linkedin_error}")
-            except Exception as exc:
-                linkedin_error = f"{type(exc).__name__}: {exc}"
-
-                if progress is not None:
-                    progress.show_error(f"LinkedIn error: {exc}")
 
     _log("=== Query results summary ===")
     _log(f"  Reddit: {len(reddit_items)} items, error={reddit_error}")
@@ -747,18 +739,22 @@ def main():
 
     _log(f"Models picked: openai={models_picked.get('openai')}, xai={models_picked.get('xai')}")
 
-    mode_mapping = {
-        "both": "both",
-        "all": "all",
-        "reddit": "reddit-only",
-        "x": "x-only",
-        "reddit-web": "reddit-web",
-        "x-web": "x-web",
-        "web": "web-only",
-        "youtube": "youtube-only",
-        "linkedin": "linkedin-only",
-    }
-    display_mode = mode_mapping.get(platform, platform)
+    mode_aliases = [
+        ("both", "both"),
+        ("all", "all"),
+        ("reddit", "reddit-only"),
+        ("x", "x-only"),
+        ("reddit-web", "reddit-web"),
+        ("x-web", "x-web"),
+        ("web", "web-only"),
+        ("youtube", "youtube-only"),
+        ("linkedin", "linkedin-only"),
+    ]
+    display_mode = platform
+    for raw_mode, friendly in mode_aliases:
+        if platform == raw_mode:
+            display_mode = friendly
+            break
 
     (
         reddit_items,
@@ -1033,22 +1029,22 @@ def output_report(
         handler()
 
     if requires_web_search:
-        separator_line = "-" * 60
+        separator_line = "=" * 64
 
         print()
         print(separator_line)
-        print("### WEB RESEARCH NEEDED ###")
+        print("### WEB AUGMENTATION REQUIRED ###")
         print(separator_line)
         print(f"Topic: {topic}")
         print(f"Date range: {start_date} to {end_date}")
         print()
-        print("Use the WebSearch tool now to find 6-12 diverse web sources.")
-        print("Skip social media platforms (already covered above).")
-        print(f"INCLUDE: blogs, docs, news, tutorials from the last {days} days")
+        print("Run WebSearch now and gather 7-14 non-social sources.")
+        print("Avoid reddit.com, x.com, and twitter.com (already handled above).")
+        print(f"Prioritize docs, blogs, changelogs, and news within the last {days} days.")
         print()
-        print("After searching, synthesize WebSearch results WITH the Reddit/X")
-        print("results above. WebSearch items should rank LOWER than comparable")
-        print("Reddit/X items (they lack engagement metrics).")
+        print("Merge web findings with platform findings in one synthesis.")
+        print("When confidence is similar, keep Reddit/X evidence above plain web links")
+        print("because web items usually lack direct engagement signals.")
         print(separator_line)
 
 

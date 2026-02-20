@@ -1,21 +1,21 @@
-"""Enrich Reddit items with real engagement data from thread JSON."""
+"""Reddit thread hydration utilities."""
 
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
 from .. import net, temporal
 
-_NON_SUBSTANTIVE = (
-    r"^(yep|nope|same|agreed|this|exactly|thanks|thank\s*you|yes|no|ok|okay)\.?!?$",
-    r"^(lol|lmao|rofl|haha|heh)+$",
+_TRIVIAL_REPLIES = (
+    r"^(yep|nope|same|agreed|this|exactly|thanks|thank\s*you|yes|no|ok|okay|got it)\.?!?$",
+    r"^(lol|lmao|rofl|haha|heh|lmfao)+$",
     r"^\[(deleted|removed)\]$",
 )
-_REMOVED_AUTHORS = {"[deleted]", "[removed]"}
+_SKIP_AUTHORS = {"[deleted]", "[removed]"}
 
 
-def _parse_url(url: str) -> Optional[str]:
-    """Extract a fetchable Reddit path from URL input."""
+def _thread_path_from_url(url: str) -> Optional[str]:
+    """Extract a fetchable Reddit path from a URL."""
     try:
         parsed = urlparse(url)
     except Exception:
@@ -26,11 +26,13 @@ def _parse_url(url: str) -> Optional[str]:
     return parsed.path or None
 
 
-def _fetch_thread(url: str, mock_data: Optional[Dict] = None) -> Optional[Dict[str, Any]]:
+def _load_thread_json(
+    url: str, mock_data: Optional[Dict] = None
+) -> Optional[Dict[str, Any]]:
     """Fetch the JSON representation of a Reddit thread."""
     if mock_data is not None:
         return mock_data
-    thread_path = _parse_url(url)
+    thread_path = _thread_path_from_url(url)
     if not thread_path:
         return None
     try:
@@ -39,7 +41,7 @@ def _fetch_thread(url: str, mock_data: Optional[Dict] = None) -> Optional[Dict[s
         return None
 
 
-def _listing_children(raw_listing: Any) -> List[Dict[str, Any]]:
+def _children(raw_listing: Any) -> List[Dict[str, Any]]:
     if not isinstance(raw_listing, dict):
         return []
     data = raw_listing.get("data", {})
@@ -49,10 +51,10 @@ def _listing_children(raw_listing: Any) -> List[Dict[str, Any]]:
     return children if isinstance(children, list) else []
 
 
-def _parse_submission(raw_data: Any) -> Optional[Dict[str, Any]]:
+def _read_submission(raw_data: Any) -> Optional[Dict[str, Any]]:
     if not isinstance(raw_data, list) or not raw_data:
         return None
-    for child in _listing_children(raw_data[0]):
+    for child in _children(raw_data[0]):
         payload = child.get("data", {})
         if not isinstance(payload, dict):
             continue
@@ -68,11 +70,11 @@ def _parse_submission(raw_data: Any) -> Optional[Dict[str, Any]]:
     return None
 
 
-def _parse_comments(raw_data: Any) -> List[Dict[str, Any]]:
+def _read_comments(raw_data: Any) -> List[Dict[str, Any]]:
     if not isinstance(raw_data, list) or len(raw_data) < 2:
         return []
     parsed: List[Dict[str, Any]] = []
-    for child in _listing_children(raw_data[1]):
+    for child in _children(raw_data[1]):
         if not isinstance(child, dict) or child.get("kind") != "t1":
             continue
         payload = child.get("data", {})
@@ -93,19 +95,18 @@ def _parse_comments(raw_data: Any) -> List[Dict[str, Any]]:
     return parsed
 
 
-def _parse_thread(raw_data: Any) -> Dict[str, Any]:
-    """Parse Reddit's JSON array into submission + comments."""
-    return {"submission": _parse_submission(raw_data), "comments": _parse_comments(raw_data)}
+def _decode_thread_payload(raw_data: Any) -> Tuple[Optional[Dict[str, Any]], List[Dict[str, Any]]]:
+    """Decode Reddit listing JSON into submission + comments."""
+    submission = _read_submission(raw_data)
+    comments = _read_comments(raw_data)
+    return submission, comments
 
 
-def _top_comments(comments: List[Dict], limit: int = 12) -> List[Dict[str, Any]]:
-    """Return the highest-scoring comments, excluding deleted authors."""
-    ranked = sorted(
-        (c for c in comments if c.get("author") not in _REMOVED_AUTHORS),
-        key=lambda c: int(c.get("score") or 0),
-        reverse=True,
-    )
-    return ranked[: max(0, limit)]
+def _top_comments(comments: List[Dict], limit: int = 10) -> List[Dict[str, Any]]:
+    """Return highest-scoring comments from non-removed authors."""
+    filtered = [c for c in comments if c.get("author") not in _SKIP_AUTHORS]
+    filtered.sort(key=lambda c: int(c.get("score") or 0), reverse=True)
+    return filtered[: max(limit, 0)]
 
 
 def _excerpt(text: str, hard_limit: int = 180, min_boundary_index: int = 60) -> str:
@@ -126,7 +127,7 @@ def _extract_insights(comments: List[Dict], limit: int = 6) -> List[str]:
         if len(body) < 25:
             continue
         lowered = body.lower()
-        if any(re.match(pattern, lowered) for pattern in _NON_SUBSTANTIVE):
+        if any(re.match(pattern, lowered) for pattern in _TRIVIAL_REPLIES):
             continue
         insights.append(_excerpt(body, hard_limit=190, min_boundary_index=70))
         if len(insights) >= limit:
@@ -138,14 +139,12 @@ def enrich(
     item: Dict[str, Any],
     mock_json: Optional[Dict] = None,
 ) -> Dict[str, Any]:
-    """Augment a Reddit item with real engagement data from the thread."""
-    thread_data = _fetch_thread(item.get("url", ""), mock_json)
+    """Augment a Reddit item with thread-derived engagement metadata."""
+    thread_data = _load_thread_json(item.get("url", ""), mock_json)
     if thread_data is None:
         return item
 
-    parsed = _parse_thread(thread_data)
-    submission = parsed["submission"]
-    comment_list = parsed["comments"]
+    submission, comment_list = _decode_thread_payload(thread_data)
 
     if submission is not None:
         item["engagement"] = {
@@ -157,7 +156,7 @@ def enrich(
         if created_utc is not None:
             item["date"] = temporal.to_date_str(created_utc)
 
-    top = _top_comments(comment_list)
+    top = _top_comments(comment_list, limit=10)
     item["top_comments"] = [
         {
             "score": c.get("score", 0),

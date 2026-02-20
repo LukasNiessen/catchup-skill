@@ -26,10 +26,10 @@ def _log(message: str):
 API_URL = "https://api.x.ai/v1/responses"
 
 # How many results to request per depth level
-DEPTH_SIZES = {
-    "quick": (10, 15),
-    "default": (18, 28),
-    "deep": (35, 55),
+DEPTH_TARGETS = {
+    "quick": {"min": 9, "max": 14},
+    "default": {"min": 18, "max": 30},
+    "deep": {"min": 34, "max": 58},
 }
 
 X_DISCOVERY_PROMPT = """Search X (formerly Twitter) for real-time discussion about: {topic}
@@ -130,22 +130,25 @@ MODEL_FALLBACKS = [
 
 def _is_model_access_error(err: net.HTTPError) -> bool:
     """Return True when an HTTP failure likely means model permission/access issues."""
-    if err.status_code is None or not (400 <= err.status_code < 500):
+    if err.status_code is None:
+        return False
+    if err.status_code not in (400, 401, 403, 404, 409, 422):
         return False
     if not err.body:
         return err.status_code == 403
     body_lower = err.body.lower()
+    markers = (
+        "does not have access",
+        "organization must be verified",
+        "not available",
+        "model not found",
+        "access denied",
+        "permission",
+        "insufficient scope",
+    )
     return any(
         marker in body_lower
-        for marker in (
-            "does not have access",
-            "organization must be verified",
-            "not available",
-            "model not found",
-            "not found",
-            "access denied",
-            "permission",
-        )
+        for marker in markers
     )
 
 
@@ -167,6 +170,66 @@ def _extract_items_blob(output_text: str) -> List[Dict[str, Any]]:
         if isinstance(candidate, dict) and isinstance(candidate.get("items"), list):
             return candidate["items"]
         cursor = start + max(consumed, 1)
+
+
+def _pick_text_payload(api_response: Dict[str, Any]) -> str:
+    """Extract first meaningful text payload from xAI response layouts."""
+    output = api_response.get("output")
+    if isinstance(output, str) and output.strip():
+        return output
+
+    if isinstance(output, list):
+        for entry in output:
+            if isinstance(entry, str) and entry.strip():
+                return entry
+            if not isinstance(entry, dict):
+                continue
+            text = entry.get("text")
+            if isinstance(text, str) and text.strip():
+                return text
+            if entry.get("type") != "message":
+                continue
+            for block in entry.get("content", []):
+                if not isinstance(block, dict):
+                    continue
+                if block.get("type") == "output_text":
+                    block_text = block.get("text", "")
+                    if isinstance(block_text, str) and block_text.strip():
+                        return block_text
+
+    for choice in api_response.get("choices", []):
+        if not isinstance(choice, dict):
+            continue
+        message = choice.get("message", {})
+        if not isinstance(message, dict):
+            continue
+        legacy = message.get("content")
+        if isinstance(legacy, str) and legacy.strip():
+            return legacy
+    return ""
+
+
+def _normalize_engagement(raw_eng: Any) -> Optional[Dict[str, Optional[int]]]:
+    if not isinstance(raw_eng, dict):
+        return None
+    normalized: Dict[str, Optional[int]] = {}
+    for key in ("likes", "reposts", "replies", "quotes"):
+        value = raw_eng.get(key)
+        if value in (None, ""):
+            normalized[key] = None
+            continue
+        try:
+            normalized[key] = int(value)
+        except (ValueError, TypeError):
+            normalized[key] = None
+    return normalized if any(v is not None for v in normalized.values()) else None
+
+
+def _safe_relevance(raw: Any) -> float:
+    try:
+        return max(0.0, min(1.0, float(raw)))
+    except (TypeError, ValueError):
+        return 0.55
 
 
 def search(
@@ -194,7 +257,9 @@ def search(
         _log("  Using MOCK response")
         return mock_response
 
-    min_items, max_items = DEPTH_SIZES.get(depth, DEPTH_SIZES["default"])
+    depth_bucket = DEPTH_TARGETS.get(depth, DEPTH_TARGETS["default"])
+    min_items = depth_bucket["min"]
+    max_items = depth_bucket["max"]
     _log(f"  Requesting {min_items}-{max_items} results")
 
     headers = {
@@ -298,124 +363,50 @@ def search(
 
 def parse_x_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Parse X post items from an xAI API response."""
-    extracted = []
-
     _log("=== parse_x_response START ===")
-    _log(f"  Response type: {type(api_response).__name__}, keys: {list(api_response.keys()) if isinstance(api_response, dict) else 'N/A'}")
+    parsed_items: List[Dict[str, Any]] = []
 
-    # API-level error check
-    if api_response.get("error"):
-        err_data = api_response["error"]
-        err_msg = err_data.get("message", str(err_data)) if isinstance(err_data, dict) else str(err_data)
-        _err(f"xAI API error: {err_msg}")
-        _log(f"  API ERROR detected: {err_msg}")
+    api_error = api_response.get("error")
+    if api_error:
+        message = api_error.get("message") if isinstance(api_error, dict) else str(api_error)
+        _err(f"xAI API error: {message}")
         if net.DEBUG:
             _err(f"Full error response: {json.dumps(api_response, indent=2)[:1000]}")
-        _log("=== parse_x_response END (error, 0 items) ===")
-        return extracted
+        _log("=== parse_x_response END (api error) ===")
+        return parsed_items
 
-    # Find output text in the response
-    output_text = ""
+    payload_text = _pick_text_payload(api_response)
+    if not payload_text:
+        _log("No text payload found in xAI response")
+        _log("=== parse_x_response END (empty payload) ===")
+        return parsed_items
 
-    if "output" in api_response:
-        output_data = api_response["output"]
-        _log(f"  'output' key found, type: {type(output_data).__name__}")
+    candidates = _extract_items_blob(payload_text)
+    _log(f"Candidate items extracted: {len(candidates)}")
 
-        if isinstance(output_data, str):
-            output_text = output_data
-            _log(f"  output is string, {len(output_text)} chars")
-        elif isinstance(output_data, list):
-            _log(f"  output is list with {len(output_data)} elements")
-            for idx, elem in enumerate(output_data):
-                if isinstance(elem, dict):
-                    _log(f"    output[{idx}]: type='{elem.get('type', '?')}', keys={list(elem.keys())}")
-                    if elem.get("type") == "message":
-                        msg_content = elem.get("content", [])
-                        _log(f"    message has {len(msg_content)} content blocks")
-                        for block_idx, block in enumerate(msg_content):
-                            if isinstance(block, dict):
-                                _log(f"      content[{block_idx}]: type='{block.get('type', '?')}'")
-                                if block.get("type") == "output_text":
-                                    output_text = block.get("text", "")
-                                    _log(f"      Found output_text: {len(output_text)} chars")
-                                    break
-                    elif "text" in elem:
-                        output_text = elem["text"]
-                        _log(f"    Found text field: {len(output_text)} chars")
-                elif isinstance(elem, str):
-                    output_text = elem
-                    _log(f"    output[{idx}] is string: {len(output_text)} chars")
-
-                if output_text:
-                    break
-    else:
-        _log("  No 'output' key in response")
-
-    # Legacy format fallback
-    if not output_text and "choices" in api_response:
-        _log("  Trying legacy 'choices' format...")
-        for choice in api_response["choices"]:
-            if "message" in choice:
-                output_text = choice["message"].get("content", "")
-                _log(f"  Found content in choices: {len(output_text)} chars")
-                break
-
-    if not output_text:
-        _log("  NO output content found in response, returning 0 items")
-        _log(f"  Full response preview: {json.dumps(api_response, indent=2)[:500] if isinstance(api_response, dict) else str(api_response)[:500]}")
-        _log("=== parse_x_response END (no content, 0 items) ===")
-        return extracted
-
-    _log(f"  Output content: {len(output_text)} chars, preview: '{output_text[:200].replace(chr(10), chr(92) + 'n')}'")
-
-    extracted = _extract_items_blob(output_text)
-    if extracted:
-        _log(f"  Parsed {len(extracted)} items from JSON object scan")
-    else:
-        _log("  NO JSON object with 'items' list found in output")
-        _log(f"  Output preview for debugging: '{output_text[:500].replace(chr(10), chr(92) + 'n')}'")
-
-    # Validate and normalise each item
-    validated = []
-
-    for idx, raw in enumerate(extracted):
-        if not isinstance(raw, dict):
+    for row in candidates:
+        if not isinstance(row, dict):
             continue
-
-        url = raw.get("url", "")
+        url = str(row.get("url", "")).strip()
         if not url:
             continue
 
-        # Parse engagement metrics
-        engagement = None
-        raw_eng = raw.get("engagement")
-        if isinstance(raw_eng, dict):
-            engagement = {
-                "likes": int(raw_eng.get("likes", 0)) if raw_eng.get("likes") else None,
-                "reposts": int(raw_eng.get("reposts", 0)) if raw_eng.get("reposts") else None,
-                "replies": int(raw_eng.get("replies", 0)) if raw_eng.get("replies") else None,
-                "quotes": int(raw_eng.get("quotes", 0)) if raw_eng.get("quotes") else None,
+        date_value = row.get("date")
+        if date_value and not re.match(r"^\d{4}-\d{2}-\d{2}$", str(date_value)):
+            date_value = None
+
+        parsed_items.append(
+            {
+                "id": f"X{len(parsed_items) + 1}",
+                "text": str(row.get("text", "")).strip()[:500],
+                "url": url,
+                "author_handle": str(row.get("author_handle", "")).strip().lstrip("@"),
+                "date": date_value,
+                "engagement": _normalize_engagement(row.get("engagement")),
+                "why_relevant": str(row.get("why_relevant", "")).strip(),
+                "relevance": _safe_relevance(row.get("relevance")),
             }
+        )
 
-        item = {
-            "id": f"X{idx + 1}",
-            "text": str(raw.get("text", "")).strip()[:500],
-            "url": url,
-            "author_handle": str(raw.get("author_handle", "")).strip().lstrip("@"),
-            "date": raw.get("date"),
-            "engagement": engagement,
-            "why_relevant": str(raw.get("why_relevant", "")).strip(),
-            "relevance": min(1.0, max(0.0, float(raw.get("relevance", 0.5)))),
-        }
-
-        if item["date"]:
-            if not re.match(r'^\d{4}-\d{2}-\d{2}$', str(item["date"])):
-                item["date"] = None
-
-        validated.append(item)
-
-    _log(f"  Validated {len(validated)} of {len(extracted)} raw items")
-    if validated:
-        _log(f"  First item: author={validated[0].get('author_handle', '?')}, url={validated[0].get('url', '?')[:60]}, date={validated[0].get('date', '?')}")
-    _log(f"=== parse_x_response END ({len(validated)} items) ===")
-    return validated
+    _log(f"=== parse_x_response END ({len(parsed_items)} items) ===")
+    return parsed_items

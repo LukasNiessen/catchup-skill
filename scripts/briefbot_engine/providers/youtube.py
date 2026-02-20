@@ -42,10 +42,10 @@ def _is_access_err(err: net.HTTPError) -> bool:
 API_URL = "https://api.openai.com/v1/responses"
 
 # How many results to request per depth level
-DEPTH_SIZES = {
-    "quick": (8, 12),
-    "default": (15, 25),
-    "deep": (30, 50),
+DEPTH_SPECS = {
+    "quick": {"min": 7, "max": 13},
+    "default": {"min": 14, "max": 24},
+    "deep": {"min": 28, "max": 52},
 }
 
 YOUTUBE_DISCOVERY_PROMPT = """Locate YouTube videos related to: {topic}
@@ -80,9 +80,14 @@ JSON format:
 
 def _core_subject(verbose_query: str) -> str:
     """Strip filler words from a query, returning the essential subject."""
-    compact = re.sub(r"\b(how\s+to|tips?\s+for|best|top|tutorials?|recommendations?|guide|advice)\b", " ", verbose_query.lower())
-    tokens = [tok for tok in re.findall(r"[a-z0-9][a-z0-9.+_-]*", compact) if tok not in {"using", "for", "with", "the", "of", "in", "on", "videos"}]
-    return " ".join(tokens[:4]) or verbose_query
+    compact = re.sub(
+        r"\b(how\s+to|tips?\s+for|best|top|tutorials?|recommendations?|guide|advice|walkthrough)\b",
+        " ",
+        verbose_query.lower(),
+    )
+    stop = {"using", "for", "with", "the", "of", "in", "on", "videos", "video"}
+    tokens = [tok for tok in re.findall(r"[a-z0-9][a-z0-9.+_-]*", compact) if tok not in stop]
+    return " ".join(tokens[:3]) or verbose_query
 
 
 def search(
@@ -99,7 +104,9 @@ def search(
     if mock_response is not None:
         return mock_response
 
-    min_items, max_items = DEPTH_SIZES.get(depth, DEPTH_SIZES["default"])
+    depth_spec = DEPTH_SPECS.get(depth, DEPTH_SPECS["default"])
+    min_items = depth_spec["min"]
+    max_items = depth_spec["max"]
 
     headers = {
         "Authorization": f"Bearer {key}",

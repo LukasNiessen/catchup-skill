@@ -42,10 +42,10 @@ def _is_access_err(err: net.HTTPError) -> bool:
 API_URL = "https://api.openai.com/v1/responses"
 
 # How many results to request per depth level
-DEPTH_SIZES = {
-    "quick": (8, 12),
-    "default": (15, 25),
-    "deep": (30, 50),
+DEPTH_SPECS = {
+    "quick": {"min": 7, "max": 12},
+    "default": {"min": 14, "max": 26},
+    "deep": {"min": 28, "max": 52},
 }
 
 LINKEDIN_DISCOVERY_PROMPT = """Find LinkedIn posts and articles about: {topic}
@@ -85,9 +85,17 @@ JSON format:
 
 def _core_subject(verbose_query: str) -> str:
     """Strip filler words from a query, returning the essential subject."""
-    reduced = re.sub(r"\b(how\s+to|tips?\s+for|best|top|tutorials?|recommendations?)\b", " ", verbose_query.lower())
-    tokens = [tok for tok in re.findall(r"[a-z0-9][a-z0-9.+_-]*", reduced) if tok not in {"for", "with", "the", "of", "in", "on", "posts"}]
-    return " ".join(tokens[:4]) or verbose_query
+    reduced = re.sub(
+        r"\b(how\s+to|tips?\s+for|best|top|tutorials?|recommendations?|insights?)\b",
+        " ",
+        verbose_query.lower(),
+    )
+    tokens = [
+        tok
+        for tok in re.findall(r"[a-z0-9][a-z0-9.+_-]*", reduced)
+        if tok not in {"for", "with", "the", "of", "in", "on", "posts", "linkedin"}
+    ]
+    return " ".join(tokens[:3]) or verbose_query
 
 
 def search(
@@ -104,7 +112,9 @@ def search(
     if mock_response is not None:
         return mock_response
 
-    min_items, max_items = DEPTH_SIZES.get(depth, DEPTH_SIZES["default"])
+    depth_spec = DEPTH_SPECS.get(depth, DEPTH_SPECS["default"])
+    min_items = depth_spec["min"]
+    max_items = depth_spec["max"]
 
     headers = {
         "Authorization": f"Bearer {key}",

@@ -18,10 +18,10 @@ from typing import Any, Dict, List, Optional, Tuple
 _BIRD_SEARCH_MJS = Path(__file__).parent.parent / "vendor" / "bird-search" / "bird-search.mjs"
 
 # Depth configurations: number of results to request
-DEPTH_CONFIG = {
-    "quick": 15,
-    "default": 25,
-    "deep": 50,
+DEPTH_SETTINGS = {
+    "quick": {"count": 14, "timeout": 30},
+    "default": {"count": 24, "timeout": 45},
+    "deep": {"count": 48, "timeout": 60},
 }
 
 
@@ -88,6 +88,7 @@ def _extract_core_subject(topic: str) -> str:
     # Phase 1: Strip multi-word prefixes (longest first)
     prefixes = [
         'what are the best', 'what is the best', 'what are the latest',
+        'show me the best', 'find the best',
         'what are people saying about', 'what do people think about',
         'how do i use', 'how to use', 'how to',
         'what are', 'what is', 'tips for', 'best practices for',
@@ -115,10 +116,10 @@ def _extract_core_subject(topic: str) -> str:
         'people', 'saying', 'think', 'said',
         # Research/meta descriptors
         'best', 'top', 'good', 'great', 'overview',
-        'latest', 'new', 'recent', 'news', 'update', 'updates',
+        'latest', 'new', 'recent', 'news', 'update', 'updates', 'trending',
         'practices', 'features', 'guide', 'tutorial',
         'recommendations', 'advice', 'review', 'reviews',
-        'usecases', 'examples', 'comparison', 'versus', 'vs',
+        'usecases', 'examples', 'example', 'comparison', 'versus', 'vs',
         # Prompting meta words
         'prompt', 'prompts', 'prompting', 'techniques', 'tips',
         'tricks', 'methods', 'strategies', 'approaches',
@@ -128,7 +129,7 @@ def _extract_core_subject(topic: str) -> str:
     words = text.split()
     result = [w for w in words if w not in _noise]
 
-    return ' '.join(result[:4]) or topic.lower().strip()  # Max 4 words
+    return ' '.join(result[:3]) or topic.lower().strip()  # Max 3 words
 
 
 def is_bird_installed() -> bool:
@@ -281,8 +282,9 @@ def search_x(
     Returns:
         Raw Bird JSON response or error dict.
     """
-    count = DEPTH_CONFIG.get(depth, DEPTH_CONFIG["default"])
-    timeout = 30 if depth == "quick" else 45 if depth == "default" else 60
+    setting = DEPTH_SETTINGS.get(depth, DEPTH_SETTINGS["default"])
+    count = setting["count"]
+    timeout = setting["timeout"]
 
     # Extract core subject - X search is literal, not semantic
     core_topic = _extract_core_subject(topic)

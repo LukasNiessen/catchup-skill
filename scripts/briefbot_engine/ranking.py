@@ -11,14 +11,14 @@ from .content import ContentItem, ScoreBreakdown, Source
 # Scoring weights and penalties
 # ---------------------------------------------------------------------------
 
-DIMENSION_WEIGHTS = {"relevance": 0.38, "recency": 0.34, "engagement": 0.28}
-WEB_DIMENSION_WEIGHTS = {"relevance": 0.58, "recency": 0.42}
+DIMENSION_WEIGHTS = {"relevance": 0.42, "recency": 0.31, "engagement": 0.27}
+WEB_DIMENSION_WEIGHTS = {"relevance": 0.64, "recency": 0.36}
 
-BASELINE_ENGAGEMENT = 45
-MISSING_ENGAGEMENT_PENALTY = 8
-WEB_SOURCE_PENALTY = 9
-WEB_DATE_BONUS = 11
-WEB_DATE_PENALTY = 14
+BASELINE_ENGAGEMENT = 48
+MISSING_ENGAGEMENT_PENALTY = 6
+WEB_SOURCE_PENALTY = 7
+WEB_DATE_BONUS = 9
+WEB_DATE_PENALTY = 10
 
 
 # ---------------------------------------------------------------------------

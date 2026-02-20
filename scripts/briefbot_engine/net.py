@@ -24,8 +24,8 @@ def _debug(msg: str):
         sys.stderr.flush()
 
 
-class HTTPError(Exception):
-    """HTTP request failure with optional status code and response body."""
+class NetworkFailure(Exception):
+    """Network request failure with optional status code and raw body."""
 
     def __init__(
         self,
@@ -38,8 +38,12 @@ class HTTPError(Exception):
         self.body = response_body
 
 
-def _sleep_duration(attempt_index: int) -> float:
-    return BACKOFF * (1.8 ** attempt_index) + (attempt_index * 0.11)
+# Backward-compatible alias used across the codebase and tests.
+HTTPError = NetworkFailure
+
+
+def _retry_delay(attempt_index: int) -> float:
+    return BACKOFF * (1.6 ** attempt_index) + (attempt_index * 0.09)
 
 
 def _can_retry_status(status_code: int) -> bool:
@@ -70,7 +74,7 @@ def _decode_json_or_raise(body_text: str) -> Dict[str, Any]:
         return json.loads(body_text)
     except json.JSONDecodeError as exc:
         _debug(f"JSON decode error: {exc}")
-        raise HTTPError(f"Invalid JSON response: {exc}") from exc
+        raise NetworkFailure(f"Invalid JSON response: {exc}") from exc
 
 
 def request(
@@ -86,7 +90,7 @@ def request(
     if isinstance(json_body, dict):
         _debug(f"Payload keys: {sorted(json_body.keys())}")
 
-    last_error: Optional[HTTPError] = None
+    last_error: Optional[NetworkFailure] = None
     for attempt in range(max(1, retries)):
         req = _prepare_request(method, url, headers, json_body)
         try:
@@ -103,24 +107,26 @@ def request(
             _debug(f"HTTP Error {exc.code}: {exc.reason}")
             if raw_body:
                 _debug(f"Error body: {raw_body[:500]}")
-            last_error = HTTPError(f"HTTP {exc.code}: {exc.reason}", exc.code, raw_body)
+            last_error = NetworkFailure(
+                f"HTTP {exc.code}: {exc.reason}", exc.code, raw_body
+            )
             if not _can_retry_status(exc.code):
                 raise last_error
         except urllib.error.URLError as exc:
             reason = getattr(exc, "reason", exc)
             _debug(f"URL Error: {reason}")
-            last_error = HTTPError(f"URL Error: {reason}")
+            last_error = NetworkFailure(f"URL Error: {reason}")
         except (OSError, TimeoutError, ConnectionResetError) as exc:
             label = type(exc).__name__
             _debug(f"Connection error: {label}: {exc}")
-            last_error = HTTPError(f"Connection error: {label}: {exc}")
+            last_error = NetworkFailure(f"Connection error: {label}: {exc}")
 
         if attempt < retries - 1:
-            time.sleep(_sleep_duration(attempt))
+            time.sleep(_retry_delay(attempt))
 
     if last_error is not None:
         raise last_error
-    raise HTTPError("All retry attempts exhausted without a response")
+    raise NetworkFailure("All retry attempts exhausted without a response")
 
 
 def get(url: str, headers: Optional[Dict[str, str]] = None, **kwargs) -> Dict[str, Any]:
@@ -138,14 +144,24 @@ def post(
     return request("POST", url, headers=headers, json_body=json_body, **kwargs)
 
 
+def _normalize_reddit_endpoint(path: str) -> str:
+    candidate = (path or "").strip().rstrip("/")
+    if not candidate:
+        candidate = "/"
+    if not candidate.startswith("/"):
+        candidate = f"/{candidate}"
+    if not candidate.endswith(".json"):
+        candidate = f"{candidate}.json"
+    return candidate
+
+
 def reddit_json(path: str) -> Dict[str, Any]:
-    """Fetch JSON data for a Reddit thread path."""
-    normalized_path = path.strip()
-    if not normalized_path.startswith("/"):
-        normalized_path = f"/{normalized_path}"
-    normalized_path = normalized_path.rstrip("/")
-    if not normalized_path.endswith(".json"):
-        normalized_path = f"{normalized_path}.json"
-    params = urllib.parse.urlencode({"raw_json": 1})
-    url = f"https://www.reddit.com{normalized_path}?{params}"
-    return get(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
+    """Fetch Reddit JSON payload for a thread-like URL path."""
+    endpoint = _normalize_reddit_endpoint(path)
+    query = urllib.parse.urlencode({"raw_json": "1"})
+    target = f"https://www.reddit.com{endpoint}?{query}"
+    request_headers = {
+        "User-Agent": USER_AGENT,
+        "Accept": "application/json",
+    }
+    return get(target, headers=request_headers)

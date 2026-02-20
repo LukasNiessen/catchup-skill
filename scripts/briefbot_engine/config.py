@@ -3,7 +3,7 @@
 import os
 import sys
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 
 
 def _log(message: str):
@@ -17,9 +17,26 @@ CONFIG_DIR = Path.home() / ".config" / "briefbot"
 CONFIG_FILE = CONFIG_DIR / ".env"
 
 
+def _strip_inline_comment(value: str) -> str:
+    in_quote = False
+    quote_char = ""
+    out = []
+    for ch in value:
+        if ch in ("'", '"'):
+            if not in_quote:
+                in_quote = True
+                quote_char = ch
+            elif ch == quote_char:
+                in_quote = False
+        if ch == "#" and not in_quote:
+            break
+        out.append(ch)
+    return "".join(out).strip()
+
+
 def parse_dotenv(filepath: Path) -> Dict[str, str]:
-    """Parse a dotenv-style file into a dict, handling comments and quotes."""
-    parsed = {}
+    """Parse a dotenv-like file into a dict."""
+    parsed: Dict[str, str] = {}
 
     _log(f"Loading config from: {filepath}")
 
@@ -41,18 +58,19 @@ def parse_dotenv(filepath: Path) -> Dict[str, str]:
 
             key, _, value = stripped.partition("=")
             key = key.strip()
-            value = value.strip()
+            value = _strip_inline_comment(value.strip())
 
             if len(value) >= 2:
                 if value[0] in ('"', "'") and value[-1] == value[0]:
                     value = value[1:-1]
 
-            value = value.strip()
-
-            if key and value:
+            if key:
                 parsed[key] = value
                 if "KEY" in key or "PASSWORD" in key or "TOKEN" in key:
-                    _log(f"  Loaded: {key} = {value[:6]}...{value[-4:]} ({len(value)} chars)")
+                    if value:
+                        _log(f"  Loaded: {key} = {value[:6]}...{value[-4:]} ({len(value)} chars)")
+                    else:
+                        _log(f"  Loaded: {key} = <empty>")
                 else:
                     _log(f"  Loaded: {key} = {value}")
 
@@ -188,7 +206,7 @@ def is_bird_x_available() -> bool:
 
 def validate_sources(
     requested_sources: str, available_platforms: str, include_web_search: bool = False
-) -> tuple:
+) -> Tuple[str, Optional[str]]:
     """Validate requested sources against available credentials.
 
     Returns (effective_sources, error_message_or_none).
@@ -198,69 +216,53 @@ def validate_sources(
 
     if available_platforms == "web":
         if requested_sources in ("auto", "web"):
-            _log("  No API keys available; sticking to web mode")
             return "web", None
-        _log(f"  Requested '{requested_sources}' but only web mode is available")
         return (
             "web",
             "No API keys found. Falling back to WebSearch only. Configure ~/.config/briefbot/.env to enable Reddit, X, YouTube, and LinkedIn.",
         )
 
+    mode_map = {
+        ("auto", False): {"both": "both", "reddit": "reddit", "x": "x"},
+        ("auto", True): {"both": "all", "reddit": "reddit-web", "x": "x-web"},
+    }
     if requested_sources == "auto":
-        if not include_web_search:
-            _log(f"  Auto mode resolved to '{available_platforms}'")
-            return available_platforms, None
-        with_web_suffix = {"both": "all", "reddit": "reddit-web", "x": "x-web"}
-        resolved = with_web_suffix.get(available_platforms, available_platforms)
-        _log(f"  Auto mode with web enabled resolved to '{resolved}'")
+        resolved = mode_map[("auto", bool(include_web_search))].get(
+            available_platforms, available_platforms
+        )
         return resolved, None
 
     if requested_sources == "web":
         return "web", None
 
     if requested_sources == "all":
-        notes = {
-            "both": None,
-            "reddit": "Note: X source unavailable (missing xAI key and Bird authentication). X/Twitter will be skipped.",
-            "x": "Note: OpenAI key missing; Reddit/YouTube/LinkedIn will be skipped.",
-        }
-        if available_platforms in notes:
-            return "all", notes[available_platforms]
+        if available_platforms == "both":
+            return "all", None
+        if available_platforms == "reddit":
+            return "all", "Note: X source unavailable (missing xAI key and Bird authentication). X/Twitter will be skipped."
+        if available_platforms == "x":
+            return "all", "Note: OpenAI key missing; Reddit/YouTube/LinkedIn will be skipped."
         return "web", "No API keys configured."
 
     if requested_sources == "both":
         if available_platforms == "both":
             return ("all", None) if include_web_search else ("both", None)
-        missing = "xAI" if available_platforms == "reddit" else "OpenAI"
-        return (
-            "none",
-            f"Cannot use both sources: missing {missing} credentials. Try --sources=auto for automatic fallback.",
-        )
+        missing = "xAI/Bird" if available_platforms == "reddit" else "OpenAI"
+        return "none", f"Cannot use both sources: missing {missing} credentials. Try --sources=auto for automatic fallback."
+
+    source_requirements = {
+        "reddit": "openai",
+        "youtube": "openai",
+        "linkedin": "openai",
+        "x": "x",
+    }
+    requirement = source_requirements.get(requested_sources)
+    if requirement == "openai" and available_platforms == "x":
+        label = requested_sources.capitalize()
+        return "none", f"{label} was requested but only xAI/Bird credentials are configured."
+    if requirement == "x" and available_platforms == "reddit":
+        return "none", "X source requires xAI or Bird credentials, but only an OpenAI key was found."
 
     if requested_sources == "reddit":
-        if available_platforms == "x":
-            return "none", "Reddit source requires an OpenAI API key, but only xAI credentials were found."
         return ("reddit-web", None) if include_web_search else ("reddit", None)
-
-    if requested_sources == "x":
-        if available_platforms == "reddit":
-            return "none", "X source requires xAI or Bird credentials, but only an OpenAI key was found."
-        return ("x-web", None) if include_web_search else ("x", None)
-
-    if requested_sources == "youtube":
-        if available_platforms == "x":
-            return (
-                "none",
-                "YouTube was requested but only an xAI key is configured (YouTube requires OpenAI).",
-            )
-        return "youtube", None
-
-    if requested_sources == "linkedin":
-        if available_platforms == "x":
-            return (
-                "none",
-                "LinkedIn was requested but only an xAI key is configured (LinkedIn requires OpenAI).",
-            )
-        return "linkedin", None
-
     return requested_sources, None
