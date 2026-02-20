@@ -3,7 +3,7 @@
 import json
 import re
 import sys
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 from .. import net
 
@@ -24,19 +24,19 @@ def _info(msg: str):
 
 
 def _is_access_err(err: net.HTTPError) -> bool:
-    """Check whether the error signals a model-access or verification problem."""
-    if err.status_code != 400 or not err.body:
+    """Check whether the failure likely means the model cannot be used by this key."""
+    if err.status_code not in (400, 403) or not err.body:
         return False
-
-    lowered = err.body.lower()
-    indicators = [
-        "verified",
-        "organization must be",
+    text = err.body.lower()
+    signals = (
+        "organization must be verified",
         "does not have access",
-        "not available",
+        "model not found",
         "not found",
-    ]
-    return any(term in lowered for term in indicators)
+        "not available for your account",
+        "access denied",
+    )
+    return any(token in text for token in signals)
 
 
 API_URL = "https://api.openai.com/v1/responses"
@@ -83,34 +83,122 @@ Output strictly as JSON:
   ]
 }}"""
 
+_FILLER_PATTERNS = (
+    r"\bhow\s+to\b",
+    r"\btips?\s+for\b",
+    r"\bbest\b",
+    r"\btop\b",
+    r"\breview(s)?\b",
+    r"\bfeatures?\b",
+    r"\bcomparison(s)?\b",
+    r"\boverview\b",
+    r"\brecommendation(s)?\b",
+    r"\badvice\b",
+    r"\btutorial(s)?\b",
+    r"\bprompting\b",
+)
+_STOPWORDS = {"using", "for", "with", "the", "of", "in", "on", "a", "an"}
+_ID_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
 
 def _core_subject(verbose_query: str) -> str:
-    """Strip filler words from a query, returning the essential subject."""
-    filler = {
-        "best",
-        "top",
-        "how to",
-        "tips for",
-        "review",
-        "features",
-        "killer",
-        "comparison",
-        "overview",
-        "recommendations",
-        "advice",
-        "tutorial",
-        "prompting",
-        "using",
-        "for",
-        "with",
-        "the",
-        "of",
-        "in",
-        "on",
+    """Extract a compact subject by dropping common modifier phrases and stopwords."""
+    lowered = verbose_query.lower()
+    for pattern in _FILLER_PATTERNS:
+        lowered = re.sub(pattern, " ", lowered)
+    tokens = [tok for tok in re.findall(r"[a-z0-9][a-z0-9.+_-]*", lowered) if tok not in _STOPWORDS]
+    return " ".join(tokens[:4]) or verbose_query
+
+
+def _iter_text_chunks(output: Any) -> Iterable[str]:
+    """Yield possible text chunks from modern and legacy Responses API shapes."""
+    if isinstance(output, str):
+        yield output
+        return
+    if not isinstance(output, list):
+        return
+    for entry in output:
+        if isinstance(entry, str):
+            yield entry
+            continue
+        if not isinstance(entry, dict):
+            continue
+        text = entry.get("text")
+        if isinstance(text, str):
+            yield text
+        content = entry.get("content", [])
+        if isinstance(content, list):
+            for block in content:
+                if not isinstance(block, dict):
+                    continue
+                block_text = block.get("text")
+                if isinstance(block_text, str):
+                    yield block_text
+
+
+def _pick_output_text(api_response: Dict[str, Any]) -> str:
+    """Pick the first non-empty text payload from known response layouts."""
+    for chunk in _iter_text_chunks(api_response.get("output")):
+        text = chunk.strip()
+        if text:
+            return text
+    for choice in api_response.get("choices", []):
+        if not isinstance(choice, dict):
+            continue
+        message = choice.get("message", {})
+        if isinstance(message, dict):
+            content = message.get("content")
+            if isinstance(content, str) and content.strip():
+                return content.strip()
+    return ""
+
+
+def _extract_items_blob(payload_text: str) -> List[Dict[str, Any]]:
+    """Decode the first JSON object containing an 'items' list from raw model text."""
+    if not payload_text:
+        return []
+    decoder = json.JSONDecoder()
+    start = 0
+    while True:
+        brace = payload_text.find("{", start)
+        if brace < 0:
+            return []
+        try:
+            obj, end = decoder.raw_decode(payload_text[brace:])
+        except json.JSONDecodeError:
+            start = brace + 1
+            continue
+        if isinstance(obj, dict) and isinstance(obj.get("items"), list):
+            return obj["items"]
+        start = brace + max(end, 1)
+
+
+def _to_relevance(value: Any) -> float:
+    try:
+        return max(0.0, min(1.0, float(value)))
+    except (TypeError, ValueError):
+        return 0.5
+
+
+def _normalize_item(raw: Dict[str, Any], ordinal: int) -> Optional[Dict[str, Any]]:
+    url = str(raw.get("url", "")).strip()
+    if "reddit.com" not in url:
+        return None
+    date_value = raw.get("date")
+    if date_value is not None and not _ID_DATE.match(str(date_value)):
+        date_value = None
+    subreddit = str(raw.get("subreddit", "")).strip()
+    if subreddit.lower().startswith("r/"):
+        subreddit = subreddit[2:]
+    return {
+        "id": f"R{ordinal}",
+        "title": str(raw.get("title", "")).strip(),
+        "url": url,
+        "subreddit": subreddit,
+        "date": date_value,
+        "why_relevant": str(raw.get("why_relevant", "")).strip(),
+        "relevance": _to_relevance(raw.get("relevance")),
     }
-    tokens = verbose_query.lower().split()
-    kept = [t for t in tokens if t not in filler]
-    return " ".join(kept[:3]) or verbose_query
 
 
 def search(
@@ -128,17 +216,9 @@ def search(
         return mock_response
 
     min_items, max_items = DEPTH_SIZES.get(depth, DEPTH_SIZES["default"])
-
-    headers = {
-        "Authorization": f"Bearer {key}",
-        "Content-Type": "application/json",
-    }
-
-    timeout_map = {"quick": 75, "default": 105, "deep": 160}
-    timeout = timeout_map.get(depth, 105)
-
-    models_chain = [model] + [m for m in FALLBACK_MODELS if m != model]
-
+    headers = {"Authorization": f"Bearer {key}"}
+    timeout = {"quick": 75, "default": 105, "deep": 160}.get(depth, 105)
+    model_candidates = [model] + [candidate for candidate in FALLBACK_MODELS if candidate != model]
     prompt = REDDIT_DISCOVERY_PROMPT.format(
         topic=topic,
         from_date=start,
@@ -147,132 +227,56 @@ def search(
         max_items=max_items,
     )
 
-    last_err = None
-
-    for current_model in models_chain:
-        payload = {
-            "model": current_model,
-            "tools": [
-                {
-                    "type": "web_search",
-                    "filters": {
-                        "allowed_domains": ["reddit.com"],
-                    },
-                }
-            ],
-            "include": ["web_search_call.action.sources"],
+    final_error = None
+    for candidate in model_candidates:
+        request_payload = {
+            "model": candidate,
             "input": prompt,
+            "tools": [{"type": "web_search", "filters": {"allowed_domains": ["reddit.com"]}}],
+            "include": ["web_search_call.action.sources"],
         }
-
         try:
-            return net.post(API_URL, payload, headers=headers, timeout=timeout)
-        except net.HTTPError as api_err:
-            last_err = api_err
-            if _is_access_err(api_err):
-                _info(f"Model {current_model} not accessible, trying fallback...")
+            return net.request(
+                "POST",
+                API_URL,
+                headers=headers,
+                json_body=request_payload,
+                timeout=timeout,
+            )
+        except net.HTTPError as exc:
+            final_error = exc
+            if _is_access_err(exc):
+                _info(f"Model {candidate} unavailable for this key, trying fallback...")
                 continue
             raise
 
-    if last_err:
-        _err(f"All models failed. Last error: {last_err}")
-        raise last_err
-
-    raise net.HTTPError("No models available")
+    if final_error:
+        _err(f"All model attempts failed: {final_error}")
+        raise final_error
+    raise net.HTTPError("No compatible model could be selected")
 
 
 def parse_reddit_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Parse Reddit items from an OpenAI API response."""
-    extracted = []
-
-    # API-level error check
-    if api_response.get("error"):
-        err_data = api_response["error"]
-        err_msg = (
-            err_data.get("message", str(err_data))
-            if isinstance(err_data, dict)
-            else str(err_data)
-        )
-        _err(f"OpenAI API error: {err_msg}")
+    api_error = api_response.get("error")
+    if api_error:
+        message = api_error.get("message") if isinstance(api_error, dict) else str(api_error)
+        _err(f"OpenAI API error: {message}")
         if net.DEBUG:
-            _err(f"Full error response: {json.dumps(api_response, indent=2)[:1000]}")
-        return extracted
+            _err(f"Error payload snapshot: {json.dumps(api_response, indent=2)[:1000]}")
+        return []
 
-    # Find output text in the response
-    output_text = ""
+    raw_text = _pick_output_text(api_response)
+    if not raw_text:
+        _err(f"No text output returned by model. Response keys: {sorted(api_response.keys())}")
+        return []
 
-    if "output" in api_response:
-        output_data = api_response["output"]
-
-        if isinstance(output_data, str):
-            output_text = output_data
-        elif isinstance(output_data, list):
-            for elem in output_data:
-                if isinstance(elem, dict):
-                    if elem.get("type") == "message":
-                        for block in elem.get("content", []):
-                            if (
-                                isinstance(block, dict)
-                                and block.get("type") == "output_text"
-                            ):
-                                output_text = block.get("text", "")
-                                break
-                    elif "text" in elem:
-                        output_text = elem["text"]
-                elif isinstance(elem, str):
-                    output_text = elem
-
-                if output_text:
-                    break
-
-    # Legacy format fallback
-    if not output_text and "choices" in api_response:
-        for choice in api_response["choices"]:
-            if "message" in choice:
-                output_text = choice["message"].get("content", "")
-                break
-
-    if not output_text:
-        print(
-            f"[WARNING REDDIT] No output text found in the response from OpenAI. Keys present: {list(api_response.keys())}",
-            flush=True,
-        )
-        return extracted
-
-    # Pull JSON from the text
-    match = re.search(r'\{[^{}]*"items"\s*:\s*\[[\s\S]*?\]\s*\}', output_text)
-
-    if match:
-        try:
-            parsed = json.loads(match.group())
-            extracted = parsed.get("items", [])
-        except json.JSONDecodeError:
-            pass
-
-    # Validate and normalise each item
-    validated = []
-
-    for idx, raw in enumerate(extracted):
-        if not isinstance(raw, dict):
+    raw_items = _extract_items_blob(raw_text)
+    parsed: List[Dict[str, Any]] = []
+    for index, row in enumerate(raw_items, start=1):
+        if not isinstance(row, dict):
             continue
-
-        url = raw.get("url", "")
-        if not url or "reddit.com" not in url:
-            continue
-
-        item = {
-            "id": f"R{idx + 1}",
-            "title": str(raw.get("title", "")).strip(),
-            "url": url,
-            "subreddit": str(raw.get("subreddit", "")).strip().lstrip("r/"),
-            "date": raw.get("date"),
-            "why_relevant": str(raw.get("why_relevant", "")).strip(),
-            "relevance": min(1.0, max(0.0, float(raw.get("relevance", 0.5)))),
-        }
-
-        if item["date"]:
-            if not re.match(r"^\d{4}-\d{2}-\d{2}$", str(item["date"])):
-                item["date"] = None
-
-        validated.append(item)
-
-    return validated
+        normalized = _normalize_item(row, index)
+        if normalized is not None:
+            parsed.append(normalized)
+    return parsed

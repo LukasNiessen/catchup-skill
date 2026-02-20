@@ -18,8 +18,6 @@ A very minimalistic backlog for BriefBot.
 
 - README crazy, overview, sections, quickstart, CRAZY examples; including videos etc.
 
-- Remove all traces
-
 - Baron should test su mac
 
 - GET IMGS FROM SOMEHWERE, while searching eg, and insert into HTML.

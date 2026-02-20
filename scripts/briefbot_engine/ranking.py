@@ -1,6 +1,6 @@
 """Percentile-harmonic scoring and SimHash deduplication for content items."""
 
-import struct
+from datetime import datetime
 from typing import List, Optional
 
 from . import temporal
@@ -179,12 +179,17 @@ def _sort_by_score(items: List[ContentItem]) -> List[ContentItem]:
         Source.WEB: 4,
     }
 
+    def _date_ordinal(value: Optional[str]) -> int:
+        if not value:
+            return -1
+        try:
+            return datetime.strptime(value, "%Y-%m-%d").date().toordinal()
+        except ValueError:
+            return -1
+
     def sort_key(item: ContentItem):
-        score_key = -item.score
-        date_val = item.published or "0000-00-00"
-        date_key = -int(date_val.replace("-", ""))
         src = source_order.get(item.source, 4)
-        return (score_key, date_key, src, item.headline)
+        return (-item.score, -_date_ordinal(item.published), src, item.headline.lower())
 
     return sorted(items, key=sort_key)
 

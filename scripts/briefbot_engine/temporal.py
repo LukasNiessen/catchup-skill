@@ -34,11 +34,16 @@ MONTHS = {
 # Core date operations
 # ---------------------------------------------------------------------------
 
+def _utc_today():
+    return datetime.now(timezone.utc).date()
+
+
 def window(days: int = 30) -> Tuple[str, str]:
     """Return (start, end) ISO date strings for a rolling window of N calendar days."""
-    today = datetime.now(timezone.utc).date()
-    start = today - timedelta(days=days)
-    return start.isoformat(), today.isoformat()
+    end_date = _utc_today()
+    span_days = max(0, int(days))
+    begin_date = end_date - timedelta(days=span_days)
+    return begin_date.isoformat(), end_date.isoformat()
 
 
 def interpret(date_input: Optional[str]) -> Optional[datetime]:
@@ -95,7 +100,7 @@ def elapsed_days(date_input: Optional[str]) -> Optional[int]:
         return None
     try:
         parsed = datetime.strptime(date_input, "%Y-%m-%d").date()
-        today = datetime.now(timezone.utc).date()
+        today = _utc_today()
         return (today - parsed).days
     except ValueError:
         return None

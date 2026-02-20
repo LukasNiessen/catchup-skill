@@ -10,8 +10,10 @@ from pathlib import Path
 
 # Fix Windows console encoding (cp1252 cannot handle emoji/box-drawing chars)
 if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 # Set to True to skip Bird X search and force xAI API usage
 DISABLE_BIRD = True
@@ -201,7 +203,7 @@ def _query_x(
                 _log(f"  xAI fallback returned {len(items)} items")
             except Exception as fallback_err:
                 _log(f"  xAI fallback FAILED: {type(fallback_err).__name__}: {fallback_err}")
-                pass
+                error = f"xAI fallback: {type(fallback_err).__name__}: {fallback_err}"
     elif has_xai:
         _log("  PATH: xAI API (paid, direct)")
         _log(f"  Calling twitter.search(key={xai_key_preview}, model={models_picked.get('xai')}, topic='{topic[:50]}', dates={start_date}->{end_date}, depth={depth})")

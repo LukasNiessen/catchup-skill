@@ -33,29 +33,29 @@ Supported scenarios:
 - **General**: any subject you're curious about → understand what the community is saying
 - **Knowledge**: "explain how attention works", "what is RAG", "CNNs vs transformers" → get a thorough expert answer without live research
 
-## ESSENTIAL: Determine User Intent
+## ESSENTIAL: Intent Triage
 
-Before doing anything, determine the user's intent from their input:
+Before doing anything, classify the request into three internal fields:
 
-1. **TOPIC**: What they want to learn about (e.g., "dashboard wireframes", "open-source LLMs", "image generation")
-2. **TARGET TOOL** (if specified): Where they'll use the prompts (e.g., "Midjourney", "ChatGPT", "Figma AI")
-3. **QUERY TYPE**: What kind of information they need:
-   - **PROMPTING** - "X prompts", "prompting for X", "X best practices" → User wants to learn techniques and get copy-paste prompts
-   - **RECOMMENDATIONS** - "best X", "top X", "what X should I use", "recommended X" → User wants a LIST of specific things
-   - **NEWS** - "what's happening with X", "X news", "latest on X" → User wants current events/updates
-   - **GENERAL** - anything that needs community research but doesn't match above → User wants broad understanding of the topic
-   - **KNOWLEDGE** - "explain [topic]", "how does [topic] work", "what is [topic]", "tell me about [topic]", "[topic] vs [topic]", "difference between X and Y", "teach me [topic]" → User wants a direct expert explanation, no live research needed
+1. **SUBJECT**: The thing they want to explore (e.g., "dashboard wireframes", "open-source LLMs")
+2. **DESTINATION** (optional): Tool/product where output will be used (e.g., "Midjourney", "ChatGPT", "Figma AI")
+3. **INTENT_CLASS**: Which response mode matches best:
+  - **PROMPTING** - "X prompts", "prompting for X", "X best practices"
+  - **RECOMMENDATIONS** - "best X", "top X", "what X should I use", "recommended X"
+  - **NEWS** - "what's happening with X", "X news", "latest on X"
+  - **GENERAL** - community research requests not covered above
+  - **KNOWLEDGE** - direct explanation requests ("what is", "how does", "X vs Y", etc.)
 
 Common patterns:
 
 - `[topic] for [tool]` → "portrait lighting for Midjourney" → TOOL IS SPECIFIED
 - `[topic] prompts for [tool]` → "UI layout prompts for Figma AI" → TOOL IS SPECIFIED
 - Just `[topic]` → "iOS onboarding flows" → TOOL NOT SPECIFIED, that's OK
-- "best [topic]" or "top [topic]" → QUERY_TYPE = RECOMMENDATIONS
-- "what are the best [topic]" → QUERY_TYPE = RECOMMENDATIONS
-- "explain [topic]" or "how does [topic] work" → QUERY_TYPE = KNOWLEDGE
-- "what is [topic]" or "tell me about [topic]" → QUERY_TYPE = KNOWLEDGE
-- "[topic] vs [topic]" or "difference between X and Y" → QUERY_TYPE = KNOWLEDGE
+- "best [topic]" or "top [topic]" → INTENT_CLASS = RECOMMENDATIONS
+- "what are the best [topic]" → INTENT_CLASS = RECOMMENDATIONS
+- "explain [topic]" or "how does [topic] work" → INTENT_CLASS = KNOWLEDGE
+- "what is [topic]" or "tell me about [topic]" → INTENT_CLASS = KNOWLEDGE
+- "[topic] vs [topic]" or "difference between X and Y" → INTENT_CLASS = KNOWLEDGE
 
 **IMPORTANT: Do NOT ask a question about target tool before you do research.**
 
@@ -64,19 +64,19 @@ Common patterns:
 
 **Store these variables:**
 
-- `TOPIC = [extracted topic]`
-- `TARGET_TOOL = [extracted tool, or "unknown" if not specified]`
-- `QUERY_TYPE = [RECOMMENDATIONS | NEWS | PROMPTING | GENERAL | KNOWLEDGE]`
+- `SUBJECT = [extracted topic]`
+- `DESTINATION = [extracted tool, or "unknown" if not specified]`
+- `INTENT_CLASS = [RECOMMENDATIONS | NEWS | PROMPTING | GENERAL | KNOWLEDGE]`
 
 **DISPLAY your parsing to the user.** Before running any tools, output:
 
 ````
-I'll investigate {TOPIC} across Reddit, X, and the web to find what's been discussed in the last 30 days.
+I'll map the current conversation around {SUBJECT} across Reddit, X, and the web from the last 30 days.
 
-Determined intent:
-- TOPIC = {TOPIC}
-- TARGET_TOOL = {TARGET_TOOL or "unknown"}
-- QUERY_TYPE = {QUERY_TYPE}
+Parsed request:
+- SUBJECT = {SUBJECT}
+- DESTINATION = {DESTINATION or "unknown"}
+- INTENT_CLASS = {INTENT_CLASS}
 
 Investigation typically takes 2-8 minutes (niche subjects take longer). Starting now.
 
@@ -202,9 +202,9 @@ After applying changes, re-run `--show` and display the updated config. Ask if t
 
 ---
 
-## If QUERY_TYPE = KNOWLEDGE: 🧠 Direct Answer Path
+## If INTENT_CLASS = KNOWLEDGE: 🧠 Direct Answer Path
 
-**If the user's query is a knowledge question, skip the entire research pipeline and answer directly.**
+**If the user's query is a knowledge question, skip the research pipeline and answer directly.**
 
 **Step 1: Decide whether supplemental search helps**
 
@@ -223,7 +223,7 @@ After applying changes, re-run `--show` and display the updated config. Ask if t
 End with:
 
 ```
-Want me to go deeper on any part of this, or research what the community is currently saying about {TOPIC}?
+Want me to go deeper on any part of this, or research what the community is currently saying about {SUBJECT}?
 
 > **Try next:** [a concrete follow-up question about the topic — e.g., "research what people are saying about RAG vs fine-tuning right now"]
 ```
@@ -234,7 +234,7 @@ The `> **Try next:**` line MUST be the very last line. It becomes the grey auto-
 
 - No stats blocks, no source counts, no research invitation
 - No Python script execution
-- If the user then asks for community research or "what people are saying", switch to QUERY_TYPE = GENERAL and run the full research pipeline below
+- If the user then asks for community research or "what people are saying", switch to INTENT_CLASS = GENERAL and run the full research pipeline below
 - Keep the tone expert but accessible
 
 **After answering, STOP. Do not proceed to Research Execution.**
@@ -243,7 +243,7 @@ The `> **Try next:**` line MUST be the very last line. It becomes the grey auto-
 
 ## Research Execution
 
-**If QUERY_TYPE = KNOWLEDGE, skip this entire section.**
+**If INTENT_CLASS = KNOWLEDGE, skip this entire section.**
 
 **IMPORTANT: The script handles API key detection automatically.** Run it and check the output to determine mode.
 
@@ -273,31 +273,31 @@ The script output will indicate the mode:
 
 For **ALL modes**, perform WebSearch to supplement (or provide all data in web-only mode).
 
-Tailor your search queries to match the QUERY_TYPE:
+Tailor your search queries to match the INTENT_CLASS:
 
 **If RECOMMENDATIONS** ("best X", "top X", "what X should I use"):
 
-- Query: `top {TOPIC} recommendations`
-- Query: `{TOPIC} examples list`
-- Query: `most widely used {TOPIC}`
+- Query: `top {SUBJECT} recommendations`
+- Query: `{SUBJECT} examples list`
+- Query: `most widely used {SUBJECT}`
 - Objective: Surface ACTUAL NAMED items, not vague guidance
 
 **If NEWS** ("what's happening with X", "X news"):
 
-- Query: `{TOPIC} latest news 2026`
-- Query: `{TOPIC} recent announcement`
+- Query: `{SUBJECT} latest news 2026`
+- Query: `{SUBJECT} recent announcement`
 - Objective: Capture breaking stories and recent happenings
 
 **If PROMPTING** ("X prompts", "prompting for X"):
 
-- Query: `{TOPIC} prompt examples 2026`
-- Query: `{TOPIC} tips techniques`
+- Query: `{SUBJECT} prompt examples 2026`
+- Query: `{SUBJECT} tips techniques`
 - Objective: Gather real prompting strategies and ready-to-use examples
 
 **If GENERAL** (default):
 
-- Query: `{TOPIC} 2026`
-- Query: `{TOPIC} community discussion`
+- Query: `{SUBJECT} 2026`
+- Query: `{SUBJECT} community discussion`
 - Objective: Discover what people are genuinely talking about
 
 Across ALL query types, follow these rules:
@@ -422,7 +422,7 @@ Study the research output with precision. Focus on:
 
 **COMMON MISTAKE TO GUARD AGAINST**: If the user queries "pixelforge workflows" and the research returns content about PixelForge (a standalone design tool), do NOT reframe the synthesis as being about Photoshop just because both deal with "workflows". Stick to what the research actually contains.
 
-### If QUERY_TYPE = RECOMMENDATIONS
+### If INTENT_CLASS = RECOMMENDATIONS
 
 **CRITICAL: Extract SPECIFIC NAMES, not generic patterns.**
 
@@ -441,7 +441,7 @@ When user asks "best X" or "top X", they want a LIST of specific things:
 
 > "Most mentioned: Continue (7 mentions), Cline (5x), Copilot (4x), Cursor Tab (3x). The Continue launch post hit 2K upvotes on r/programming."
 
-### For all QUERY_TYPEs
+### For all INTENT_CLASS values
 
 Identify from the ACTUAL RESEARCH OUTPUT:
 
@@ -503,7 +503,7 @@ _Why this is better: The mental model ("reasoning-first, treat it like a design 
 
 **Display in this EXACT sequence:**
 
-**FIRST - Key findings (based on QUERY_TYPE):**
+**FIRST - Key findings (based on INTENT_CLASS):**
 
 **If RECOMMENDATIONS** - Show specific things mentioned:
 
@@ -603,21 +603,21 @@ What do you want to make? For example:
 - [Specific vivid example applying technique 2 — e.g., "A miniature/diorama scene exploiting {tool}'s scale logic strength"]
 - [Specific vivid example applying a unique finding — e.g., "A complex scene with embedded text using structured prompts"]
 
-Just describe your vision and I'll write a prompt you can paste straight into {TARGET_TOOL or best-guess tool from research}.
+Just describe your vision and I'll write a prompt you can paste straight into {DESTINATION or best-guess tool from research}.
 ```
 
 **Rules for the invitation examples:**
 
 - Each example must reference a specific technique or finding from your research
 - Use concrete, visual language — the user should be able to picture the output
-- If TARGET_TOOL is unknown, infer the most likely tool from the research context and use that
+- If DESTINATION is unknown, infer the most likely tool from the research context and use that
 - These examples replace any generic "1. Gemini 2. Midjourney 3. Other" menu — NEVER show a generic tool-choice list
 
 **Use real numbers from the research output.** The patterns should be actual insights from the research, not generic advice.
 
 **SELF-CHECK before displaying**: Re-read your key findings section. Does it match what the research ACTUALLY says? If the research was about ClawdBot (a self-hosted AI agent), your summary should be about ClawdBot, not Claude Code. If you catch yourself projecting your own knowledge instead of the research, rewrite it.
 
-**IF TARGET_TOOL is still unknown**, infer from context. If research is clearly about an image generation tool, default to that tool. If genuinely ambiguous, ask briefly at the end: "What tool will you paste this into?" — but NEVER as a numbered multiple-choice menu.
+**IF DESTINATION is still unknown**, infer from context. If research is clearly about an image generation tool, default to that tool. If genuinely ambiguous, ask briefly at the end: "What tool will you paste this into?" — but NEVER as a numbered multiple-choice menu.
 
 **CRITICAL — Suggested prompt for grey suggestion:**
 
@@ -700,7 +700,7 @@ Based on what they want to create, compose a **single, highly-tailored prompt** 
 ### Output Format:
 
 ```
-Here's your prompt for {TARGET_TOOL}:
+Here's your prompt for {DESTINATION}:
 
 ---
 
@@ -717,7 +717,7 @@ This applies [brief 1-line explanation of what research insight you used].
 - [ ] Speaks directly to the user's stated creative goal
 - [ ] Incorporates the concrete patterns, terminology, and keywords surfaced during research
 - [ ] Can be pasted as-is with no modification (or has clearly labeled [PLACEHOLDER] markers where customization is needed)
-- [ ] Length and tone are suited to TARGET_TOOL's conventions
+- [ ] Length and tone are suited to DESTINATION's conventions
 
 ---
 
@@ -743,8 +743,8 @@ End every prompt delivery with the `> **Try next:**` line so the user always has
 
 Keep the following in working memory for the entire conversation:
 
-- **TOPIC**: {topic}
-- **TARGET_TOOL**: {tool}
+- **SUBJECT**: {subject}
+- **DESTINATION**: {tool}
 - **KEY PATTERNS**: {the top 3-5 patterns you extracted}
 - **RESEARCH FINDINGS**: The essential facts and insights gathered during investigation
 
@@ -769,7 +769,7 @@ For **full/partial mode**:
 
 ```
 ---
-**Expertise:** {TOPIC} for {TARGET_TOOL}
+**Expertise:** {SUBJECT} for {DESTINATION}
 **Grounded in:** {n} Reddit threads ({sum} upvotes) + {n} X posts ({sum} likes) + {n} YouTube videos + {n} LinkedIn posts + {n} web pages
 
 > **Try next:** [a short, concrete, vivid prompt exploring a different angle of the topic — e.g., "a product flat-lay on marble with dramatic side lighting"]
@@ -779,7 +779,7 @@ For **web-only mode**:
 
 ```
 ---
-**Expertise:** {TOPIC} for {TARGET_TOOL}
+**Expertise:** {SUBJECT} for {DESTINATION}
 **Grounded in:** {n} web pages from {domains}
 
 > **Try next:** [a short, concrete, vivid prompt exploring a different angle of the topic]

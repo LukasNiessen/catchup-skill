@@ -5,6 +5,7 @@ import os
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from typing import Any, Dict, Optional
 
@@ -37,6 +38,41 @@ class HTTPError(Exception):
         self.body = response_body
 
 
+def _sleep_duration(attempt_index: int) -> float:
+    return BACKOFF * (1.8 ** attempt_index) + (attempt_index * 0.11)
+
+
+def _can_retry_status(status_code: int) -> bool:
+    if status_code in (429, 503, 504):
+        return True
+    return status_code >= 500
+
+
+def _prepare_request(
+    method: str,
+    url: str,
+    headers: Optional[Dict[str, str]],
+    json_body: Optional[Dict[str, Any]],
+) -> urllib.request.Request:
+    outgoing_headers = dict(headers or {})
+    outgoing_headers.setdefault("User-Agent", USER_AGENT)
+    payload = None
+    if json_body is not None:
+        outgoing_headers.setdefault("Content-Type", "application/json")
+        payload = json.dumps(json_body).encode("utf-8")
+    return urllib.request.Request(url, data=payload, headers=outgoing_headers, method=method.upper())
+
+
+def _decode_json_or_raise(body_text: str) -> Dict[str, Any]:
+    if not body_text:
+        return {}
+    try:
+        return json.loads(body_text)
+    except json.JSONDecodeError as exc:
+        _debug(f"JSON decode error: {exc}")
+        raise HTTPError(f"Invalid JSON response: {exc}") from exc
+
+
 def request(
     method: str,
     url: str,
@@ -46,74 +82,44 @@ def request(
     retries: int = MAX_RETRIES,
 ) -> Dict[str, Any]:
     """Execute an HTTP request with automatic retry and return parsed JSON."""
-    headers = headers or {}
-    headers.setdefault("User-Agent", USER_AGENT)
+    _debug(f"{method.upper()} {url}")
+    if isinstance(json_body, dict):
+        _debug(f"Payload keys: {sorted(json_body.keys())}")
 
-    encoded = None
-    if json_body is not None:
-        encoded = json.dumps(json_body).encode('utf-8')
-        headers.setdefault("Content-Type", "application/json")
-
-    req = urllib.request.Request(url, data=encoded, headers=headers, method=method)
-
-    _debug(f"{method} {url}")
-    if json_body:
-        _debug(f"Payload keys: {list(json_body.keys())}")
-
-    last_err = None
-
-    for attempt in range(retries):
+    last_error: Optional[HTTPError] = None
+    for attempt in range(max(1, retries)):
+        req = _prepare_request(method, url, headers, json_body)
         try:
             with urllib.request.urlopen(req, timeout=timeout) as resp:
-                body = resp.read().decode('utf-8')
+                body = resp.read().decode("utf-8")
                 _debug(f"Response: {resp.status} ({len(body)} bytes)")
-                return json.loads(body) if body else {}
-
-        except json.JSONDecodeError as e:
-            _debug(f"JSON decode error: {e}")
-            last_err = HTTPError(f"Invalid JSON response: {e}")
-            raise last_err
-
-        except urllib.error.HTTPError as e:
-            err_body = None
+                return _decode_json_or_raise(body)
+        except urllib.error.HTTPError as exc:
+            raw_body = None
             try:
-                err_body = e.read().decode('utf-8')
+                raw_body = exc.read().decode("utf-8")
             except Exception:
-                pass
+                raw_body = None
+            _debug(f"HTTP Error {exc.code}: {exc.reason}")
+            if raw_body:
+                _debug(f"Error body: {raw_body[:500]}")
+            last_error = HTTPError(f"HTTP {exc.code}: {exc.reason}", exc.code, raw_body)
+            if not _can_retry_status(exc.code):
+                raise last_error
+        except urllib.error.URLError as exc:
+            reason = getattr(exc, "reason", exc)
+            _debug(f"URL Error: {reason}")
+            last_error = HTTPError(f"URL Error: {reason}")
+        except (OSError, TimeoutError, ConnectionResetError) as exc:
+            label = type(exc).__name__
+            _debug(f"Connection error: {label}: {exc}")
+            last_error = HTTPError(f"Connection error: {label}: {exc}")
 
-            _debug(f"HTTP Error {e.code}: {e.reason}")
-            if err_body:
-                _debug(f"Error body: {err_body[:500]}")
+        if attempt < retries - 1:
+            time.sleep(_sleep_duration(attempt))
 
-            last_err = HTTPError(f"HTTP {e.code}: {e.reason}", e.code, err_body)
-
-            if 400 <= e.code < 500 and e.code not in (429, 503):
-                raise last_err
-
-            if attempt < retries - 1:
-                delay = BACKOFF * (2 ** attempt) + (attempt * 0.1)
-                time.sleep(delay)
-
-        except (OSError, TimeoutError, ConnectionResetError) as e:
-            etype = type(e).__name__
-            _debug(f"Connection error: {etype}: {e}")
-            last_err = HTTPError(f"Connection error: {etype}: {e}")
-
-            if attempt < retries - 1:
-                delay = BACKOFF * (2 ** attempt) + (attempt * 0.1)
-                time.sleep(delay)
-
-        except urllib.error.URLError as e:
-            _debug(f"URL Error: {e.reason}")
-            last_err = HTTPError(f"URL Error: {e.reason}")
-
-            if attempt < retries - 1:
-                delay = BACKOFF * (2 ** attempt) + (attempt * 0.1)
-                time.sleep(delay)
-
-    if last_err:
-        raise last_err
-
+    if last_error is not None:
+        raise last_error
     raise HTTPError("All retry attempts exhausted without a response")
 
 
@@ -134,16 +140,12 @@ def post(
 
 def reddit_json(path: str) -> Dict[str, Any]:
     """Fetch JSON data for a Reddit thread path."""
-    if not path.startswith('/'):
-        path = f"/{path}"
-
-    path = path.rstrip('/')
-    if not path.endswith('.json'):
-        path = f"{path}.json"
-
-    url = f"https://www.reddit.com{path}"
-    if "?" not in url:
-        url += "?raw_json=1"
-    else:
-        url += "&raw_json=1"
+    normalized_path = path.strip()
+    if not normalized_path.startswith("/"):
+        normalized_path = f"/{normalized_path}"
+    normalized_path = normalized_path.rstrip("/")
+    if not normalized_path.endswith(".json"):
+        normalized_path = f"{normalized_path}.json"
+    params = urllib.parse.urlencode({"raw_json": 1})
+    url = f"https://www.reddit.com{normalized_path}?{params}"
     return get(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})

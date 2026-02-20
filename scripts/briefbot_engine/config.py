@@ -197,74 +197,55 @@ def validate_sources(
     _log(f"  Requested: '{requested_sources}', Available: '{available_platforms}', Include web: {include_web_search}")
 
     if available_platforms == "web":
-        if requested_sources == "auto":
-            _log("  No API keys, auto -> 'web' (WebSearch fallback)")
+        if requested_sources in ("auto", "web"):
+            _log("  No API keys available; sticking to web mode")
             return "web", None
-        elif requested_sources == "web":
-            _log("  No API keys, web -> 'web'")
-            return "web", None
-        else:
-            _log(f"  No API keys, requested '{requested_sources}' -> forced to 'web' with warning")
-            return (
-                "web",
-                "No API keys found \u2014 falling back to WebSearch only. Configure keys in ~/.config/briefbot/.env to enable Reddit, X, YouTube, and LinkedIn.",
-            )
+        _log(f"  Requested '{requested_sources}' but only web mode is available")
+        return (
+            "web",
+            "No API keys found. Falling back to WebSearch only. Configure ~/.config/briefbot/.env to enable Reddit, X, YouTube, and LinkedIn.",
+        )
 
     if requested_sources == "auto":
-        if include_web_search:
-            mapping = {
-                "both": "all",
-                "reddit": "reddit-web",
-                "x": "x-web",
-            }
-            result = mapping.get(available_platforms, available_platforms)
-            _log(f"  Auto + web -> '{result}'")
-            return result, None
-        _log(f"  Auto -> '{available_platforms}'")
-        return available_platforms, None
+        if not include_web_search:
+            _log(f"  Auto mode resolved to '{available_platforms}'")
+            return available_platforms, None
+        with_web_suffix = {"both": "all", "reddit": "reddit-web", "x": "x-web"}
+        resolved = with_web_suffix.get(available_platforms, available_platforms)
+        _log(f"  Auto mode with web enabled resolved to '{resolved}'")
+        return resolved, None
 
     if requested_sources == "web":
         return "web", None
 
     if requested_sources == "all":
-        if available_platforms == "both":
-            return "all", None
-        elif available_platforms == "reddit":
-            return (
-                "all",
-                "Note: No X source available (no xAI key and Bird not authenticated). X/Twitter will be skipped.",
-            )
-        elif available_platforms == "x":
-            return (
-                "all",
-                "Note: OpenAI key not configured, Reddit/YouTube/LinkedIn will be skipped.",
-            )
+        notes = {
+            "both": None,
+            "reddit": "Note: X source unavailable (missing xAI key and Bird authentication). X/Twitter will be skipped.",
+            "x": "Note: OpenAI key missing; Reddit/YouTube/LinkedIn will be skipped.",
+        }
+        if available_platforms in notes:
+            return "all", notes[available_platforms]
         return "web", "No API keys configured."
 
     if requested_sources == "both":
-        if available_platforms != "both":
-            missing_provider = "xAI" if available_platforms == "reddit" else "OpenAI"
-            return (
-                "none",
-                f"Cannot use both sources: missing {missing_provider} credentials. Try --sources=auto for automatic fallback.",
-            )
-        if include_web_search:
-            return "all", None
-        return "both", None
+        if available_platforms == "both":
+            return ("all", None) if include_web_search else ("both", None)
+        missing = "xAI" if available_platforms == "reddit" else "OpenAI"
+        return (
+            "none",
+            f"Cannot use both sources: missing {missing} credentials. Try --sources=auto for automatic fallback.",
+        )
 
     if requested_sources == "reddit":
         if available_platforms == "x":
             return "none", "Reddit source requires an OpenAI API key, but only xAI credentials were found."
-        if include_web_search:
-            return "reddit-web", None
-        return "reddit", None
+        return ("reddit-web", None) if include_web_search else ("reddit", None)
 
     if requested_sources == "x":
         if available_platforms == "reddit":
             return "none", "X source requires xAI or Bird credentials, but only an OpenAI key was found."
-        if include_web_search:
-            return "x-web", None
-        return "x", None
+        return ("x-web", None) if include_web_search else ("x", None)
 
     if requested_sources == "youtube":
         if available_platforms == "x":

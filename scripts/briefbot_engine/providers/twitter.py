@@ -128,6 +128,47 @@ MODEL_FALLBACKS = [
 ]
 
 
+def _is_model_access_error(err: net.HTTPError) -> bool:
+    """Return True when an HTTP failure likely means model permission/access issues."""
+    if err.status_code is None or not (400 <= err.status_code < 500):
+        return False
+    if not err.body:
+        return err.status_code == 403
+    body_lower = err.body.lower()
+    return any(
+        marker in body_lower
+        for marker in (
+            "does not have access",
+            "organization must be verified",
+            "not available",
+            "model not found",
+            "not found",
+            "access denied",
+            "permission",
+        )
+    )
+
+
+def _extract_items_blob(output_text: str) -> List[Dict[str, Any]]:
+    """Decode the first JSON object containing an `items` list from model output text."""
+    if not output_text:
+        return []
+    decoder = json.JSONDecoder()
+    cursor = 0
+    while True:
+        start = output_text.find("{", cursor)
+        if start < 0:
+            return []
+        try:
+            candidate, consumed = decoder.raw_decode(output_text[start:])
+        except json.JSONDecodeError:
+            cursor = start + 1
+            continue
+        if isinstance(candidate, dict) and isinstance(candidate.get("items"), list):
+            return candidate["items"]
+        cursor = start + max(consumed, 1)
+
+
 def search(
     key: str,
     model: str,
@@ -139,7 +180,7 @@ def search(
 ) -> Dict[str, Any]:
     """Query X posts via xAI's Agent Tools API with live search.
 
-    If the primary model returns a 403 (permission denied), automatically
+    If the primary model returns a model-access error, automatically
     retries with fallback models until one succeeds or all are exhausted.
     """
     _log("=== search START ===")
@@ -180,10 +221,16 @@ def search(
         _log("=== search END ===")
         return response
     except net.HTTPError as e:
-        if e.status_code != 403:
+        if not _is_model_access_error(e):
             raise
-        _err(f"Model '{model}' returned 403 (permission denied), trying fallbacks...")
-        _log(f"  Primary model '{model}' returned 403, entering fallback loop")
+        _err(
+            f"Model '{model}' appears unavailable for this key "
+            f"(status {e.status_code}); trying fallbacks..."
+        )
+        _log(
+            f"  Primary model '{model}' failed with access-style error "
+            f"(status {e.status_code}), entering fallback loop"
+        )
         # Invalidate the cached model so next run picks a working one
         registry.set_cached_model("xai", "")
         last_err = e
@@ -201,8 +248,11 @@ def search(
             _log("=== search END (via fallback) ===")
             return response
         except net.HTTPError as e:
-            if e.status_code == 403:
-                _log(f"  Fallback model '{fallback_model}' also returned 403, skipping")
+            if _is_model_access_error(e):
+                _log(
+                    f"  Fallback model '{fallback_model}' failed with access-style error "
+                    f"(status {e.status_code}), skipping"
+                )
                 last_err = e
                 continue
             raise
@@ -227,20 +277,23 @@ def search(
             _log("=== search END (via dynamic discovery) ===")
             return response
         except net.HTTPError as e:
-            if e.status_code == 403:
-                _log(f"  Discovered model '{fallback_model}' also returned 403, skipping")
+            if _is_model_access_error(e):
+                _log(
+                    f"  Discovered model '{fallback_model}' failed with access-style error "
+                    f"(status {e.status_code}), skipping"
+                )
                 last_err = e
                 continue
             raise
 
     # All options exhausted
     total = len(tried)
-    _err(f"All {total} models returned 403 — API key lacks x_search permission")
+    _err(f"All {total} candidate models were rejected by access constraints")
     _log(f"  Tried models: {sorted(tried)}")
     _log("=== search END (all fallbacks exhausted) ===")
     if last_err:
         raise last_err
-    raise net.HTTPError("All models returned 403 — API key lacks x_search permission", 403)
+    raise net.HTTPError("All models were rejected by access constraints", 403)
 
 
 def parse_x_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -315,20 +368,11 @@ def parse_x_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]]:
 
     _log(f"  Output content: {len(output_text)} chars, preview: '{output_text[:200].replace(chr(10), chr(92) + 'n')}'")
 
-    # Pull JSON from the text
-    match = re.search(r'\{[^{}]*"items"\s*:\s*\[[\s\S]*?\]\s*\}', output_text)
-
-    if match:
-        _log(f"  JSON pattern found ({len(match.group())} chars)")
-        try:
-            parsed = json.loads(match.group())
-            extracted = parsed.get("items", [])
-            _log(f"  Parsed {len(extracted)} items from JSON")
-        except json.JSONDecodeError as exc:
-            _log(f"  JSON PARSE ERROR: {exc}")
-            _err(f"JSON parse error: {exc}")
+    extracted = _extract_items_blob(output_text)
+    if extracted:
+        _log(f"  Parsed {len(extracted)} items from JSON object scan")
     else:
-        _log("  NO JSON pattern with 'items' found in output")
+        _log("  NO JSON object with 'items' list found in output")
         _log(f"  Output preview for debugging: '{output_text[:500].replace(chr(10), chr(92) + 'n')}'")
 
     # Validate and normalise each item

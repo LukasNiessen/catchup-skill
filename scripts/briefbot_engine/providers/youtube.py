@@ -25,17 +25,17 @@ def _info(msg: str):
 
 def _is_access_err(err: net.HTTPError) -> bool:
     """Check whether the error signals a model-access or verification problem."""
-    if err.status_code != 400 or not err.body:
+    if err.status_code not in (400, 403) or not err.body:
         return False
 
     lowered = err.body.lower()
-    indicators = [
-        "verified",
-        "organization must be",
+    indicators = (
+        "organization must be verified",
         "does not have access",
-        "not available",
-        "not found",
-    ]
+        "access denied",
+        "model not found",
+        "not available for your account",
+    )
     return any(term in lowered for term in indicators)
 
 
@@ -80,14 +80,9 @@ JSON format:
 
 def _core_subject(verbose_query: str) -> str:
     """Strip filler words from a query, returning the essential subject."""
-    filler = {
-        'best', 'top', 'how to', 'tips for', 'practices', 'features',
-        'killer', 'guide', 'tutorial', 'recommendations', 'advice',
-        'using', 'for', 'with', 'the', 'of', 'in', 'on', 'videos',
-    }
-    tokens = verbose_query.lower().split()
-    kept = [t for t in tokens if t not in filler]
-    return ' '.join(kept[:3]) or verbose_query
+    compact = re.sub(r"\b(how\s+to|tips?\s+for|best|top|tutorials?|recommendations?|guide|advice)\b", " ", verbose_query.lower())
+    tokens = [tok for tok in re.findall(r"[a-z0-9][a-z0-9.+_-]*", compact) if tok not in {"using", "for", "with", "the", "of", "in", "on", "videos"}]
+    return " ".join(tokens[:4]) or verbose_query
 
 
 def search(
@@ -129,6 +124,7 @@ def search(
     for current_model in models_chain:
         payload = {
             "model": current_model,
+            "input": prompt,
             "tools": [
                 {
                     "type": "web_search",
@@ -138,7 +134,6 @@ def search(
                 }
             ],
             "include": ["web_search_call.action.sources"],
-            "input": prompt,
         }
 
         try:

@@ -1,7 +1,7 @@
 """Unified content model and factory functions for all platform sources."""
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional, TypeVar
@@ -54,13 +54,9 @@ class ThreadComment:
     url: str
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
-            "score": self.score,
-            "date": self.date,
-            "author": self.author,
-            "excerpt": self.excerpt,
-            "url": self.url,
-        }
+        payload = asdict(self)
+        payload["score"] = int(payload.get("score", 0))
+        return payload
 
 
 @dataclass
@@ -72,11 +68,7 @@ class ScoreBreakdown:
     engagement: int = 0
 
     def to_dict(self) -> Dict[str, int]:
-        return {
-            "relevance": self.relevance,
-            "recency": self.recency,
-            "engagement": self.engagement,
-        }
+        return asdict(self)
 
 
 @dataclass
@@ -361,9 +353,15 @@ def build_report(
 
 def _safe_log1p(val: Optional[int]) -> float:
     """Safe log1p, returns 0.0 for None or negative inputs."""
-    if val is None or val < 0:
+    if val is None:
         return 0.0
-    return math.log1p(val)
+    try:
+        number = float(val)
+    except (TypeError, ValueError):
+        return 0.0
+    if number < 0:
+        return 0.0
+    return math.log1p(number)
 
 
 def _compute_composite_reddit(sig: Signals) -> float:
