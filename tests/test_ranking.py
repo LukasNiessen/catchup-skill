@@ -1,4 +1,4 @@
-"""Tests for briefbot_engine.ranking: percentile-harmonic scoring and SimHash deduplication.
+﻿"""Tests for briefbot_engine.ranking: percentile-power scoring and SimHash deduplication.
 
 Uses "Kubernetes service mesh adoption" items for scoring tests and
 "Quantum error correction breakthrough at IBM" near-duplicates for dedup tests.
@@ -8,8 +8,8 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from briefbot_engine.content import ContentItem, ScoreParts, Engagement, Source
-from briefbot_engine import ranking
+from briefbot_engine.content import ContentItem, ScoreBreakdown, Engagement, Source
+from briefbot_engine import ranking, temporal
 
 
 # ---------------------------------------------------------------------------
@@ -24,7 +24,7 @@ def _days_ago(n: int) -> str:
     return (datetime.now(timezone.utc).date() - timedelta(days=n)).isoformat()
 
 
-def _make_reddit_item(uid, title, signal, engagement, published, date_quality="high"):
+def _make_reddit_item(uid, title, signal, engagement, published, date_confidence=None):
     return ContentItem(
         uid=uid,
         source=Source.REDDIT,
@@ -32,13 +32,13 @@ def _make_reddit_item(uid, title, signal, engagement, published, date_quality="h
         link=f"https://reddit.com/r/kubernetes/{uid}",
         author="r/kubernetes",
         published=published,
-        date_quality=date_quality,
+        date_confidence=date_confidence or temporal.CONFIDENCE_SOLID,
         engagement=engagement,
-        signal=signal,
+        relevance=signal,
     )
 
 
-def _make_web_item(uid, title, signal, published, date_quality="high"):
+def _make_web_item(uid, title, signal, published, date_confidence=None):
     return ContentItem(
         uid=uid,
         source=Source.WEB,
@@ -46,8 +46,8 @@ def _make_web_item(uid, title, signal, published, date_quality="high"):
         link=f"https://example.com/{uid}",
         author="example.com",
         published=published,
-        date_quality=date_quality,
-        signal=signal,
+        date_confidence=date_confidence or temporal.CONFIDENCE_SOLID,
+        relevance=signal,
     )
 
 
@@ -83,29 +83,25 @@ class TestPercentileRanks:
 
 
 # ---------------------------------------------------------------------------
-# Internal helpers: _weighted_harmonic_mean
+# Internal helpers: _weighted_power_mean
 # ---------------------------------------------------------------------------
 
-class TestWeightedHarmonicMean:
+class TestWeightedPowerMean:
     def test_equal_values_returns_that_value(self):
-        result = ranking._weighted_harmonic_mean([50.0, 50.0, 50.0], [1.0, 1.0, 1.0])
+        result = ranking._weighted_power_mean([50.0, 50.0, 50.0], [1.0, 1.0, 1.0])
         assert abs(result - 50.0) < 0.01
 
     def test_zero_weights_returns_zero(self):
-        result = ranking._weighted_harmonic_mean([50.0, 60.0], [0.0, 0.0])
+        result = ranking._weighted_power_mean([50.0, 60.0], [0.0, 0.0])
         assert result == 0.0
 
     def test_one_dimension_near_zero_drags_mean_down(self):
-        result = ranking._weighted_harmonic_mean([90.0, 1.0], [0.5, 0.5])
-        assert result < 45.0
-
-    def test_epsilon_prevents_division_by_zero(self):
-        result = ranking._weighted_harmonic_mean([0.0, 50.0], [0.5, 0.5])
-        assert result > 0.0
+        result = ranking._weighted_power_mean([90.0, 1.0], [0.5, 0.5])
+        assert result < 50.0
 
     def test_higher_weight_on_higher_value_increases_mean(self):
-        heavy_high = ranking._weighted_harmonic_mean([80.0, 20.0], [0.8, 0.2])
-        heavy_low = ranking._weighted_harmonic_mean([80.0, 20.0], [0.2, 0.8])
+        heavy_high = ranking._weighted_power_mean([80.0, 20.0], [0.8, 0.2])
+        heavy_low = ranking._weighted_power_mean([80.0, 20.0], [0.2, 0.8])
         assert heavy_high > heavy_low
 
 
@@ -208,11 +204,12 @@ class TestRankItems:
         result = ranking.rank_items(items)
 
         assert len(result) == 1
-        bd = result[0].score_parts
-        assert isinstance(bd, ScoreParts)
-        assert isinstance(bd.signal, int)
-        assert isinstance(bd.freshness, int)
-        assert isinstance(bd.engagement, int)
+        bd = result[0].breakdown
+        assert isinstance(bd, ScoreBreakdown)
+        assert isinstance(bd.relevance, int)
+        assert isinstance(bd.timeliness, int)
+        assert isinstance(bd.traction, int)
+        assert isinstance(bd.credibility, int)
 
     def test_scores_are_bounded_0_to_100(self):
         items = [
@@ -243,14 +240,14 @@ class TestRankItems:
             "Kubernetes service mesh adoption guide 2026",
             signal=0.88,
             published=_today(),
-            date_quality="high",
+            date_confidence=temporal.CONFIDENCE_SOLID,
         )
 
         result = ranking.rank_items([web_item])
 
         assert len(result) == 1
         assert result[0].score > 0
-        assert result[0].score_parts.engagement == 0
+        assert result[0].breakdown.traction == 0
 
     def test_mixed_platform_and_web_items(self):
         items = [
@@ -266,7 +263,7 @@ class TestRankItems:
                 "Kubernetes service mesh adoption web article",
                 signal=0.90,
                 published=_today(),
-                date_quality="high",
+                date_confidence=temporal.CONFIDENCE_SOLID,
             ),
         ]
 

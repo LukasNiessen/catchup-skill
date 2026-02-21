@@ -1,4 +1,4 @@
-"""Process and normalize web search results with date extraction."""
+﻿"""Process and normalize web search results with date extraction."""
 
 import re
 from typing import Any, Dict, List, Optional, Tuple
@@ -70,10 +70,10 @@ def process_results(
 
         # Date detection
         result_date = raw.get("date")
-        confidence = "low"
+        confidence = temporal.CONFIDENCE_WEAK
 
         if result_date and re.match(r'^\d{4}-\d{2}-\d{2}$', str(result_date)):
-            confidence = "med"
+            confidence = temporal.CONFIDENCE_SOFT
         else:
             detected, det_conf = temporal.detect(link, snippet, title)
             if detected:
@@ -102,7 +102,7 @@ def process_results(
             "domain": _domain(link),
             "snippet": snippet[:400],
             "posted": result_date,
-            "date_quality": confidence,
+            "date_confidence": confidence,
             "signal": relevance,
             "reason": str(raw.get("why_relevant", "")).strip(),
         })

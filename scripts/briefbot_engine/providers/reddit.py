@@ -1,4 +1,4 @@
-"""Reddit discovery via OpenAI Responses web tool."""
+﻿"""Reddit discovery via OpenAI Responses web tool."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from typing import Any, Dict, Iterable, List, Optional
 
 from .. import net
 
-FALLBACK_MODELS = ["gpt-4o-mini", "gpt-4o"]
+FALLBACK_MODELS = ["gpt-4o", "gpt-4o-mini"]
 
 
 def _err(msg: str) -> None:
@@ -23,7 +23,7 @@ def _info(msg: str) -> None:
 
 
 def _is_access_err(err: net.HTTPError) -> bool:
-    if err.status_code not in (400, 403) or not err.body:
+    if err.status_code not in (400, 401, 403) or not err.body:
         return False
     text = err.body.lower()
     tokens = (
@@ -32,6 +32,7 @@ def _is_access_err(err: net.HTTPError) -> bool:
         "model not found",
         "not available for your account",
         "access denied",
+        "unauthorized",
     )
     return any(token in text for token in tokens)
 
@@ -39,33 +40,33 @@ def _is_access_err(err: net.HTTPError) -> bool:
 API_URL = "https://api.openai.com/v1/responses"
 
 DEPTH_SPECS = {
-    "quick": {"min": 9, "max": 16},
-    "default": {"min": 20, "max": 36},
-    "deep": {"min": 42, "max": 74},
+    "quick": {"min": 7, "max": 14},
+    "default": {"min": 18, "max": 32},
+    "deep": {"min": 45, "max": 72},
 }
 
-REDDIT_DISCOVERY_PROMPT = """You are scouting Reddit threads for research.
+REDDIT_DISCOVERY_PROMPT = """You are assembling Reddit threads for a research brief.
 
 Topic: {topic}
 Window: {from_date} through {to_date}
-Goal: collect {min_items}-{max_items} substantive threads.
+Target: {min_items}-{max_items} solid threads
 
-Guidelines:
-- First distill the topic into a 2-3 word search phrase.
-- Run broad `site:reddit.com` searches and over-collect if needed.
-- Prefer community discussions with details or lessons learned.
-- Ignore developer/business subdomains.
+Process:
+- Compress the topic into a tight 2-4 word query.
+- Use broad searches across reddit.com and then refine if needed.
+- Prefer threads with concrete details, lessons learned, or firsthand experience.
+- Avoid low-effort meme posts or thin link dumps.
 
 Return JSON only in this structure:
 {{
   "threads": [
     {{
-      "headline": "Thread title",
-      "link": "https://www.reddit.com/r/example/comments/abc123/example_thread/",
-      "community": "example",
-      "posted": "2026-01-15",
+      "title": "Thread title",
+      "url": "https://www.reddit.com/r/example/comments/abc123/example_thread/",
+      "subreddit": "example",
+      "date": "2026-01-15",
       "signal": 0.9,
-      "reason": "Explains why the thread matters for the topic"
+      "why": "Explains why the thread matters for the topic"
     }}
   ]
 }}
@@ -97,9 +98,9 @@ def compress_topic(verbose_query: str) -> str:
     for pattern in _FILLERS:
         lowered = re.sub(pattern, " ", lowered)
     tokens = [tok for tok in re.findall(r"[a-z0-9][a-z0-9.+_-]*", lowered) if tok not in _STOPWORDS]
-    if len(tokens) <= 3:
+    if len(tokens) <= 4:
         return " ".join(tokens) or verbose_query
-    return " ".join(tokens[:3])
+    return " ".join(tokens[:4])
 
 
 def _iter_text_chunks(output: Any) -> Iterable[str]:
@@ -170,22 +171,24 @@ def _to_signal(value: Any) -> float:
 
 
 def _normalize_item(raw: Dict[str, Any], ordinal: int) -> Optional[Dict[str, Any]]:
-    link = str(raw.get("link", "")).strip()
+    link = str(raw.get("url", raw.get("link", ""))).strip()
     if "reddit.com" not in link:
         return None
-    date_value = raw.get("posted")
+    date_value = raw.get("date", raw.get("posted"))
     if date_value is not None and not _ID_DATE.match(str(date_value)):
         date_value = None
-    community = str(raw.get("community", "")).strip()
+    community = str(raw.get("subreddit", raw.get("community", ""))).strip()
     if community.lower().startswith("r/"):
         community = community[2:]
+    title = str(raw.get("title", raw.get("headline", ""))).strip()
+    why = str(raw.get("why", raw.get("reason", ""))).strip()
     return {
-        "uid": f"R{ordinal}",
-        "title": str(raw.get("headline", "")).strip(),
+        "uid": f"RD{ordinal}",
+        "title": title,
         "link": link,
         "community": community,
         "posted": date_value,
-        "reason": str(raw.get("reason", "")).strip(),
+        "reason": why,
         "signal": _to_signal(raw.get("signal")),
     }
 
@@ -207,7 +210,7 @@ def search(
     min_items = depth_spec["min"]
     max_items = depth_spec["max"]
     headers = {"Authorization": f"Bearer {key}"}
-    timeout = {"quick": 65, "default": 95, "deep": 150}.get(depth, 95)
+    timeout = {"quick": 60, "default": 90, "deep": 150}.get(depth, 90)
     model_candidates = [model] + [candidate for candidate in FALLBACK_MODELS if candidate != model]
     prompt = REDDIT_DISCOVERY_PROMPT.format(
         topic=topic,
@@ -222,13 +225,12 @@ def search(
         request_payload = {
             "model": candidate,
             "input": [
-                {
-                    "role": "user",
-                    "content": prompt,
-                }
+                {"role": "system", "content": "You are a research scout for Reddit."},
+                {"role": "user", "content": prompt},
             ],
             "tools": [{"type": "web_search", "filters": {"allowed_domains": ["reddit.com"]}}],
-            "include": ["web_search_call.action.sources"],
+            "temperature": 0.2,
+            "max_output_tokens": 1200,
         }
         try:
             return net.request(

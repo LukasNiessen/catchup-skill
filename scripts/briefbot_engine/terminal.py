@@ -127,13 +127,13 @@ UPGRADE_NOTICE = f"""
   {Style.TEAL}\U0001f535 X (Twitter){Style.NORMAL} - Real-time posts, likes, reposts from creators
      \u2514\u2500 Add XAI_API_KEY (uses xAI's live X search)
 
-{Style.SUBDUED}Setup:{Style.NORMAL} Edit {Style.EMPHASIZED}~/.config/briefbot/.env{Style.NORMAL}
+{Style.SUBDUED}Setup:{Style.NORMAL} Edit {Style.EMPHASIZED}~/.config/briefbot/briefbot.env{Style.NORMAL} {Style.SUBDUED}(legacy .env also supported){Style.NORMAL}
 {Style.AMBER}{Style.EMPHASIZED}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501{Style.NORMAL}
 """
 
 SINGLE_KEY_HINTS = {
-    "reddit": f"\n{Style.SUBDUED}\U0001f4a1 Tip: Add {Style.AMBER}OPENAI_API_KEY{Style.NORMAL}{Style.SUBDUED} to ~/.config/briefbot/.env for Reddit, YouTube & LinkedIn data!{Style.NORMAL}\n",
-    "x": f"\n{Style.SUBDUED}\U0001f4a1 Tip: Add {Style.TEAL}XAI_API_KEY{Style.NORMAL}{Style.SUBDUED} to ~/.config/briefbot/.env for X/Twitter data with real likes & reposts!{Style.NORMAL}\n",
+    "reddit": f"\n{Style.SUBDUED}\U0001f4a1 Tip: Add {Style.AMBER}OPENAI_API_KEY{Style.NORMAL}{Style.SUBDUED} to ~/.config/briefbot/briefbot.env (or legacy .env) for Reddit, YouTube & LinkedIn data!{Style.NORMAL}\n",
+    "x": f"\n{Style.SUBDUED}\U0001f4a1 Tip: Add {Style.TEAL}XAI_API_KEY{Style.NORMAL}{Style.SUBDUED} to ~/.config/briefbot/briefbot.env (or legacy .env) for X/Twitter data with real likes & reposts!{Style.NORMAL}\n",
 }
 
 SPIN_CHARS = ['\u25dc', '\u25dd', '\u25de', '\u25df']

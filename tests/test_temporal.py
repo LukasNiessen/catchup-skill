@@ -1,8 +1,11 @@
-"""Tests for briefbot_engine.temporal -- date windowing, parsing, freshness, extraction."""
+﻿"""Tests for briefbot_engine.temporal -- date windowing, parsing, freshness, extraction."""
 
 from datetime import datetime, timedelta, timezone
 
 from briefbot_engine.temporal import (
+    CONFIDENCE_SOLID,
+    CONFIDENCE_SOFT,
+    CONFIDENCE_WEAK,
     detect,
     elapsed_days,
     extract_from_text,
@@ -127,33 +130,39 @@ def test_to_date_str_none_returns_none():
 # trust_level()
 # ---------------------------------------------------------------------------
 
-def test_trust_level_high_within_range():
+def test_trust_level_solid_within_range():
     result = trust_level("2026-02-10", "2026-01-20", "2026-02-19")
 
-    assert result == "high"
+    assert result == CONFIDENCE_SOLID
 
 
-def test_trust_level_low_before_range():
+def test_trust_level_soft_near_range():
+    result = trust_level("2026-02-22", "2026-01-20", "2026-02-19")
+
+    assert result == CONFIDENCE_SOFT
+
+
+def test_trust_level_weak_before_range():
     result = trust_level("2025-11-30", "2026-01-20", "2026-02-19")
 
-    assert result == "low"
+    assert result == CONFIDENCE_WEAK
 
 
-def test_trust_level_low_after_range():
+def test_trust_level_weak_after_range():
     result = trust_level("2026-04-01", "2026-01-20", "2026-02-19")
 
-    assert result == "low"
+    assert result == CONFIDENCE_WEAK
 
 
-def test_trust_level_low_for_none():
+def test_trust_level_weak_for_none():
     result = trust_level(None, "2026-01-20", "2026-02-19")
 
-    assert result == "low"
+    assert result == CONFIDENCE_WEAK
 
 
-def test_trust_level_high_at_boundaries():
-    assert trust_level("2026-01-20", "2026-01-20", "2026-02-19") == "high"
-    assert trust_level("2026-02-19", "2026-01-20", "2026-02-19") == "high"
+def test_trust_level_solid_at_boundaries():
+    assert trust_level("2026-01-20", "2026-01-20", "2026-02-19") == CONFIDENCE_SOLID
+    assert trust_level("2026-02-19", "2026-01-20", "2026-02-19") == CONFIDENCE_SOLID
 
 
 # ---------------------------------------------------------------------------
@@ -202,13 +211,13 @@ def test_freshness_score_30_days_ago_is_0():
     assert result == 0
 
 
-def test_freshness_score_15_days_ago_near_50():
+def test_freshness_score_15_days_ago_near_45():
     mid = (datetime.now(timezone.utc).date() - timedelta(days=15)).isoformat()
 
     result = freshness_score(mid)
 
-    # Curved formula: int(100 * ((30-15)/30) ** 0.95) ~ 51
-    assert 48 <= result <= 53
+    # Curved formula: int(100 * ((30-15)/30) ** 1.15) ~ 45
+    assert 42 <= result <= 48
 
 
 def test_freshness_score_none_is_0():
@@ -331,7 +340,7 @@ def test_detect_url_date_takes_priority():
     date, confidence = detect(url, snippet, title)
 
     assert date == "2026-02-07"
-    assert confidence == "high"
+    assert confidence == CONFIDENCE_SOLID
 
 
 def test_detect_falls_back_to_title():
@@ -342,7 +351,7 @@ def test_detect_falls_back_to_title():
     date, confidence = detect(url, snippet, title)
 
     assert date == "2026-02-12"
-    assert confidence == "low"  # title dates get "low" confidence
+    assert confidence == CONFIDENCE_SOFT
 
 
 def test_detect_falls_back_to_snippet():
@@ -353,7 +362,7 @@ def test_detect_falls_back_to_snippet():
     date, confidence = detect(url, snippet, title)
 
     assert date == "2026-02-09"
-    assert confidence == "med"
+    assert confidence == CONFIDENCE_SOFT
 
 
 def test_detect_returns_none_when_no_date():
@@ -364,4 +373,4 @@ def test_detect_returns_none_when_no_date():
     date, confidence = detect(url, snippet, title)
 
     assert date is None
-    assert confidence == "low"
+    assert confidence == CONFIDENCE_WEAK

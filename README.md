@@ -1,4 +1,4 @@
-# BriefBot - ClaudeCode Skill
+﻿# BriefBot - ClaudeCode Skill
 
 <div align="center" name="top">
   
@@ -16,15 +16,15 @@ AI reinvents itself every week. The world has never moved this fast. Use BriefBo
 
 Use cases include prompt research, following trends and staying up to date on a certain topic. Works with a terminal, email and Telegram.
 
-<i>Get your briefing at 5 am while the world is sleeping - and know more than anyone else in the room. 🐉🐲</i>
+<i>Get your briefing at 5 am while the world is sleeping - and know more than anyone else in the room. ðŸ‰ðŸ²</i>
 
 <i>Works without OpenClaw or any other additional setup.</i>
 
-[Setup](#-setup) • [Demo](#-demo) • [Examples](#-examples) • [Options](#-options) • [Features](#-features) • [Contributing](CONTRIBUTING.md) • [Documentation](https://lukasniessen.github.io/ArchUnitTS/)
+[Setup](#-setup) â€¢ [Demo](#-demo) â€¢ [Examples](#-examples) â€¢ [Options](#-options) â€¢ [Features](#-features) â€¢ [Contributing](CONTRIBUTING.md) â€¢ [Documentation](https://lukasniessen.github.io/ArchUnitTS/)
 
 ---
 
-## ⚡ 2 min Quickstart
+## âš¡ 2 min Quickstart
 
 ### 1. Clone the repo
 
@@ -38,7 +38,7 @@ git clone https://github.com/lukasniessen/briefbot-skill.git ~/.claude/skills/br
 /briefbot setup
 ```
 
-The setup wizard walks through all settings — API keys, email, Telegram, audio.
+The setup wizard walks through all settings â€” API keys, email, Telegram, audio.
 
 ### 3. Optional: Telegram
 
@@ -72,24 +72,24 @@ On Telegram you don't need to write `/briefbot`. In group chats however, you nee
 
 ---
 
-## 📋 Examples
+## ðŸ“‹ Examples
 
 > **Tip:** Click on any collapsed section below to expand the full example.
 
-### Nano Banano Pro Prompts
+### Aurora Canvas Prompts
 
-#### 💻 Prompt:
+#### ðŸ’» Prompt:
 
 ```bash
-/briefbot nano banana pro prompting
+/briefbot Aurora Canvas prompting
 ```
 
-#### 🤖 Answer:
+#### ðŸ¤– Answer:
 
 ```
 **What I learned**
 
-Nano Banana Pro is a reasoning-first image model — it has a "Deep Think" step that plans composition before generating pixels. This means it responds to structured,
+Aurora Canvas is a reasoning-first image model â€” it has a "Deep Think" step that plans composition before generating pixels. This means it responds to structured,
 constraint-rich design documents far better than keyword lists or vague requests. Think of your prompt as a visual design brief, not a search query.
 
 The model's reasoning engine parses context, spatial relationships, and even structured data formats (JSON, HTML/CSS, grids). This is why short prompts like "make an
@@ -98,22 +98,22 @@ prompt like a specification document with clear sections for subject, layout, co
 
 Key techniques
 
-1. Design-document prompting — Structure your prompt as a full visual brief with sections for subject, composition, action, setting, style, and constraints. The
+1. Design-document prompting â€” Structure your prompt as a full visual brief with sections for subject, composition, action, setting, style, and constraints. The
    reasoning engine parses context hierarchically, so a narrative description ("a bartender polishing glasses in a speakeasy at golden hour") massively outperforms
    comma-separated tags. Vague requests trigger the model's worst outputs. (https://www.radicalcuriosity.xyz/p/how-to-create-an-effective-prompt)
-2. MUST-constraint enforcement — ALL CAPS "MUST" statements activate the reasoning step's constraint-checking system. Writing "All elements MUST follow rule of thirds"
+2. MUST-constraint enforcement â€” ALL CAPS "MUST" statements activate the reasoning step's constraint-checking system. Writing "All elements MUST follow rule of thirds"
    or "Text MUST be in Times New Roman, 24pt bold" is enforced systematically, unlike lowercase suggestions which the model may treat as optional. Structure constraints as
    a bulleted list under "MUST obey ALL the FOLLOWING:" for maximum compliance. (https://minimaxir.com/2025/12/nano-banana-pro/)
-3. Camera-gear anchoring — Referencing specific camera models and lens specs (e.g., "Canon EOS R5 with 85mm f/1.8", "Shot on Arri Alexa") overrides generic style words
+3. Camera-gear anchoring â€” Referencing specific camera models and lens specs (e.g., "Canon EOS R5 with 85mm f/1.8", "Shot on Arri Alexa") overrides generic style words
    and forces physical realism. The model uses gear references to infer depth-of-field, film grain, and color science. Tags like "Shot on Arri Alexa" emulate specific film
    characteristics, while focal length and aperture control bokeh and volumetric depth precisely. (https://higgsfield.ai/nano-banana-pro-prompt-guide,
    https://minimaxir.com/2025/12/nano-banana-pro/)
-4. Explicit text rendering — Nano Banana Pro has exceptional text rendering. To activate it reliably: put the exact text in double quotes, specify font family (e.g.,
+4. Explicit text rendering â€” Aurora Canvas has exceptional text rendering. To activate it reliably: put the exact text in double quotes, specify font family (e.g.,
    "Roboto Bold"), define placement location, and describe background treatment. For multilingual text, the model handles a wide range of global languages. This enables
-   posters, product mockups, UI designs, and diagrams with sharp, legible text — a capability most competing models lack.
+   posters, product mockups, UI designs, and diagrams with sharp, legible text â€” a capability most competing models lack.
    (https://www.imagine.art/blogs/nano-banana-pro-prompt-guide)
-5. Negative constraints for cleanup — The model's reasoning engine responds to explicit exclusion rules. "NEVER include watermarks, text overlays, or extra limbs"
-   narrows the model's search space and prevents common artifacts. Define the boundaries of failure by listing what to exclude alongside what to include — this tightens the
+5. Negative constraints for cleanup â€” The model's reasoning engine responds to explicit exclusion rules. "NEVER include watermarks, text overlays, or extra limbs"
+   narrows the model's search space and prevents common artifacts. Define the boundaries of failure by listing what to exclude alongside what to include â€” this tightens the
    output without sacrificing compositional richness. (https://higgsfield.ai/nano-banana-pro-prompt-guide, https://minimaxir.com/2025/12/nano-banana-pro/)
 
 ---
@@ -132,26 +132,26 @@ Top sources: Max Woolf on minimaxir.com, Google Blog (Bea Alessio), Radical Curi
 
 What do you want to make? For example:
 
-- A photorealistic product shot with specific camera specs and studio lighting (the most reliable technique right now — camera-gear anchoring + MUST constraints)
+- A photorealistic product shot with specific camera specs and studio lighting (the most reliable technique right now â€” camera-gear anchoring + MUST constraints)
 - An infographic or data visualization with structured layout, precise text rendering, and color palette specs (exploits the Deep Think reasoning engine)
 - A cinematic scene with volumetric lighting and film grain, specifying exact lens and aperture to nail the look (Arri Alexa emulation + narrative prompting)
 
 Just describe your vision and I'll write a prompt you can paste straight into Gemini.
 ```
 
-#### 💻 Follow-up Prompt:
+#### ðŸ’» Follow-up Prompt:
 
 ```bash
 Make a mockup of an app for moms who cook
 ```
 
-#### 🤖 Answer:
+#### ðŸ¤– Answer:
 
 ```
 A premium UI/UX app mockup displayed on a modern iPhone 15 Pro held at a slight
 angle on a clean white marble surface with soft diffused studio lighting.
 
-The app is called "MamaChef" — a warm, friendly cooking app designed for busy moms.
+The app is called "MamaChef" â€” a warm, friendly cooking app designed for busy moms.
 
 SCREEN CONTENT:
 - Top bar: greeting text "Hi, Sarah" with a soft round profile avatar
@@ -176,11 +176,11 @@ CONSTRAINTS:
 - Do NOT include any hands holding the phone
 ```
 
-#### 🔥 Result:
+#### ðŸ”¥ Result:
 
-<i>Generated by Gemini with Nano Banana Pro</i>
+<i>Generated by Gemini with Aurora Canvas</i>
 
-<img src="assets/mamachef-mockup.png" width="500" alt="MamaChef iOS app mockup generated with Nano Banana Pro"/>
+<img src="assets/mamachef-mockup.png" width="500" alt="MamaChef iOS app mockup generated with Aurora Canvas"/>
 
 ---
 
@@ -199,7 +199,7 @@ The AI video ad space has split into two distinct lanes: general-purpose cinemat
 
 The biggest shift in 2026 is that avatar and UGC-style ads now rival traditional production quality. Tools like HeyGen and Creatify can generate spokesperson-style ads indistinguishable from real footage, with lip-synced multilingual versions, eliminating the need for actors, studios, or reshoots entirely.
 
-────────────────────
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 Most Mentioned
 
@@ -219,7 +219,7 @@ Most Mentioned
 
 Notable mentions: Runway ML (creative professionals), Adobe Firefly Video (Premiere Pro integration), Pictory (blog-to-video repurposing), Veo 3.1 by Google (best raw video quality), Arcads (AI UGC actors), Veed.io (quick social edits)
 
-────────────────────
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 How to Choose
 
@@ -232,7 +232,7 @@ How to Choose
 | Local business / agency volume  | Waymark       | Website-to-ad in minutes, broadcast-ready                |
 | Performance marketing creatives | AdCreative.ai | Trained on real ad performance data                      |
 
-────────────────────
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 Key Techniques
 
@@ -483,7 +483,7 @@ Sources collected
 Platform: X
 Items: 21 posts
 Engagement: 4,877 likes, 256 reposts
-────────────────────────────────────────
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 Platform: Web
 Items: 20+ pages
 Engagement: kdnuggets.com, faros.ai, builder.io, tembo.io, aimultiple.com, pinggy.io, dextralabs.com, kiro.dev, sourceforge.net, nxgntools.com, uibakery.io,
@@ -507,8 +507,8 @@ Just tell me your stack or workflow and I'll give you a specific recommendation.
 
 **3. Result:**
 
-```
-# CLAUDE.md — Personal Website (React + TypeScript)
+````
+# CLAUDE.md â€” Personal Website (React + TypeScript)
 
 ## Project Overview
 
@@ -519,7 +519,7 @@ Personal portfolio website built with React 18, TypeScript, Vite, Chakra UI, and
 ```bash
 npm run dev        # Start Vite dev server (http://localhost:5173)
 npm run build      # TypeScript check + production build (tsc -b && vite build)
-npm run lint       # ESLint — zero warnings allowed
+npm run lint       # ESLint â€” zero warnings allowed
 npm run preview    # Preview production build locally
 npm run test       # Jest (unit tests)
 npx playwright test # E2E tests (Chromium, Firefox, WebKit)
@@ -529,53 +529,53 @@ Always run npm run lint before considering a task done.
 
 Tech Stack
 
-┌────────────┬───────────────────────────────────────────────────────────┐
-│   Layer    │                        Technology                         │
-├────────────┼───────────────────────────────────────────────────────────┤
-│ Framework  │ React 18.3 + TypeScript 5.2                               │
-├────────────┼───────────────────────────────────────────────────────────┤
-│ Build      │ Vite 5                                                    │
-├────────────┼───────────────────────────────────────────────────────────┤
-│ State      │ Redux Toolkit (@reduxjs/toolkit + react-redux)            │
-├────────────┼───────────────────────────────────────────────────────────┤
-│ Routing    │ React Router v6 (react-router-dom)                        │
-├────────────┼───────────────────────────────────────────────────────────┤
-│ UI Library │ Chakra UI v2 (@chakra-ui/react)                           │
-├────────────┼───────────────────────────────────────────────────────────┤
-│ Styling    │ SCSS modules (component-level) + Chakra UI components     │
-├────────────┼───────────────────────────────────────────────────────────┤
-│ Animation  │ Framer Motion (available, use where appropriate)          │
-├────────────┼───────────────────────────────────────────────────────────┤
-│ Linting    │ ESLint + @typescript-eslint + react-hooks + react-refresh │
-├────────────┼───────────────────────────────────────────────────────────┤
-│ Testing    │ Jest (unit) + Playwright (E2E)                            │
-└────────────┴───────────────────────────────────────────────────────────┘
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚   Layer    â”‚                        Technology                         â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚ Framework  â”‚ React 18.3 + TypeScript 5.2                               â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚ Build      â”‚ Vite 5                                                    â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚ State      â”‚ Redux Toolkit (@reduxjs/toolkit + react-redux)            â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚ Routing    â”‚ React Router v6 (react-router-dom)                        â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚ UI Library â”‚ Chakra UI v2 (@chakra-ui/react)                           â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚ Styling    â”‚ SCSS modules (component-level) + Chakra UI components     â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚ Animation  â”‚ Framer Motion (available, use where appropriate)          â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚ Linting    â”‚ ESLint + @typescript-eslint + react-hooks + react-refresh â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚ Testing    â”‚ Jest (unit) + Playwright (E2E)                            â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 
 Project Structure
 
 src/
-├── assets/                  # Static assets (images, etc.)
-├── components/
-│   ├── aboutme/             # AboutMe page component + styles
-│   ├── blog/                # Blog page component + styles
-│   ├── code-game/           # CodeGame interactive component + styles
-│   ├── constants/           # Shared constants (CodeSnippets.ts)
-│   ├── milestones/          # Milestones page component + styles
-│   └── navigation/          # TopNavigationBar + styles
-├── slices/                  # Redux Toolkit slices
-│   ├── appSlice.ts          # UI state (currentLocation)
-│   └── statsSlice.ts        # User interaction tracking stats
-├── stylesheets/
-│   └── common.scss          # Shared SCSS variables and utility classes
-├── utils/                   # Pure utility functions
-│   ├── RandomCodeGenerator.ts
-│   └── RandomUtils.ts
-├── App.tsx                  # Root component, global event listeners
-├── App.scss                 # Root layout styles
-├── AppRoutes.tsx            # All route definitions
-├── main.tsx                 # Entry point, BrowserRouter + Provider
-├── store.ts                 # Redux store configuration + type exports
-└── vite-env.d.ts
+â”œâ”€â”€ assets/                  # Static assets (images, etc.)
+â”œâ”€â”€ components/
+â”‚   â”œâ”€â”€ aboutme/             # AboutMe page component + styles
+â”‚   â”œâ”€â”€ blog/                # Blog page component + styles
+â”‚   â”œâ”€â”€ code-game/           # CodeGame interactive component + styles
+â”‚   â”œâ”€â”€ constants/           # Shared constants (CodeSnippets.ts)
+â”‚   â”œâ”€â”€ milestones/          # Milestones page component + styles
+â”‚   â””â”€â”€ navigation/          # TopNavigationBar + styles
+â”œâ”€â”€ slices/                  # Redux Toolkit slices
+â”‚   â”œâ”€â”€ appSlice.ts          # UI state (currentLocation)
+â”‚   â””â”€â”€ statsSlice.ts        # User interaction tracking stats
+â”œâ”€â”€ stylesheets/
+â”‚   â””â”€â”€ common.scss          # Shared SCSS variables and utility classes
+â”œâ”€â”€ utils/                   # Pure utility functions
+â”‚   â”œâ”€â”€ RandomCodeGenerator.ts
+â”‚   â””â”€â”€ RandomUtils.ts
+â”œâ”€â”€ App.tsx                  # Root component, global event listeners
+â”œâ”€â”€ App.scss                 # Root layout styles
+â”œâ”€â”€ AppRoutes.tsx            # All route definitions
+â”œâ”€â”€ main.tsx                 # Entry point, BrowserRouter + Provider
+â”œâ”€â”€ store.ts                 # Redux store configuration + type exports
+â””â”€â”€ vite-env.d.ts
 
 
 Architecture Rules
@@ -592,7 +592,7 @@ Components
 
 TypeScript
 
-- Strict mode is ON. Do not use any — ever. Use unknown + type narrowing if the type is genuinely unknown.
+- Strict mode is ON. Do not use any â€” ever. Use unknown + type narrowing if the type is genuinely unknown.
 - Define interfaces/types locally in the file that uses them, co-located with the component or slice. Do not create a central types.ts unless a type is shared across 3+
 files.
 - Use interface for object shapes, type for unions/intersections/aliases.
@@ -601,7 +601,7 @@ files.
 
 State Management (Redux Toolkit)
 
-- Store is configured in src/store.ts — two slices: stats and userInterface.
+- Store is configured in src/store.ts â€” two slices: stats and userInterface.
 - All new state goes into a new slice in src/slices/ or extends an existing one.
 - Use createSlice from RTK. Never write reducers manually.
 - Export pattern for slices:
@@ -629,7 +629,7 @@ Utilities
 
 - Pure utility functions go in src/utils/.
 - Utility files use PascalCase: RandomCodeGenerator.ts.
-- Functions must be pure — no side effects, no state mutations.
+- Functions must be pure â€” no side effects, no state mutations.
 - Export named functions, not default exports.
 
 Code Style & Conventions
@@ -644,13 +644,13 @@ Do
 
 Don't
 
-- Don't use console.log — remove any you encounter (existing ones are debug artifacts)
-- Don't use alert() — use Chakra UI useToast or a modal instead
-- Don't use useRef to track mount state — use useEffect with proper dependency arrays
-- Don't add barrel/index.ts files — import directly from the source file
+- Don't use console.log â€” remove any you encounter (existing ones are debug artifacts)
+- Don't use alert() â€” use Chakra UI useToast or a modal instead
+- Don't use useRef to track mount state â€” use useEffect with proper dependency arrays
+- Don't add barrel/index.ts files â€” import directly from the source file
 - Don't install new dependencies without asking first
 - Don't modify vite.config.ts or tsconfig.json unless absolutely necessary
-- Don't use inline styles — use Chakra props or SCSS classes
+- Don't use inline styles â€” use Chakra props or SCSS classes
 - Don't add comments that restate what the code does. Only comment why when it's non-obvious
 
 Exports
@@ -661,31 +661,31 @@ Exports
 
 Naming
 
-┌───────────────────┬───────────────────────────────┬──────────────────────────┐
-│       Thing       │          Convention           │         Example          │
-├───────────────────┼───────────────────────────────┼──────────────────────────┤
-│ Component files   │ kebab-case.tsx                │ code-game.tsx            │
-├───────────────────┼───────────────────────────────┼──────────────────────────┤
-│ Component names   │ PascalCase                    │ CodeGame                 │
-├───────────────────┼───────────────────────────────┼──────────────────────────┤
-│ SCSS files        │ kebab-case.scss               │ code-game.scss           │
-├───────────────────┼───────────────────────────────┼──────────────────────────┤
-│ SCSS classes      │ kebab-case                    │ .game-container          │
-├───────────────────┼───────────────────────────────┼──────────────────────────┤
-│ Redux slices      │ camelCaseSlice.ts             │ statsSlice.ts            │
-├───────────────────┼───────────────────────────────┼──────────────────────────┤
-│ Slice actions     │ camelCase                     │ incrLeftMouse            │
-├───────────────────┼───────────────────────────────┼──────────────────────────┤
-│ Utility files     │ PascalCase.ts                 │ RandomUtils.ts           │
-├───────────────────┼───────────────────────────────┼──────────────────────────┤
-│ Utility functions │ camelCase                     │ randomIntFromInterval    │
-├───────────────────┼───────────────────────────────┼──────────────────────────┤
-│ Interfaces        │ PascalCase                    │ StatsState, NavItem      │
-├───────────────────┼───────────────────────────────┼──────────────────────────┤
-│ Type aliases      │ PascalCase                    │ RootState                │
-├───────────────────┼───────────────────────────────┼──────────────────────────┤
-│ Constants         │ camelCase or UPPER_SNAKE_CASE │ sliceName, CODE_SNIPPETS │
-└───────────────────┴───────────────────────────────┴──────────────────────────┘
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚       Thing       â”‚          Convention           â”‚         Example          â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚ Component files   â”‚ kebab-case.tsx                â”‚ code-game.tsx            â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚ Component names   â”‚ PascalCase                    â”‚ CodeGame                 â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚ SCSS files        â”‚ kebab-case.scss               â”‚ code-game.scss           â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚ SCSS classes      â”‚ kebab-case                    â”‚ .game-container          â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚ Redux slices      â”‚ camelCaseSlice.ts             â”‚ statsSlice.ts            â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚ Slice actions     â”‚ camelCase                     â”‚ incrLeftMouse            â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚ Utility files     â”‚ PascalCase.ts                 â”‚ RandomUtils.ts           â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚ Utility functions â”‚ camelCase                     â”‚ randomIntFromInterval    â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚ Interfaces        â”‚ PascalCase                    â”‚ StatsState, NavItem      â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚ Type aliases      â”‚ PascalCase                    â”‚ RootState                â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚ Constants         â”‚ camelCase or UPPER_SNAKE_CASE â”‚ sliceName, CODE_SNIPPETS â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 
 Error Handling
 
@@ -704,8 +704,8 @@ PR & Commit Conventions
 
 - Commits: imperative mood, concise (Add milestones page, Fix nav highlight on route change)
 - One logical change per commit
-- Run npm run build and npm run lint before committing — both must pass
-```
+- Run npm run build and npm run lint before committing â€” both must pass
+````
 
 </details>
 
@@ -721,19 +721,19 @@ PR & Commit Conventions
 ```
 What Amodei has been up to this week
 
-1. $30B Series G at $380B valuation (Feb 12) — The largest AI funding round in history. Amodei framed it as a necessity given projected compute scaling: 3x annual growth
+1. $30B Series G at $380B valuation (Feb 12) â€” The largest AI funding round in history. Amodei framed it as a necessity given projected compute scaling: 3x annual growth
  reaching 300GW of AI compute by 2029.
 
-2. Dwarkesh Podcast: "Near the end of the exponential" (Feb 13) — A 3-hour deep dive where Amodei laid out his clearest AGI timeline yet, predicting a "country of geniuses
+2. Dwarkesh Podcast: "Near the end of the exponential" (Feb 13) â€” A 3-hour deep dive where Amodei laid out his clearest AGI timeline yet, predicting a "country of geniuses
  in a data center" in 2026-2027. He argued AI models are approaching the capability to build their own successors.
 
-3. India expansion (Feb 16) — Opened Anthropic's Bengaluru office and keynoted the India AI Impact Summit in Delhi. India is now Anthropic's second-largest market (revenue
+3. India expansion (Feb 16) â€” Opened Anthropic's Bengaluru office and keynoted the India AI Impact Summit in Delhi. India is now Anthropic's second-largest market (revenue
  doubled in 4 months). Improving Claude in 10 Indian languages.
 
-4. Bankruptcy risk candor — Told Fortune that if growth is 5x/year instead of 10x, or if timelines slip by one year, "you go bankrupt." Remarkable candor days after raising
+4. Bankruptcy risk candor â€” Told Fortune that if growth is 5x/year instead of 10x, or if timelines slip by one year, "you go bankrupt." Remarkable candor days after raising
  $30B.
 
-5. AI consciousness remarks — Stated "we don't know if the models are conscious" and framed AI development as "cultivating" rather than "programming" intelligence. Went
+5. AI consciousness remarks â€” Stated "we don't know if the models are conscious" and framed AI development as "cultivating" rather than "programming" intelligence. Went
  viral on X (595+ likes on top posts).
 
 X engagement
@@ -742,7 +742,7 @@ X engagement
 
 The thread worth pulling
 
-The tension between "we might go bankrupt" and a $30B raise — what does this signal about AI capex risk broadly? His India bet (talent, market, or regulatory arbitrage?),
+The tension between "we might go bankrupt" and a $30B raise â€” what does this signal about AI capex risk broadly? His India bet (talent, market, or regulatory arbitrage?),
 and the "cultivation vs programming" framing for AI safety.
 ```
 
@@ -767,7 +767,7 @@ Top Use Cases Trending on X
 
   2. E-Commerce & TikTok Shop Scouting
   - Scours TikTok Shop for trends/creators 24/7, generates UGC ads
-  - Described as a "$1B use case" — https://x.com/maverickecom/status/2021284803170140174
+  - Described as a "$1B use case" â€” https://x.com/maverickecom/status/2021284803170140174
 
   3. Real-World Negotiations & Transactions
   - Someone's ClawdBot negotiated a Hyundai Palisade $4,200 under market
@@ -864,17 +864,17 @@ Key Themes Across the Papers
 
 Where to Track These Papers
 
-• Hugging Face Daily Papers -- community-upvoted daily feed
-• alphaXiv -- discussion layer on top of arXiv
-• Deep Learning Monitor -- aggregates arXiv, tweets, and Reddit
-• @dair_ai weekly roundups -- curated top papers each week (593 likes on latest)
-• arXiv cs.AI -- the canonical source
+â€¢ Hugging Face Daily Papers -- community-upvoted daily feed
+â€¢ alphaXiv -- discussion layer on top of arXiv
+â€¢ Deep Learning Monitor -- aggregates arXiv, tweets, and Reddit
+â€¢ @dair_ai weekly roundups -- curated top papers each week (593 likes on latest)
+â€¢ arXiv cs.AI -- the canonical source
 
 Further Reading
 
-• 6 AI breakthroughs that will define 2026 (InfoWorld)
-• TechCrunch: In 2026, AI will move from hype to pragmatism
-• Constellation Research: DeepSeek's paper latest evidence AI muscle head era coming to end
+â€¢ 6 AI breakthroughs that will define 2026 (InfoWorld)
+â€¢ TechCrunch: In 2026, AI will move from hype to pragmatism
+â€¢ Constellation Research: DeepSeek's paper latest evidence AI muscle head era coming to end
 ```
 
 </details>
@@ -972,7 +972,7 @@ Sources collected
 Platform: X
 Items: 21 posts
 Engagement: ~490,000 likes, ~97,000 reposts
-────────────────────────────────────────
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 Platform: Web
 Items: 30 pages
 Engagement: CNN, CNBC, Bloomberg, NPR, Variety, Rolling Stone, Al Jazeera,
@@ -1091,7 +1091,7 @@ Sources collected
 Platform: X
 Items: 18 posts
 Engagement: ~270,000 likes, ~61,000 reposts
-────────────────────────────────────────
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 Platform: Web
 Items: 30+ pages
 Engagement: Bloomberg, Al Jazeera, CNBC, NBC, ITV, YouGov, GB News, CNN, The
@@ -1128,23 +1128,23 @@ Try next: What are the realistic scenarios for Starmer being replaced before the
 ```
 What I learned
 
-ChatGPT's image engine (GPT-4o / GPT Image 1.5) responds to prompts structured like creative direction briefs, not keyword lists. The dominant technique across X right now is the "analyze-then-JSON" workflow: upload a reference photo, ask ChatGPT to analyze it into a detailed JSON prompt, then feed that JSON back for generation. This two-step approach consistently produces the most realistic results because the JSON structure forces the model to attend to every parameter — skin texture, lighting angle, lens specs — rather than guessing from vague prose (iamrollandex on X, Mho_23 on X).
+ChatGPT's image engine (GPT-4o / GPT Image 1.5) responds to prompts structured like creative direction briefs, not keyword lists. The dominant technique across X right now is the "analyze-then-JSON" workflow: upload a reference photo, ask ChatGPT to analyze it into a detailed JSON prompt, then feed that JSON back for generation. This two-step approach consistently produces the most realistic results because the JSON structure forces the model to attend to every parameter â€” skin texture, lighting angle, lens specs â€” rather than guessing from vague prose (iamrollandex on X, Mho_23 on X).
 
-The second shift: face-reference prompting has become standard. Nearly every viral portrait prompt on X in the last 30 days includes "use the uploaded image as the face reference — the face must match 100% exactly," treating the uploaded photo as a strict identity anchor rather than a loose inspiration (Sheldon056 on X, r4jjesh on X).
+The second shift: face-reference prompting has become standard. Nearly every viral portrait prompt on X in the last 30 days includes "use the uploaded image as the face reference â€” the face must match 100% exactly," treating the uploaded photo as a strict identity anchor rather than a loose inspiration (Sheldon056 on X, r4jjesh on X).
 
 Key techniques
 
-1. Analyze-then-JSON workflow — Upload a Pinterest or reference photo and prompt: "Analyze this photo and give me a very detailed JSON prompt I can use to recreate this style." Then paste the resulting JSON back as your generation prompt. The JSON forces granular control over every element — lighting, skin texture, camera specs, pose — producing results that look "100% real" because nothing is left to the model's default assumptions (iamrollandex on X, 2K likes, Mho_23 on X, 1.4K likes).
+1. Analyze-then-JSON workflow â€” Upload a Pinterest or reference photo and prompt: "Analyze this photo and give me a very detailed JSON prompt I can use to recreate this style." Then paste the resulting JSON back as your generation prompt. The JSON forces granular control over every element â€” lighting, skin texture, camera specs, pose â€” producing results that look "100% real" because nothing is left to the model's default assumptions (iamrollandex on X, 2K likes, Mho_23 on X, 1.4K likes).
 
-2. Camera-gear anchoring — Specifying real lens and camera parameters (e.g., "85mm f/1.8," "50mm shallow depth of field," "8K DSLR-quality") forces the model to simulate actual optical physics — bokeh, depth-of-field falloff, grain — rather than applying a generic "realistic" filter. This is why nearly every high-engagement prompt includes focal length and aperture (121clicks.com, Professor_134 on X).
+2. Camera-gear anchoring â€” Specifying real lens and camera parameters (e.g., "85mm f/1.8," "50mm shallow depth of field," "8K DSLR-quality") forces the model to simulate actual optical physics â€” bokeh, depth-of-field falloff, grain â€” rather than applying a generic "realistic" filter. This is why nearly every high-engagement prompt includes focal length and aperture (121clicks.com, Professor_134 on X).
 
-3. Skin-texture realism keywords — Explicitly requesting "natural pores, hyper-realistic skin texture, visible peach fuzz, subtle imperfections" prevents the AI's tendency to over-smooth faces into uncanny-valley territory. The model CAN render micro-detail, but only if told to preserve it (TheLOKII_ on X, 893 likes, eWeek).
+3. Skin-texture realism keywords â€” Explicitly requesting "natural pores, hyper-realistic skin texture, visible peach fuzz, subtle imperfections" prevents the AI's tendency to over-smooth faces into uncanny-valley territory. The model CAN render micro-detail, but only if told to preserve it (TheLOKII_ on X, 893 likes, eWeek).
 
-4. Face-reference locking — When uploading your own photo, include the phrase "use the uploaded image as the face reference — the face must match 100% exactly" to activate strict identity preservation. Without this explicit constraint, the model treats uploads as loose style guides rather than identity anchors (Sheldon056 on X, firatbilal on X, 3.5K likes).
+4. Face-reference locking â€” When uploading your own photo, include the phrase "use the uploaded image as the face reference â€” the face must match 100% exactly" to activate strict identity preservation. Without this explicit constraint, the model treats uploads as loose style guides rather than identity anchors (Sheldon056 on X, firatbilal on X, 3.5K likes).
 
-5. Lighting-as-mood direction — Instead of saying "good lighting," name the exact setup: "golden hour backlighting with rim light," "45-degree window light with soft facial shadows," or "low-key cinematic with deep shadows." Naming the light tells the model both the physics AND the emotional tone simultaneously (121clicks.com, imaginewithrashid.com).
+5. Lighting-as-mood direction â€” Instead of saying "good lighting," name the exact setup: "golden hour backlighting with rim light," "45-degree window light with soft facial shadows," or "low-key cinematic with deep shadows." Naming the light tells the model both the physics AND the emotional tone simultaneously (121clicks.com, imaginewithrashid.com).
 
-────────────────────
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 Sources collected
 
@@ -1155,15 +1155,15 @@ Sources collected
 
 Top voices: @firatbilal (3.5K likes), @iamrollandex (2K likes), @Mho_23 (1.4K likes), @TheLOKII_ (893 likes) -- 121clicks.com, imaginewithrashid.com
 
-────────────────────
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 Further reading
 
-• Introducing 4o Image Generation — OpenAI
-• 4o Image Generation Prompt Engineering Guide
-• 120+ Viral ChatGPT Image Prompts (pxz.ai)
-• GPT Image 1.5 Prompting Guide — OpenAI Cookbook
-• 20 ChatGPT Prompts for Modern Portrait Photography
+â€¢ Introducing 4o Image Generation â€” OpenAI
+â€¢ 4o Image Generation Prompt Engineering Guide
+â€¢ 120+ Viral ChatGPT Image Prompts (pxz.ai)
+â€¢ GPT Image 1.5 Prompting Guide â€” OpenAI Cookbook
+â€¢ 20 ChatGPT Prompts for Modern Portrait Photography
 ```
 
 **Follow-up**: Good. Now create a prompt that will have four faces of elon musk from baby age up to 100 years. Arranged as a 2x2 grid.
@@ -1173,7 +1173,7 @@ Follow-up: Photorealistic Portraits. Keep it short, best techniques for ChatGPT 
 
 Here's your ready-to-paste prompt:
 
-────────────────────
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 Prompt:
 
@@ -1182,9 +1182,9 @@ A photorealistic 2x2 grid of four portraits of Elon Musk at different ages, arra
 Top-left: Age 0 (baby) | Top-right: Age 33 (young adult)
 Bottom-left: Age 66 (mature) | Bottom-right: Age 100 (elderly)
 
-Each face must be unmistakably recognizable as the same person across all ages. Maintain consistent framing, lighting, and background across all four panels. Label each panel with the age in small white text at the bottom. Hyper-realistic skin texture appropriate to each age â€” smooth baby skin progressing to deep wrinkles, age spots, and thinning hair. Natural aging progression throughout.
+Each face must be unmistakably recognizable as the same person across all ages. Maintain consistent framing, lighting, and background across all four panels. Label each panel with the age in small white text at the bottom. Hyper-realistic skin texture appropriate to each age Ã¢â‚¬â€ smooth baby skin progressing to deep wrinkles, age spots, and thinning hair. Natural aging progression throughout.
 
-────────────────────
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 Paste that straight into ChatGPT. The ages are spaced roughly evenly (0, 33, 66, 100) to cover the full lifespan across four panels.
 ```
@@ -1278,7 +1278,7 @@ Sources collected
 Platform: X
 Items: 17 posts
 Engagement: 20,806 likes, 3,137 reposts
-────────────────────────────────────────
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 Platform: Web
 Items: 18 pages
 Engagement: americanbar.org, stanford.edu, nexlaw.ai, paxton.ai, suse.com,
@@ -1313,7 +1313,7 @@ You are a legal research assistant. You must follow these rules strictly:
 
   === NEGATIVE CONSTRAINTS ===
   - NEVER cite a Florida statute without providing the exact statute number (e.g.,
-  F.S. § 95.18)
+  F.S. Â§ 95.18)
   - NEVER reference a court case without the full case name and reporter citation
   - NEVER assume a law exists in Florida without verification
   - NEVER fabricate procedural steps, deadlines, or filing fees
@@ -1322,15 +1322,15 @@ You are a legal research assistant. You must follow these rules strictly:
   === UNCERTAINTY PROTOCOL ===
   If you cannot verify a specific statute, deadline, fee, court form number,
   or procedural requirement from known Florida sources, you MUST say:
-  "⚠️ I could not verify this — confirm with a Florida attorney or the
+  "âš ï¸ I could not verify this â€” confirm with a Florida attorney or the
   Miami-Dade County Clerk of Courts before acting."
   Do NOT fill gaps with plausible-sounding information.
 
   === SOURCE ANCHORING ===
   Ground every answer in specific, named authorities:
-  - According to Florida Statutes (Title VI, Chapter 82 — Unlawful Detainer)
+  - According to Florida Statutes (Title VI, Chapter 82 â€” Unlawful Detainer)
   - According to Florida HB 621 (2024 anti-squatter law)
-  - According to F.S. § 95.18 (adverse possession requirements)
+  - According to F.S. Â§ 95.18 (adverse possession requirements)
   - According to Miami-Dade County Sheriff's Office procedures
 
   === MY SITUATION ===
@@ -1345,7 +1345,7 @@ affidavit with the sheriff to remove unauthorized occupants? What forms
 do I need, and what is the timeline?
 
   2. What are the specific legal distinctions under Florida law between a
-trespasser, a squatter, and a holdover tenant — and which category do
+trespasser, a squatter, and a holdover tenant â€” and which category do
 my occupants likely fall under?
 
   3. If the sheriff affidavit route fails or is contested, what is the
@@ -1363,9 +1363,9 @@ or threaten my safety?
   After answering all five questions, list every statute number, case
   citation, form number, fee amount, and deadline you referenced.
   For each one, state whether you are CONFIDENT or UNCERTAIN in its
-  accuracy. Flag anything uncertain with ⚠️.
+  accuracy. Flag anything uncertain with âš ï¸.
 
-Outcome: An in-depth 3000+ word guide examining Florida’s eviction (unlawful detainer) procedures, key provisions of the Miami-Dade County eviction rules and Florida landlord-tenant statutes, critical differences between trespassers and legal tenants, realistic timeframe projections, potential liability exposure for landlords and property managers, plus a list of 12 targeted questions to bring to any Florida real estate or eviction attorney — all carefully qualified with clear “areas of uncertainty” disclaimers and no invented court case references.
+Outcome: An in-depth 3000+ word guide examining Floridaâ€™s eviction (unlawful detainer) procedures, key provisions of the Miami-Dade County eviction rules and Florida landlord-tenant statutes, critical differences between trespassers and legal tenants, realistic timeframe projections, potential liability exposure for landlords and property managers, plus a list of 12 targeted questions to bring to any Florida real estate or eviction attorney â€” all carefully qualified with clear â€œareas of uncertaintyâ€ disclaimers and no invented court case references.
 
 This case study demonstrates recent /briefbot progress in crafting highly specialized legal-domain prompts (with strong emphasis on hallucination avoidance), resulting in reliable, cautious, and actually actionable output for real-world use.
 ```
@@ -1453,7 +1453,7 @@ Sources collected
 Platform: X
 Items: 12 posts
 Engagement: 1,500+ likes, 130+ reposts
-────────────────────────────────────────
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 Platform: Web
 Items: 18+ pages
 Engagement: soundverse.ai, musci.io, howtopromptsuno.com, sider.ai,
@@ -1481,7 +1481,7 @@ Try next: a melancholic indie folk ballad with fingerpicked acoustic guitar and
 soft male vocals, rainy evening mood
 ```
 
-**Follow-up:**  Amazing. Now use this to write a Suno prompt that will end up in a song that's close to The Weeknd's Blinding Lights but faster and a slight bit more party. The lyrics is supposed to be about OpenClaw, which means its history, Peter Steinberger, the renaming, and the outcome.
+**Follow-up:** Amazing. Now use this to write a Suno prompt that will end up in a song that's close to The Weeknd's Blinding Lights but faster and a slight bit more party. The lyrics is supposed to be about OpenClaw, which means its history, Peter Steinberger, the renaming, and the outcome.
 
 ```
 Suno Prompt
@@ -1566,20 +1566,20 @@ Suno Prompt
   How it's applied: "Male falsetto vocals, high-energy 80s synthwave" leads the style
 
     field to lock the Weeknd-like lane
-  ────────────────────────────────────────
+  â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Technique: 4-component prompting
   How it's applied: Genre (80s synthwave/dance-pop), mood (euphoric/bright),
     instrumentation (synth arpeggios, punchy kicks, pulsing bass), vocals (male
     falsetto)
-  ────────────────────────────────────────
+  â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Technique: Metatag scaffolding
   How it's applied: [Intro], [Verse], [Pre-Chorus], [Chorus], [Bridge], [Outro]
     prevent chaotic arrangements
-  ────────────────────────────────────────
+  â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Technique: Inline production direction
   How it's applied: [Stripped back, synths exposed, building tension] in the Bridge
     nudges the mix per-section
-  ────────────────────────────────────────
+  â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Technique: Descriptive over imperative
   How it's applied: "driving synth arpeggios" and "punchy electronic kicks" instead
   of
@@ -1600,7 +1600,7 @@ I followed up with prompts for a Kling 3.0 music video and the final result was 
 
 ---
 
-## 🤖 Telegram Bot
+## ðŸ¤– Telegram Bot
 
 BriefBot includes a Telegram bot listener that receives research requests via Telegram messages and sends results back.
 
@@ -1628,7 +1628,7 @@ Unknown users receive a pairing code. The bot owner approves them:
 
 /briefbot setup # to manage from Claude Code
 
-````
+```
 
 Or standalone:
 
@@ -1636,7 +1636,7 @@ Or standalone:
 python ~/.claude/skills/briefbot/scripts/telegram_bot.py pair list
 python ~/.claude/skills/briefbot/scripts/telegram_bot.py pair approve CODE
 python ~/.claude/skills/briefbot/scripts/telegram_bot.py pair revoke CHAT_ID
-````
+```
 
 ### Standalone bot control
 
@@ -1648,7 +1648,7 @@ python ~/.claude/skills/briefbot/scripts/telegram_bot.py status
 
 ---
 
-## 🎯 Use Cases
+## ðŸŽ¯ Use Cases
 
 | Use Case                | Example Query                                    | What You Get                       |
 | ----------------------- | ------------------------------------------------ | ---------------------------------- |
@@ -1661,7 +1661,7 @@ python ~/.claude/skills/briefbot/scripts/telegram_bot.py status
 
 ---
 
-## 🚀 Features
+## ðŸš€ Features
 
 ### Multi-Platform Research
 
@@ -1673,7 +1673,7 @@ Searches across 5 sources simultaneously:
 | X/Twitter | Real-time posts, announcements         | Likes, reposts    |
 | YouTube   | Tutorials, reviews, demonstrations     | Views, likes      |
 | LinkedIn  | Professional insights, industry takes  | Reactions         |
-| Web       | Blogs, docs, tutorials, news           | —                 |
+| Web       | Blogs, docs, tutorials, news           | â€”                 |
 
 ### Engagement-Weighted Scoring
 
@@ -1702,7 +1702,7 @@ Automatically removes duplicate content across platforms and identifies cross-po
 
 ---
 
-## ⚙️ Options
+## âš™ï¸ Options
 
 ### Research
 
@@ -1740,18 +1740,73 @@ Automatically removes duplicate content across platforms and identifies cross-po
 
 ---
 
-## 📄 License
+## ðŸ•µï¸ Technical Deep Dive
 
-MIT
+How does BriefBot work under the hood? See [here](info/TECHNICAL.md) for a deep dive!
+
+## ðŸ¦Š Contributing
+
+We highly appreciate contributions! See more in [Contributing](CONTRIBUTING.md). See also our _'[Backlog](TODO.md)'_.
+
+## â„¹ï¸ FAQ
+
+**Q: XYZ?**
+
+ABC
+
+## ðŸ“… Plans
+
+TODO
+
+## ðŸ£ Origin Story
+
+While working as a consultant on an Express backend project, I needed to implement architectural fitness functions similar to how one can do it with ArchUnit. Finding no good TypeScript library for this purpose, I decided to build ArchUnitTS. With the rise of LLMs and AI integration in companies, enforcing architectural boundaries and QA in general has become more critical than ever.
+
+## ðŸ’Ÿ Community
+
+### Maintainers
+
+â€¢ **[LukasNiessen](https://github.com/LukasNiessen)** - Creator and main maintainer
+
+â€¢ **[Tina Tajrishi](https://www.tiktok.com/@tinatajrishi)** - Product management ("PO")
+
+â€¢ **[janMagnusHeimann](https://github.com/janMagnusHeimann)** - Maintainer
+
+â€¢ **[TristanKruse](https://github.com/TristanKruse)** - Maintainer
+
+### Contributors
+
+<a href="https://github.com/LukasNiessen/BriefBot/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=LukasNiessen/BriefBot&max=1000&contributors=10" />
+</a>
+
+### Questions
+
+Found a bug? Want to discuss features?
+
+- Submit an [issue on GitHub](https://github.com/LukasNiessen/BriefBot/issues/new/choose)
+- Join our [GitHub Discussions](https://github.com//LukasNiessen/BriefBot/discussions)
+- Questions? Post on [Stack Overflow](https://stackoverflow.com/questions/tagged/BriefBot) with the BriefBot tag
+- Leave a comment or thoughts on our [X account](https://x.com/BriefBot)
+- Visit our [documentation](https://lukasniessen.github.io/BriefBot/)
+
+If ArchUnitTS helps your project, please consider:
+
+- Starring the repository ðŸ’š
+- Suggesting new features ðŸ’­
+- Contributing code or documentation âŒ¨ï¸
+
+### Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=LukasNiessen/BriefBot&type=Date)](https://www.star-history.com/#LukasNiessen/BriefBot&Date)
+
+## ðŸ“„ License
+
+This project is under the **MIT** license.
 
 ---
 
-## Star History
+<p align="center">
+  <a href="#top"><strong>Go Back to Top</strong></a>
+</p>
 
-<a href="https://star-history.com/#lukasniessen/briefbot-skill&Date">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=lukasniessen/briefbot-skill&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=lukasniessen/briefbot-skill&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=lukasniessen/briefbot-skill&type=Date" />
- </picture>
-</a>

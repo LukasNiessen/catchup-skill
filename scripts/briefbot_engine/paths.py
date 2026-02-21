@@ -1,4 +1,4 @@
-"""Shared filesystem locations for BriefBot."""
+﻿"""Shared filesystem locations for BriefBot."""
 
 from __future__ import annotations
 
@@ -27,11 +27,11 @@ def config_dir() -> Path:
 
 
 def config_file() -> Path:
-    return config_dir() / ".env"
+    return config_dir() / "briefbot.env"
 
 
 def legacy_config_file() -> Path:
-    return config_file()
+    return config_dir() / ".env"
 
 
 def data_dir() -> Path:

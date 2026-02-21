@@ -1,4 +1,4 @@
-"""Content domain models and normalization helpers."""
+﻿"""Content domain models and normalization helpers."""
 
 from __future__ import annotations
 
@@ -73,12 +73,13 @@ class CommentNote:
 
 
 @dataclass
-class ScoreParts:
+class ScoreBreakdown:
     """Score breakdown per dimension."""
 
-    signal: int = 0
-    freshness: int = 0
-    engagement: int = 0
+    relevance: int = 0
+    timeliness: int = 0
+    traction: int = 0
+    credibility: int = 0
 
     def to_dict(self) -> Dict[str, int]:
         return asdict(self)
@@ -95,12 +96,12 @@ class ContentItem:
     author: str = ""
     summary: str = ""
     published: Optional[str] = None
-    date_quality: str = "low"
+    date_confidence: str = "weak"
     engagement: Optional[Engagement] = None
-    signal: float = 0.5
+    relevance: float = 0.5
     reason: str = ""
     score: int = 0
-    score_parts: ScoreParts = field(default_factory=ScoreParts)
+    breakdown: ScoreBreakdown = field(default_factory=ScoreBreakdown)
     comments: List[CommentNote] = field(default_factory=list)
     comment_highlights: List[str] = field(default_factory=list)
     meta: Dict[str, Any] = field(default_factory=dict)
@@ -114,12 +115,12 @@ class ContentItem:
             "author": self.author,
             "summary": self.summary,
             "published": self.published,
-            "date_quality": self.date_quality,
+            "date_confidence": self.date_confidence,
             "engagement": self.engagement.to_dict() if self.engagement else None,
-            "signal": self.signal,
+            "relevance": self.relevance,
             "reason": self.reason,
             "score": self.score,
-            "score_parts": self.score_parts.to_dict(),
+            "breakdown": self.breakdown.to_dict(),
             "comments": [c.to_dict() for c in self.comments],
             "comment_highlights": self.comment_highlights,
             "meta": self.meta,
@@ -127,25 +128,65 @@ class ContentItem:
 
 
 @dataclass
+class Window:
+    start: str
+    end: str
+
+
+@dataclass
+class ModelUsage:
+    openai: Optional[str] = None
+    xai: Optional[str] = None
+
+
+@dataclass
+class InsightBundle:
+    practice_notes: List[str] = field(default_factory=list)
+    prompt_samples: List[str] = field(default_factory=list)
+    context_md: str = ""
+
+
+@dataclass
+class CacheState:
+    enabled: bool = False
+    age_hours: Optional[float] = None
+
+
+@dataclass
+class RunMetrics:
+    search_seconds: Optional[float] = None
+    item_count: int = 0
+
+
+@dataclass
+class ErrorBag:
+    by_source: Dict[str, str] = field(default_factory=dict)
+
+    def get(self, source: str) -> Optional[str]:
+        return self.by_source.get(source)
+
+    def set(self, source: str, message: Optional[str]) -> None:
+        if message is not None:
+            self.by_source[source] = message
+
+    def to_dict(self) -> Dict[str, str]:
+        return dict(self.by_source)
+
+
+@dataclass
 class Report:
     """Aggregated research output with metadata."""
 
     topic: str
-    range_start: str
-    range_end: str
+    window: Window
     generated_at: str
     mode: str
-    openai_model_used: Optional[str] = None
-    xai_model_used: Optional[str] = None
+    models: ModelUsage = field(default_factory=ModelUsage)
     items: List[ContentItem] = field(default_factory=list)
-    best_practices: List[str] = field(default_factory=list)
-    prompt_pack: List[str] = field(default_factory=list)
-    context_snippet_md: str = ""
-    errors: Dict[str, str] = field(default_factory=dict)
-    from_cache: bool = False
-    cache_age_hours: Optional[float] = None
-    search_duration_seconds: Optional[float] = None
-    item_count: int = 0
+    insights: InsightBundle = field(default_factory=InsightBundle)
+    errors: ErrorBag = field(default_factory=ErrorBag)
+    cache: CacheState = field(default_factory=CacheState)
+    metrics: RunMetrics = field(default_factory=RunMetrics)
 
     @property
     def reddit(self) -> List[ContentItem]:
@@ -173,8 +214,7 @@ class Report:
 
     @reddit_error.setter
     def reddit_error(self, value: Optional[str]):
-        if value is not None:
-            self.errors["reddit"] = value
+        self.errors.set("reddit", value)
 
     @property
     def x_error(self) -> Optional[str]:
@@ -182,8 +222,7 @@ class Report:
 
     @x_error.setter
     def x_error(self, value: Optional[str]):
-        if value is not None:
-            self.errors["x"] = value
+        self.errors.set("x", value)
 
     @property
     def youtube_error(self) -> Optional[str]:
@@ -191,8 +230,7 @@ class Report:
 
     @youtube_error.setter
     def youtube_error(self, value: Optional[str]):
-        if value is not None:
-            self.errors["youtube"] = value
+        self.errors.set("youtube", value)
 
     @property
     def linkedin_error(self) -> Optional[str]:
@@ -200,8 +238,7 @@ class Report:
 
     @linkedin_error.setter
     def linkedin_error(self, value: Optional[str]):
-        if value is not None:
-            self.errors["linkedin"] = value
+        self.errors.set("linkedin", value)
 
     @property
     def web_error(self) -> Optional[str]:
@@ -209,45 +246,72 @@ class Report:
 
     @web_error.setter
     def web_error(self, value: Optional[str]):
-        if value is not None:
-            self.errors["web"] = value
+        self.errors.set("web", value)
+
+    @property
+    def context_snippet_md(self) -> str:
+        return self.insights.context_md
+
+    @context_snippet_md.setter
+    def context_snippet_md(self, value: str):
+        self.insights.context_md = value
 
     def to_dict(self) -> Dict[str, Any]:
         payload = {
             "topic": self.topic,
-            "range": {"from": self.range_start, "to": self.range_end},
+            "window": {"start": self.window.start, "end": self.window.end},
             "generated_at": self.generated_at,
             "mode": self.mode,
-            "openai_model_used": self.openai_model_used,
-            "xai_model_used": self.xai_model_used,
-            "reddit": [item.to_dict() for item in self.reddit],
-            "x": [item.to_dict() for item in self.x],
-            "youtube": [item.to_dict() for item in self.youtube],
-            "linkedin": [item.to_dict() for item in self.linkedin],
-            "web": [item.to_dict() for item in self.web],
-            "best_practices": self.best_practices,
-            "prompt_pack": self.prompt_pack,
-            "context_snippet_md": self.context_snippet_md,
+            "models": {"openai": self.models.openai, "xai": self.models.xai},
+            "items": {
+                "reddit": [item.to_dict() for item in self.reddit],
+                "x": [item.to_dict() for item in self.x],
+                "youtube": [item.to_dict() for item in self.youtube],
+                "linkedin": [item.to_dict() for item in self.linkedin],
+                "web": [item.to_dict() for item in self.web],
+            },
+            "insights": {
+                "practice_notes": list(self.insights.practice_notes),
+                "prompt_samples": list(self.insights.prompt_samples),
+                "context_md": self.insights.context_md,
+            },
         }
-        for platform, msg in self.errors.items():
-            payload[f"{platform}_error"] = msg
-        if self.from_cache:
-            payload["from_cache"] = self.from_cache
-        if self.cache_age_hours is not None:
-            payload["cache_age_hours"] = self.cache_age_hours
-        if self.search_duration_seconds is not None:
-            payload["search_duration_seconds"] = self.search_duration_seconds
-        if self.item_count:
-            payload["item_count"] = self.item_count
+        if self.errors.by_source:
+            payload["errors"] = self.errors.to_dict()
+        if self.cache.enabled:
+            payload["cache"] = {
+                "enabled": True,
+                "age_hours": self.cache.age_hours,
+            }
+        metrics = {}
+        if self.metrics.search_seconds is not None:
+            metrics["search_seconds"] = self.metrics.search_seconds
+        if self.metrics.item_count:
+            metrics["item_count"] = self.metrics.item_count
+        if metrics:
+            payload["metrics"] = metrics
         return payload
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Report":
-        range_section = data.get("range", {})
-        start = range_section.get("from", data.get("range_start", ""))
-        end = range_section.get("to", data.get("range_end", ""))
+        window_data = data.get("window") or {}
+        range_section = data.get("range", {}) if not window_data else {}
+        start = (
+            window_data.get("start")
+            or window_data.get("from")
+            or range_section.get("from")
+            or data.get("range_start", "")
+        )
+        end = (
+            window_data.get("end")
+            or window_data.get("to")
+            or range_section.get("to")
+            or data.get("range_end", "")
+        )
 
         items: List[ContentItem] = []
+        item_block = data.get("items", {}) if isinstance(data.get("items"), dict) else {}
+
         for platform, source_enum in [
             ("reddit", Source.REDDIT),
             ("x", Source.X),
@@ -255,47 +319,73 @@ class Report:
             ("linkedin", Source.LINKEDIN),
             ("web", Source.WEB),
         ]:
-            for item_data in data.get(platform, []):
+            raw_list = item_block.get(platform)
+            if raw_list is None:
+                raw_list = data.get(platform, [])
+            for item_data in raw_list or []:
                 items.append(_item_from_dict(item_data, source_enum))
 
-        errors = {}
-        for platform in ("reddit", "x", "youtube", "linkedin", "web"):
-            err = data.get(f"{platform}_error")
-            if err:
-                errors[platform] = err
+        errors = ErrorBag()
+        error_block = data.get("errors")
+        if isinstance(error_block, dict):
+            for key, val in error_block.items():
+                if val:
+                    errors.set(key, str(val))
+        else:
+            for platform in ("reddit", "x", "youtube", "linkedin", "web"):
+                err = data.get(f"{platform}_error")
+                if err:
+                    errors.set(platform, err)
 
-        item_count = data.get("item_count", 0)
-        if not item_count:
-            item_count = sum(
-                len(data.get(k, []))
+        insights_block = data.get("insights", {}) if isinstance(data.get("insights"), dict) else {}
+        insights = InsightBundle(
+            practice_notes=insights_block.get("practice_notes", data.get("best_practices", [])),
+            prompt_samples=insights_block.get("prompt_samples", data.get("prompt_pack", [])),
+            context_md=insights_block.get("context_md", data.get("context_snippet_md", "")),
+        )
+
+        cache_block = data.get("cache", {}) if isinstance(data.get("cache"), dict) else {}
+        cache = CacheState(
+            enabled=bool(cache_block.get("enabled") or data.get("from_cache", False)),
+            age_hours=cache_block.get("age_hours", data.get("cache_age_hours")),
+        )
+
+        metrics_block = data.get("metrics", {}) if isinstance(data.get("metrics"), dict) else {}
+        metrics = RunMetrics(
+            search_seconds=metrics_block.get("search_seconds", data.get("search_duration_seconds")),
+            item_count=metrics_block.get("item_count", data.get("item_count", 0)),
+        )
+        if not metrics.item_count:
+            metrics.item_count = sum(
+                len(item_block.get(k, data.get(k, [])) or [])
                 for k in ("reddit", "x", "youtube", "linkedin", "web")
             )
 
+        models_block = data.get("models", {}) if isinstance(data.get("models"), dict) else {}
+        models = ModelUsage(
+            openai=models_block.get("openai", data.get("openai_model_used")),
+            xai=models_block.get("xai", data.get("xai_model_used")),
+        )
+
         return cls(
             topic=data["topic"],
-            range_start=start,
-            range_end=end,
+            window=Window(start=start, end=end),
             generated_at=data["generated_at"],
             mode=data["mode"],
-            openai_model_used=data.get("openai_model_used"),
-            xai_model_used=data.get("xai_model_used"),
+            models=models,
             items=items,
-            best_practices=data.get("best_practices", []),
-            prompt_pack=data.get("prompt_pack", []),
-            context_snippet_md=data.get("context_snippet_md", ""),
+            insights=insights,
             errors=errors,
-            from_cache=data.get("from_cache", False),
-            cache_age_hours=data.get("cache_age_hours"),
-            search_duration_seconds=data.get("search_duration_seconds"),
-            item_count=item_count,
+            cache=cache,
+            metrics=metrics,
         )
 
 
 def _item_from_dict(d: Dict[str, Any], source: Source) -> ContentItem:
     eng = Engagement(**d["engagement"]) if d.get("engagement") else None
     comments = [CommentNote(**comment) for comment in d.get("comments", [])]
-    parts = d.get("score_parts", {})
-    score_parts = ScoreParts(**parts) if parts else ScoreParts()
+    parts = d.get("breakdown") or d.get("score_parts", {})
+    breakdown = ScoreBreakdown(**parts) if parts else ScoreBreakdown()
 
     return ContentItem(
         uid=d.get("uid", ""),
@@ -305,12 +395,12 @@ def _item_from_dict(d: Dict[str, Any], source: Source) -> ContentItem:
         author=d.get("author", ""),
         summary=d.get("summary", ""),
         published=d.get("published"),
-        date_quality=d.get("date_quality", "low"),
+        date_confidence=d.get("date_confidence", d.get("date_quality", "weak")),
         engagement=eng,
-        signal=d.get("signal", 0.5),
+        relevance=d.get("relevance", d.get("signal", 0.5)),
         reason=d.get("reason", ""),
         score=d.get("score", 0),
-        score_parts=score_parts,
+        breakdown=breakdown,
         comments=comments,
         comment_highlights=d.get("comment_highlights", []),
         meta=d.get("meta", {}),
@@ -328,26 +418,24 @@ def build_report(
 ) -> Report:
     return Report(
         topic=topic,
-        range_start=start,
-        range_end=end,
+        window=Window(start=start, end=end),
         generated_at=datetime.now(timezone.utc).isoformat(),
         mode=mode,
-        openai_model_used=openai_model,
-        xai_model_used=xai_model,
+        models=ModelUsage(openai=openai_model, xai=xai_model),
         **kwargs,
     )
 
 
-def _safe_log1p(value: Optional[int]) -> float:
+def _scale_count(value: Optional[int]) -> float:
     if value is None:
         return 0.0
     try:
         numeric = float(value)
     except (TypeError, ValueError):
         return 0.0
-    if numeric < 0:
+    if numeric <= 0:
         return 0.0
-    return math.log1p(numeric)
+    return math.sqrt(numeric)
 
 
 def _weighted_sum(components: List[tuple]) -> float:
@@ -355,11 +443,13 @@ def _weighted_sum(components: List[tuple]) -> float:
 
 
 def _reddit_composite(sig: Engagement) -> float:
+    ratio = sig.vote_ratio if sig.vote_ratio is not None else 0.5
+    ratio = max(0.0, min(1.0, ratio))
     return _weighted_sum(
         [
-            (0.48, _safe_log1p(sig.upvotes)),
-            (0.37, _safe_log1p(sig.comments)),
-            (0.15, (sig.vote_ratio or 0.5) * 12),
+            (0.35, _scale_count(sig.upvotes)),
+            (0.45, _scale_count(sig.comments)),
+            (0.20, ratio * 10),
         ]
     )
 
@@ -367,20 +457,30 @@ def _reddit_composite(sig: Engagement) -> float:
 def _x_composite(sig: Engagement) -> float:
     return _weighted_sum(
         [
-            (0.45, _safe_log1p(sig.likes)),
-            (0.28, _safe_log1p(sig.reposts)),
-            (0.17, _safe_log1p(sig.replies)),
-            (0.10, _safe_log1p(sig.quotes)),
+            (0.50, _scale_count(sig.likes)),
+            (0.25, _scale_count(sig.replies)),
+            (0.15, _scale_count(sig.reposts)),
+            (0.10, _scale_count(sig.quotes)),
         ]
     )
 
 
 def _youtube_composite(sig: Engagement) -> float:
-    return _weighted_sum([(0.62, _safe_log1p(sig.views)), (0.38, _safe_log1p(sig.likes))])
+    return _weighted_sum(
+        [
+            (0.70, _scale_count(sig.views)),
+            (0.30, _scale_count(sig.likes)),
+        ]
+    )
 
 
 def _linkedin_composite(sig: Engagement) -> float:
-    return _weighted_sum([(0.55, _safe_log1p(sig.reactions)), (0.45, _safe_log1p(sig.comments))])
+    return _weighted_sum(
+        [
+            (0.60, _scale_count(sig.reactions)),
+            (0.40, _scale_count(sig.comments)),
+        ]
+    )
 
 
 def from_reddit_raw(entry: Dict[str, Any], start: str, end: str) -> ContentItem:
@@ -416,11 +516,11 @@ def from_reddit_raw(entry: Dict[str, Any], start: str, end: str) -> ContentItem:
         link=entry.get("link", ""),
         author=entry.get("community", ""),
         published=item_date,
-        date_quality=trust,
+        date_confidence=trust,
         engagement=sig,
         comments=comments,
         comment_highlights=entry.get("comment_highlights", []),
-        signal=entry.get("signal", 0.5),
+        relevance=entry.get("signal", 0.5),
         reason=entry.get("reason", ""),
         meta={
             "subreddit": entry.get("community", ""),
@@ -452,9 +552,9 @@ def from_x_raw(entry: Dict[str, Any], start: str, end: str) -> ContentItem:
         link=entry.get("link", ""),
         author=entry.get("handle", ""),
         published=item_date,
-        date_quality=trust,
+        date_confidence=trust,
         engagement=sig,
-        signal=entry.get("signal", 0.5),
+        relevance=entry.get("signal", 0.5),
         reason=entry.get("reason", ""),
         meta={
             "is_repost": bool(entry.get("is_repost", False)),
@@ -481,9 +581,9 @@ def from_youtube_raw(entry: Dict[str, Any], start: str, end: str) -> ContentItem
         author=entry.get("channel", ""),
         summary=entry.get("summary") or "",
         published=item_date,
-        date_quality=trust,
+        date_confidence=trust,
         engagement=sig,
-        signal=entry.get("signal", 0.5),
+        relevance=entry.get("signal", 0.5),
         reason=entry.get("reason", ""),
         meta={
             "duration_seconds": entry.get("duration_seconds"),
@@ -508,9 +608,9 @@ def from_linkedin_raw(entry: Dict[str, Any], start: str, end: str) -> ContentIte
         link=entry.get("link", ""),
         author=entry.get("author", ""),
         published=item_date,
-        date_quality=trust,
+        date_confidence=trust,
         engagement=sig,
-        signal=entry.get("signal", 0.5),
+        relevance=entry.get("signal", 0.5),
         reason=entry.get("reason", ""),
         meta={
             "author_title": entry.get("role"),
@@ -520,7 +620,7 @@ def from_linkedin_raw(entry: Dict[str, Any], start: str, end: str) -> ContentIte
 
 def from_web_raw(entry: Dict[str, Any], start: str, end: str) -> ContentItem:
     item_date = entry.get("posted")
-    trust = entry.get("date_quality", "low")
+    trust = entry.get("date_confidence", entry.get("date_quality", "weak"))
 
     return ContentItem(
         uid=entry.get("uid", ""),
@@ -530,8 +630,8 @@ def from_web_raw(entry: Dict[str, Any], start: str, end: str) -> ContentItem:
         author=entry.get("domain", ""),
         summary=entry.get("snippet", ""),
         published=item_date,
-        date_quality=trust,
-        signal=entry.get("signal", 0.45),
+        date_confidence=trust,
+        relevance=entry.get("signal", 0.45),
         reason=entry.get("reason", ""),
         meta={
             "source_domain": entry.get("domain", ""),

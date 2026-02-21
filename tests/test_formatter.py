@@ -1,9 +1,10 @@
-"""Tests for the output/formatter module (briefbot_engine.output)."""
+﻿"""Tests for the output/formatter module (briefbot_engine.output)."""
 
 import pytest
 
-from briefbot_engine.content import Report, ContentItem, Source, Engagement
+from briefbot_engine.content import Report, ContentItem, Source, Engagement, build_report
 from briefbot_engine.output import compact, context_fragment, full_report, context_path
+from briefbot_engine import temporal
 
 
 # ---------------------------------------------------------------------------
@@ -12,16 +13,17 @@ from briefbot_engine.output import compact, context_fragment, full_report, conte
 
 def _make_report(topic="AI agents", mode="both", items=None):
     """Create a minimal Report for testing."""
-    return Report(
+    report = build_report(
         topic=topic,
-        range_start="2026-01-01",
-        range_end="2026-01-31",
-        generated_at="2026-01-31T12:00:00+00:00",
+        start="2026-01-01",
+        end="2026-01-31",
         mode=mode,
-        openai_model_used="gpt-4o-mini",
-        xai_model_used="grok-2",
-        items=items or [],
+        openai_model="gpt-4o-mini",
+        xai_model="grok-2",
     )
+    report.generated_at = "2026-01-31T12:00:00+00:00"
+    report.items = items or []
+    return report
 
 
 def _make_reddit_item(uid="R1", title="Big discussion", subreddit="machinelearning"):
@@ -33,9 +35,9 @@ def _make_reddit_item(uid="R1", title="Big discussion", subreddit="machinelearni
         link="https://www.reddit.com/r/{}/comments/abc123/test/".format(subreddit),
         author=subreddit,
         published="2026-01-15",
-        date_quality="high",
+        date_confidence=temporal.CONFIDENCE_SOLID,
         engagement=Engagement(upvotes=42, comments=10),
-        signal=0.9,
+        relevance=0.9,
         reason="Highly relevant discussion",
         score=85,
         meta={"subreddit": subreddit},

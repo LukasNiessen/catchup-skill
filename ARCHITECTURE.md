@@ -1,64 +1,51 @@
-# BriefBot Skill Architecture
+﻿# BriefBot Skill Architecture
 
-This document explains how the `/briefbot` skill works internally, for developers who want to understand, modify, or extend it.
+This document explains how the `/briefbot` skill works internally for developers who want to understand, modify, or extend it.
 
 ## Overview
 
-The `/briefbot` skill is a research automation tool that discovers trending topics across multiple platforms (Reddit, X/Twitter, YouTube, LinkedIn, and the web) from the past 30 days. It synthesizes findings into actionable insights and prompts.
+The `/briefbot` skill is a research automation tool that discovers recent topics across multiple platforms (Reddit, X/Twitter, YouTube, LinkedIn, and the web) for the last N days. It normalizes results into a single data model, scores them, and produces a report for Claude to synthesize.
 
-**Key differentiator**: Percentile-harmonic scoring that combines engagement metrics (upvotes, likes, views) with relevance and recency via weighted harmonic mean.
+Key differentiator: percentile + power-mean scoring that blends relevance, timeliness, engagement, and credibility into a single score.
 
 ## Directory Structure
 
 ```
 briefbot-skill/
-├── SKILL.md                        # Skill definition (YAML frontmatter + instructions)
-├── ARCHITECTURE.md                 # This file
-├── README.md                       # Installation & usage examples
-├── SPEC.md                         # Technical specification
-├── scripts/
-│   ├── briefbot.py                 # Main orchestrator
-│   ├── deliver.py                  # Standalone delivery (email/audio/telegram)
-│   ├── run_job.py                  # Scheduled job runner
-│   ├── setup.py                    # Interactive setup wizard
-│   ├── telegram_bot.py             # Telegram bot listener
-│   └── briefbot_engine/            # Core package
-│       ├── __init__.py
-│       ├── content.py              # Unified ContentItem model + factory functions
-│       ├── ranking.py              # Percentile-harmonic scoring + SimHash dedup
-│       ├── temporal.py             # Date windowing, parsing, freshness scoring
-│       ├── config.py               # API key & credential management
-│       ├── net.py                  # stdlib-only HTTP client with retry
-│       ├── output.py               # Report rendering (JSON/MD/compact)
-│       ├── terminal.py             # CLI progress display & spinner
-│       ├── providers/
-│       │   ├── __init__.py
-│       │   ├── registry.py         # Response caching + model selection
-│       │   ├── reddit.py           # Reddit search via OpenAI web_search
-│       │   ├── twitter.py          # X search via xAI x_search
-│       │   ├── youtube.py          # YouTube search via OpenAI web_search
-│       │   ├── linkedin.py         # LinkedIn search via OpenAI web_search
-│       │   ├── enrich.py           # Reddit thread enrichment (engagement + comments)
-│       │   ├── web.py              # Web search fallback
-│       │   └── claude_web.py       # Claude web search provider
-│       ├── delivery/
-│       │   ├── __init__.py
-│       │   ├── email.py            # SMTP email with HTML newsletter
-│       │   ├── telegram.py         # Telegram message delivery
-│       │   ├── audio.py            # TTS audio generation (ElevenLabs / edge-tts)
-│       │   └── document.py         # PDF generation
-│       ├── scheduling/
-│       │   ├── __init__.py
-│       │   ├── cron.py             # Cron expression parsing
-│       │   ├── jobs.py             # Job registry (CRUD)
-│       │   └── platform.py         # OS scheduler (crontab / schtasks)
-│       ├── extras/
-│       │   ├── __init__.py
-├── fixtures/                       # Sample API responses for testing
-└── tests/                          # Test suite (pure pytest)
+- SKILL.md
+- ARCHITECTURE.md
+- README.md
+- SPEC.md
+- scripts/
+  - briefbot.py
+  - deliver.py
+  - run_job.py
+  - setup.py
+  - telegram_bot.py
+  - briefbot_engine/
+    - content.py
+    - ranking.py
+    - temporal.py
+    - config.py
+    - net.py
+    - output.py
+    - terminal.py
+    - providers/
+      - registry.py
+      - reddit.py
+      - twitter.py
+      - youtube.py
+      - linkedin.py
+      - enrich.py
+      - web.py
+      - claude_web.py
+    - delivery/
+    - scheduling/
+- fixtures/
+- tests/
 ```
 
-## How the Skill is Invoked
+## How the Skill Is Invoked
 
 ### YAML Frontmatter (SKILL.md)
 
@@ -77,15 +64,11 @@ allowed-tools: Bash, Read, Write, AskUserQuestion, WebSearch
 
 ```
 User: /briefbot [topic] for [tool]
-          ↓
-    SKILL.md parsed by Claude Code
-          ↓
-    Agent dispatches via Bash:
-    python scripts/briefbot.py "$ARGUMENTS" --emit=compact
-          ↓
-    Script runs parallel searches → processes → outputs results
-          ↓
-    Claude synthesizes findings and waits for user direction
+  -> SKILL.md parsed by Claude Code
+  -> Agent dispatches via Bash:
+     python scripts/briefbot.py "$ARGUMENTS" --emit=compact
+  -> Script runs parallel searches -> processes -> outputs results
+  -> Claude synthesizes findings and waits for user direction
 ```
 
 ## Unified Content Model (`content.py`)
@@ -101,9 +84,8 @@ class Source(Enum):
     WEB = "web"
 
 @dataclass
-class Signals:
-    """Platform-agnostic engagement metrics."""
-    composite: Optional[float] = None   # Pre-computed aggregate
+class Engagement:
+    composite: Optional[float] = None
     upvotes: Optional[int] = None
     comments: Optional[int] = None
     vote_ratio: Optional[float] = None
@@ -116,40 +98,48 @@ class Signals:
     bookmarks: Optional[int] = None
 
 @dataclass
+class ScoreBreakdown:
+    relevance: int = 0
+    timeliness: int = 0
+    traction: int = 0
+    credibility: int = 0
+
+@dataclass
 class ContentItem:
-    item_id: str
+    uid: str
     source: Source
-    headline: str           # title/text
-    permalink: str          # url
-    author: str = ""        # subreddit/handle/channel/domain
-    body: str = ""          # description/snippet
+    title: str
+    link: str
+    author: str = ""
+    summary: str = ""
     published: Optional[str] = None
-    date_trust: str = "low"
-    signals: Optional[Signals] = None
+    date_confidence: str = "weak"
+    engagement: Optional[Engagement] = None
     relevance: float = 0.5
-    rationale: str = ""
+    reason: str = ""
     score: int = 0
     breakdown: ScoreBreakdown = field(default_factory=ScoreBreakdown)
-    thread_comments: List[ThreadComment] = field(default_factory=list)
-    thread_insights: List[str] = field(default_factory=list)
+    comments: List[CommentNote] = field(default_factory=list)
+    comment_highlights: List[str] = field(default_factory=list)
     meta: Dict[str, Any] = field(default_factory=dict)
 ```
 
-**Report** stores all items in a single list with property-based filtering:
+Report stores items with property-based filtering:
 
 ```python
 @dataclass
 class Report:
     topic: str
-    range_start: str
-    range_end: str
+    window: Window
+    generated_at: str
+    mode: str
+    models: ModelUsage
     items: List[ContentItem] = field(default_factory=list)
-    errors: Dict[str, str] = field(default_factory=dict)
+    errors: ErrorBag = field(default_factory=ErrorBag)
 
     @property
     def reddit(self) -> List[ContentItem]:
         return [i for i in self.items if i.source == Source.REDDIT]
-    # ... same for x, youtube, linkedin, web
 ```
 
 Factory functions convert raw API responses to ContentItem:
@@ -161,59 +151,43 @@ Factory functions convert raw API responses to ContentItem:
 
 ## Scoring System (`ranking.py`)
 
-### Percentile-Harmonic Scoring
+### Percentile + Power-Mean Scoring
 
-Instead of linear weighted sums, scoring uses **percentile ranks** combined via **weighted harmonic mean**:
+Instead of linear weighted sums, scoring uses percentile ranks combined via a weighted power mean:
 
-1. Convert raw values (relevance, recency, engagement) to **percentile ranks** (0-100) across the batch
-2. Combine dimensions via **weighted harmonic mean** — naturally penalizes items weak in any dimension
-3. Apply post-harmonic confidence adjustments (additive penalties/bonuses)
+1. Convert raw values (relevance, timeliness, traction) to percentile ranks (0-100)
+2. Add credibility as a source-weighted adjustment
+3. Combine dimensions via weighted power mean, then apply confidence penalties/bonuses
 
-**Dimension weights (platform items)**:
-- Relevance: 0.38
-- Recency: 0.34
-- Engagement: 0.28
+Dimension weights (platform items):
+- Relevance: 0.40
+- Timeliness: 0.28
+- Traction: 0.22
+- Credibility: 0.10
 
-**Dimension weights (web items, no engagement)**:
+Dimension weights (web items):
 - Relevance: 0.58
-- Recency: 0.42
+- Timeliness: 0.30
+- Credibility: 0.12
 
 ### SimHash Deduplication
 
-Near-duplicate detection uses **SimHash** 64-bit fingerprinting:
-
-1. Tokenize headline into 3-gram shingles
-2. Hash each shingle with FNV-1a (64-bit)
-3. Aggregate into a single 64-bit fingerprint
-4. Compare fingerprints via **Hamming distance** (threshold: ≤10 bits)
-5. Keep the higher-scored item from each duplicate pair
+Near-duplicate detection uses SimHash with a 64-bit fingerprint and Hamming distance threshold <= 10 bits.
 
 ## Search Providers
 
-### Reddit (`providers/reddit.py`)
+- Reddit (`providers/reddit.py`): OpenAI Responses API with `web_search` filtered to `reddit.com`
+- X/Twitter (`providers/twitter.py`): xAI Responses API with `x_search`
+- YouTube (`providers/youtube.py`): OpenAI Responses API with `web_search` filtered to `youtube.com`
+- LinkedIn (`providers/linkedin.py`): OpenAI Responses API with `web_search` filtered to `linkedin.com`
+- Web (`providers/web.py`): WebSearch fallback with domain exclusions
 
-Uses OpenAI's Responses API with `web_search` filtered to `reddit.com`.
-
-### X/Twitter (`providers/twitter.py`)
-
-Uses xAI's Responses API with `x_search` for live Twitter data.
-
-
-
-### YouTube (`providers/youtube.py`)
-
-Uses OpenAI's Responses API with `web_search` filtered to `youtube.com`.
-
-### LinkedIn (`providers/linkedin.py`)
-
-Uses OpenAI's Responses API with `web_search` filtered to `linkedin.com`.
-
-### Parallel Execution
+## Parallel Execution
 
 All searches run concurrently using `ThreadPoolExecutor`:
 
 ```python
-with ThreadPoolExecutor(max_workers=4) as executor:
+with ThreadPoolExecutor(max_workers=5) as executor:
     futures = {
         executor.submit(_search_reddit, ...): "reddit",
         executor.submit(_search_x, ...): "x",
@@ -226,28 +200,16 @@ with ThreadPoolExecutor(max_workers=4) as executor:
 
 ```
 Raw API Responses
-      ↓
-content.items_from_raw()         # Factory functions → ContentItem list
-      ↓
-content.filter_by_date()         # Hard filter: exclude out-of-range items
-      ↓
-ranking.rank_items()             # Percentile-harmonic scoring (all items at once)
-      ↓
-ranking.deduplicate()            # SimHash fingerprint dedup
-      ↓
-output.compact()                 # Render for Claude
+  -> content.items_from_raw()
+  -> content.filter_by_date()
+  -> ranking.rank_items()
+  -> ranking.deduplicate()
+  -> output.compact()
 ```
-
-## Provider Registry (`providers/registry.py`)
-
-Unified class managing:
-- **Response caching**: JSON files with TTL (default 18 hours)
-- **Model selection**: Auto-selects latest OpenAI/xAI models with preference lists
-- **Model preference persistence**: Caches selected model for 5 days
 
 ## Configuration (`config.py`)
 
-**Config file**: `~/.config/briefbot/.env`
+Config file: `~/.config/briefbot/briefbot.env` (legacy `.env` still supported)
 
 ```env
 OPENAI_API_KEY=sk-...      # Reddit, YouTube, LinkedIn
@@ -256,11 +218,11 @@ ELEVENLABS_API_KEY=...     # Premium TTS (optional)
 TELEGRAM_BOT_TOKEN=...     # Telegram delivery (optional)
 ```
 
-**Source modes** (based on available keys):
-- Both keys → `both` (Reddit + X + YouTube + LinkedIn)
-- OpenAI only → `reddit` (Reddit + YouTube + LinkedIn)
-- xAI only → `x` (X/Twitter only)
-- Neither → `web` (WebSearch fallback)
+Source modes (based on available keys):
+- Both keys -> `both`
+- OpenAI only -> `reddit`
+- xAI only -> `x`
+- Neither -> `web`
 
 ## Output Modes (`--emit`)
 
@@ -271,28 +233,13 @@ TELEGRAM_BOT_TOKEN=...     # Telegram delivery (optional)
 | `md` | Full human-readable markdown |
 | `context` | Compact snippet for embedding |
 | `path` | File path only |
+| `cards` | Compact card-style summary |
 
 ## Extension Points
 
-### Adding a New Source
-
-1. Create `briefbot_engine/providers/newplatform.py`:
-   - Implement `search_newplatform()` and `parse_response()`
-
-2. Update `content.py`:
-   - Add `Source.NEWPLATFORM` enum value
-   - Add `from_newplatform_raw()` factory function
-
-3. Update `briefbot.py`:
-   - Import new provider
-   - Add to parallel execution
-   - Feed items through `items_from_raw()` pipeline
-
-4. Update `output.py`:
-   - Add rendering for new platform items
-
-5. Update `config.py` (if new API key needed):
-   - Add to `load_config()` and `determine_available_platforms()`
-
-
-
+Adding a new source:
+1. Create `briefbot_engine/providers/newplatform.py`
+2. Add `Source.NEWPLATFORM` and `from_newplatform_raw()` in `content.py`
+3. Wire it into `briefbot.py` parallel execution and normalization
+4. Add rendering in `output.py`
+5. Add config keys and source resolution in `config.py` if needed

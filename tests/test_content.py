@@ -1,4 +1,4 @@
-"""Tests for briefbot_engine.content -- unified content model and factory functions.
+﻿"""Tests for briefbot_engine.content -- unified content model and factory functions.
 
 Topic theme: Solar panel efficiency improvements 2026
 """
@@ -19,6 +19,7 @@ from briefbot_engine.content import (
     from_x_raw,
     from_youtube_raw,
 )
+from briefbot_engine import temporal
 
 # ---------------------------------------------------------------------------
 # Shared date range for the "solar panel" research window
@@ -67,8 +68,8 @@ def test_from_reddit_raw_creates_content_item():
     assert item.link == raw["link"]
     assert item.author == "solar"
     assert item.published == "2026-02-10"
-    assert item.date_quality == "high"
-    assert item.signal == 0.91
+    assert item.date_confidence == temporal.CONFIDENCE_SOLID
+    assert item.relevance == 0.91
     assert item.reason == raw["reason"]
     # Engagement
     assert item.engagement is not None
@@ -88,7 +89,7 @@ def test_from_reddit_raw_creates_content_item():
 
 
 def test_from_reddit_raw_composite_formula():
-    """Verify the Reddit composite formula: 0.48*log1p(upvotes) + 0.37*log1p(comments) + 0.15*(ratio*12)."""
+    """Verify the Reddit composite formula uses sqrt scaling and ratio weighting."""
     raw = {
         "uid": "sp_r002",
         "title": "Bifacial panels now standard on utility-scale installs",
@@ -104,9 +105,9 @@ def test_from_reddit_raw_composite_formula():
     item = from_reddit_raw(raw, START, END)
 
     expected = (
-        0.48 * math.log1p(340)
-        + 0.37 * math.log1p(87)
-        + 0.15 * (0.92 * 12)
+        0.35 * math.sqrt(340)
+        + 0.45 * math.sqrt(87)
+        + 0.20 * (0.92 * 10)
     )
     assert abs(item.engagement.composite - expected) < 1e-9
 
@@ -141,7 +142,7 @@ def test_from_x_raw_creates_content_item():
     assert item.title == raw["excerpt"]
     assert item.author == "solarnews"
     assert item.published == "2026-02-12"
-    assert item.date_quality == "high"
+    assert item.date_confidence == temporal.CONFIDENCE_SOLID
     # Engagement
     assert item.engagement is not None
     assert item.engagement.likes == 2100
@@ -150,10 +151,10 @@ def test_from_x_raw_creates_content_item():
     assert item.engagement.quotes == 42
     assert item.engagement.composite is not None
     expected_composite = (
-        0.45 * math.log1p(2100)
-        + 0.28 * math.log1p(380)
-        + 0.17 * math.log1p(95)
-        + 0.10 * math.log1p(42)
+        0.50 * math.sqrt(2100)
+        + 0.25 * math.sqrt(95)
+        + 0.15 * math.sqrt(380)
+        + 0.10 * math.sqrt(42)
     )
     assert abs(item.engagement.composite - expected_composite) < 1e-9
     # Meta
@@ -187,12 +188,12 @@ def test_from_youtube_raw_creates_content_item():
     assert item.author == "JustHaveFun Engineering"
     assert item.summary == raw["summary"]
     assert item.published == "2026-02-05"
-    assert item.date_quality == "high"
+    assert item.date_confidence == temporal.CONFIDENCE_SOLID
     # Engagement
     assert item.engagement is not None
     assert item.engagement.views == 185000
     assert item.engagement.likes == 4200
-    expected_composite = 0.62 * math.log1p(185000) + 0.38 * math.log1p(4200)
+    expected_composite = 0.70 * math.sqrt(185000) + 0.30 * math.sqrt(4200)
     assert abs(item.engagement.composite - expected_composite) < 1e-9
     # Meta
     assert item.meta["duration_seconds"] == 912
@@ -222,12 +223,12 @@ def test_from_linkedin_raw_creates_content_item():
     assert item.title == raw["excerpt"]
     assert item.author == "Dr. Elena Vasquez"
     assert item.published == "2026-02-08"
-    assert item.date_quality == "high"
+    assert item.date_confidence == temporal.CONFIDENCE_SOLID
     # Engagement
     assert item.engagement is not None
     assert item.engagement.reactions == 620
     assert item.engagement.comments == 41
-    expected_composite = 0.55 * math.log1p(620) + 0.45 * math.log1p(41)
+    expected_composite = 0.60 * math.sqrt(620) + 0.40 * math.sqrt(41)
     assert abs(item.engagement.composite - expected_composite) < 1e-9
     # Meta
     assert item.meta["author_title"] == "Director of PV Research, SunTech Labs"
@@ -245,7 +246,7 @@ def test_from_web_raw_creates_content_item_with_no_engagement():
         "domain": "pv-magazine.com",
         "snippet": "Researchers achieved 33.7% tandem cell efficiency...",
         "posted": "2026-02-07",
-        "date_quality": "high",
+        "date_confidence": temporal.CONFIDENCE_SOLID,
         "signal": 0.75,
         "reason": "Trade press coverage of the record",
         "language": "en",
@@ -260,7 +261,7 @@ def test_from_web_raw_creates_content_item_with_no_engagement():
     assert item.summary == raw["snippet"]
     assert item.engagement is None
     assert item.published == "2026-02-07"
-    assert item.date_quality == "high"
+    assert item.date_confidence == temporal.CONFIDENCE_SOLID
     assert item.meta["source_domain"] == "pv-magazine.com"
     assert item.meta["language"] == "en"
 
@@ -351,9 +352,9 @@ def test_content_item_to_dict():
         link="https://reddit.com/r/solar/td001",
         author="solar",
         published="2026-02-10",
-        date_quality="high",
+        date_confidence=temporal.CONFIDENCE_SOLID,
         engagement=sig,
-        signal=0.91,
+        relevance=0.91,
         reason="High relevance to query",
     )
 
@@ -368,7 +369,7 @@ def test_content_item_to_dict():
     assert d["engagement"]["vote_ratio"] == 0.92
     assert d["engagement"]["composite"] == 5.5
     assert d["published"] == "2026-02-10"
-    assert d["date_quality"] == "high"
+    assert d["date_confidence"] == temporal.CONFIDENCE_SOLID
 
 
 # ---------------------------------------------------------------------------
@@ -387,14 +388,14 @@ def test_build_report_creates_report_with_fields():
 
     assert isinstance(rpt, Report)
     assert rpt.topic == "Solar panel efficiency improvements 2026"
-    assert rpt.range_start == START
-    assert rpt.range_end == END
+    assert rpt.window.start == START
+    assert rpt.window.end == END
     assert rpt.mode == "deep"
-    assert rpt.openai_model_used == "gpt-4o"
-    assert rpt.xai_model_used == "grok-3"
+    assert rpt.models.openai == "gpt-4o"
+    assert rpt.models.xai == "grok-3"
     assert rpt.generated_at
     assert rpt.items == []
-    assert rpt.errors == {}
+    assert rpt.errors.by_source == {}
 
 
 # ---------------------------------------------------------------------------
@@ -465,7 +466,7 @@ def test_report_reddit_error_property():
 
     rpt.reddit_error = "Rate limit exceeded"
     assert rpt.reddit_error == "Rate limit exceeded"
-    assert rpt.errors["reddit"] == "Rate limit exceeded"
+    assert rpt.errors.by_source["reddit"] == "Rate limit exceeded"
 
 
 def test_report_x_error_property():
@@ -480,7 +481,7 @@ def test_report_x_error_property():
 
     rpt.x_error = "API key invalid"
     assert rpt.x_error == "API key invalid"
-    assert rpt.errors["x"] == "API key invalid"
+    assert rpt.errors.by_source["x"] == "API key invalid"
 
 
 def test_report_error_setter_ignores_none():
@@ -493,4 +494,4 @@ def test_report_error_setter_ignores_none():
 
     rpt.reddit_error = None
 
-    assert "reddit" not in rpt.errors
+    assert "reddit" not in rpt.errors.by_source

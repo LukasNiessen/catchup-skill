@@ -1,24 +1,41 @@
-"""Ranking and near-duplicate suppression for aggregated items."""
+﻿"""Ranking and near-duplicate suppression for aggregated items."""
 
 from datetime import datetime
 from typing import List, Optional
 
 from . import temporal
-from .content import ContentItem, ScoreParts, Source
+from .content import ContentItem, ScoreBreakdown, Source
 
 
 # ---------------------------------------------------------------------------
 # Scoring weights and penalties
 # ---------------------------------------------------------------------------
 
-PLATFORM_WEIGHTS = {"signal": 0.42, "freshness": 0.31, "engagement": 0.27}
-WEB_WEIGHTS = {"signal": 0.64, "freshness": 0.36}
+PLATFORM_WEIGHTS = {
+    "relevance": 0.40,
+    "timeliness": 0.28,
+    "traction": 0.22,
+    "credibility": 0.10,
+}
+WEB_WEIGHTS = {
+    "relevance": 0.58,
+    "timeliness": 0.30,
+    "credibility": 0.12,
+}
 
-MISSING_ENGAGEMENT_FALLBACK = 48
-MISSING_ENGAGEMENT_PENALTY = 6
-WEB_SOURCE_PENALTY = 7
-WEB_DATE_BONUS = 9
-WEB_DATE_PENALTY = 10
+MISSING_ENGAGEMENT_FALLBACK = 44
+MISSING_ENGAGEMENT_PENALTY = 8
+WEB_SOURCE_PENALTY = 5
+WEB_DATE_BONUS = 6
+WEB_DATE_PENALTY = 8
+
+SOURCE_TRUST_BASE = {
+    Source.REDDIT: 62,
+    Source.X: 55,
+    Source.YOUTUBE: 60,
+    Source.LINKEDIN: 64,
+    Source.WEB: 50,
+}
 
 
 # ---------------------------------------------------------------------------
@@ -42,16 +59,25 @@ def _percentile_ranks(values: List[Optional[float]], fallback: float = 50) -> Li
 
 
 # ---------------------------------------------------------------------------
-# Harmonic mean combiner
+# Power mean combiner
 # ---------------------------------------------------------------------------
 
-def _weighted_harmonic_mean(values: List[float], weights: List[float], epsilon: float = 1.0) -> float:
-    """Compute a weighted harmonic mean, floored by epsilon to avoid division by zero."""
+def _weighted_power_mean(values: List[float], weights: List[float], power: float = 0.65) -> float:
+    """Compute a weighted power mean to balance outliers."""
     total_weight = sum(weights)
     if total_weight == 0:
         return 0.0
-    denominator = sum(weight / max(value, epsilon) for weight, value in zip(weights, values))
-    return total_weight / denominator if denominator > 0 else 0.0
+    numerator = sum(weight * max(value, 0.0) ** power for weight, value in zip(weights, values))
+    return (numerator / total_weight) ** (1.0 / power) if numerator > 0 else 0.0
+
+
+def _credibility(item: ContentItem) -> int:
+    base = SOURCE_TRUST_BASE.get(item.source, 50)
+    if item.date_confidence == temporal.CONFIDENCE_SOLID:
+        base += 6
+    elif item.date_confidence == temporal.CONFIDENCE_WEAK:
+        base -= 6
+    return max(0, min(100, int(base)))
 
 
 # ---------------------------------------------------------------------------
@@ -73,38 +99,44 @@ def rank_items(items: List[ContentItem]) -> List[ContentItem]:
 
 
 def _score_platform_items(items: List[ContentItem]) -> None:
-    """Score non-web items via percentile normalization + harmonic blend."""
+    """Score non-web items via percentile normalization + power mean."""
     if not items:
         return
 
-    raw_signal = [item.signal * 100 for item in items]
+    raw_signal = [item.relevance * 100 for item in items]
     raw_recency = [temporal.freshness_score(item.published) for item in items]
     raw_engagement = [item.engagement.composite if item.engagement else None for item in items]
+    raw_credibility = [_credibility(item) for item in items]
 
     pct_signal = _percentile_ranks([float(v) for v in raw_signal])
     pct_recency = _percentile_ranks([float(v) for v in raw_recency])
     pct_engagement = _percentile_ranks(raw_engagement, fallback=MISSING_ENGAGEMENT_FALLBACK)
 
-    weights = [PLATFORM_WEIGHTS["signal"], PLATFORM_WEIGHTS["freshness"], PLATFORM_WEIGHTS["engagement"]]
+    weights = [
+        PLATFORM_WEIGHTS["relevance"],
+        PLATFORM_WEIGHTS["timeliness"],
+        PLATFORM_WEIGHTS["traction"],
+        PLATFORM_WEIGHTS["credibility"],
+    ]
 
     for idx, item in enumerate(items):
         rel_pct = pct_signal[idx]
         rec_pct = pct_recency[idx]
         eng_pct = pct_engagement[idx] if pct_engagement[idx] is not None else MISSING_ENGAGEMENT_FALLBACK
+        cred_pct = raw_credibility[idx]
 
-        item.score_parts = ScoreParts(
-            signal=int(rel_pct),
-            freshness=int(rec_pct),
-            engagement=int(eng_pct),
+        item.breakdown = ScoreBreakdown(
+            relevance=int(rel_pct),
+            timeliness=int(rec_pct),
+            traction=int(eng_pct),
+            credibility=int(cred_pct),
         )
 
-        score = _weighted_harmonic_mean([rel_pct, rec_pct, eng_pct], weights)
+        score = _weighted_power_mean([rel_pct, rec_pct, eng_pct, cred_pct], weights)
         if raw_engagement[idx] is None:
             score -= MISSING_ENGAGEMENT_PENALTY
-        if item.date_quality == "low":
-            score -= 7
-        elif item.date_quality == "med":
-            score -= 3
+        if item.date_confidence == temporal.CONFIDENCE_WEAK:
+            score -= 6
 
         item.score = max(0, min(100, round(score)))
 
@@ -115,31 +147,29 @@ def _score_web_items(items: List[ContentItem]) -> None:
         return
 
     for item in items:
-        rel = int(item.signal * 100)
+        rel = int(item.relevance * 100)
         rec = temporal.freshness_score(item.published)
+        cred = _credibility(item)
 
-        item.score_parts = ScoreParts(signal=rel, freshness=rec, engagement=0)
+        item.breakdown = ScoreBreakdown(relevance=rel, timeliness=rec, traction=0, credibility=cred)
 
-        total = WEB_WEIGHTS["signal"] * rel + WEB_WEIGHTS["freshness"] * rec
+        total = (
+            WEB_WEIGHTS["relevance"] * rel
+            + WEB_WEIGHTS["timeliness"] * rec
+            + WEB_WEIGHTS["credibility"] * cred
+        )
         total -= WEB_SOURCE_PENALTY
 
-        if item.date_quality == "high":
+        if item.date_confidence == temporal.CONFIDENCE_SOLID:
             total += WEB_DATE_BONUS
-        elif item.date_quality == "low":
+        elif item.date_confidence == temporal.CONFIDENCE_WEAK:
             total -= WEB_DATE_PENALTY
 
         item.score = max(0, min(100, round(total)))
 
 
 def _sort_by_score(items: List[ContentItem]) -> List[ContentItem]:
-    """Sort items by score (desc), date, then source priority."""
-    source_order = {
-        Source.REDDIT: 0,
-        Source.X: 1,
-        Source.YOUTUBE: 2,
-        Source.LINKEDIN: 3,
-        Source.WEB: 4,
-    }
+    """Sort items by score (desc), credibility, then date."""
 
     def _date_ordinal(value: Optional[str]) -> int:
         if not value:
@@ -150,8 +180,8 @@ def _sort_by_score(items: List[ContentItem]) -> List[ContentItem]:
             return -1
 
     def sort_key(item: ContentItem):
-        src_rank = source_order.get(item.source, 4)
-        return (-item.score, -_date_ordinal(item.published), src_rank, item.title.lower())
+        credibility = item.breakdown.credibility if item.breakdown else 0
+        return (-item.score, -credibility, -_date_ordinal(item.published), item.title.lower())
 
     return sorted(items, key=sort_key)
 

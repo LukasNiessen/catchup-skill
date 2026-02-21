@@ -1,11 +1,12 @@
-"""Render report views and persist artifacts."""
+﻿"""Render report views and persist artifacts."""
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
 from .content import Report, ContentItem, Source
-from . import paths
+from . import paths, temporal
 
 OUTPUT_DIR = paths.output_dir()
 
@@ -14,31 +15,38 @@ def _ensure_output_dir():
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def _freshness_check(report: Report) -> dict:
-    counts = {}
-    for src in Source:
-        counts[src.value] = sum(
-            1
-            for item in report.items
-            if item.source == src
-            and item.published
-            and item.published >= report.range_start
-        )
+@dataclass
+class FreshnessSnapshot:
+    recent_by_source: dict
+    total_recent: int
+    total_items: int
+    density: float
+    sparse: bool
+    evergreen: bool
+
+
+def _freshness_snapshot(report: Report) -> FreshnessSnapshot:
+    counts = {src.value: 0 for src in Source}
+    for item in report.items:
+        if not item.published:
+            continue
+        if item.published >= report.window.start:
+            counts[item.source.value] += 1
 
     total_recent = sum(counts.values())
     total_items = len(report.items)
+    density = (total_recent / total_items) if total_items else 0.0
+    sparse = total_recent < 3 or density < 0.2
+    evergreen = total_items > 0 and density < 0.2
 
-    return {
-        "reddit_recent": counts.get("reddit", 0),
-        "x_recent": counts.get("x", 0),
-        "youtube_recent": counts.get("youtube", 0),
-        "linkedin_recent": counts.get("linkedin", 0),
-        "web_recent": counts.get("web", 0),
-        "total_recent": total_recent,
-        "total_items": total_items,
-        "is_sparse": total_recent < 4,
-        "mostly_evergreen": total_items > 0 and total_recent < total_items * 0.25,
-    }
+    return FreshnessSnapshot(
+        recent_by_source=counts,
+        total_recent=total_recent,
+        total_items=total_items,
+        density=density,
+        sparse=sparse,
+        evergreen=evergreen,
+    )
 
 
 def compact(
@@ -46,32 +54,32 @@ def compact(
 ) -> str:
     lines = [f"## Research Snapshot: {report.topic}", ""]
 
-    freshness = _freshness_check(report)
-    if freshness["is_sparse"]:
+    freshness = _freshness_snapshot(report)
+    if freshness.sparse:
         lines.append("**Sparse recent activity detected.**")
         lines.append(
-            f"Found {freshness['total_recent']} in-range item(s) between {report.range_start} and {report.range_end}."
+            f"Found {freshness.total_recent} in-range item(s) between {report.window.start} and {report.window.end}."
         )
-        if freshness["mostly_evergreen"]:
+        if freshness.evergreen:
             lines.append("Most results appear evergreen rather than newly published.")
         lines.append("")
 
-    if report.from_cache:
-        age_display = f"{report.cache_age_hours:.1f}h old" if report.cache_age_hours else "cached"
+    if report.cache.enabled:
+        age_display = f"{report.cache.age_hours:.1f}h old" if report.cache.age_hours else "cached"
         lines.append(f"**Cache:** {age_display} (`--refresh` for a new run)")
         lines.append("")
 
-    summary_bits = [f"Window: {report.range_start} to {report.range_end}", f"Mode: {report.mode}"]
-    if report.openai_model_used:
-        summary_bits.append(f"OpenAI={report.openai_model_used}")
-    if report.xai_model_used:
-        summary_bits.append(f"xAI={report.xai_model_used}")
+    summary_bits = [f"Window: {report.window.start} to {report.window.end}", f"Mode: {report.mode}"]
+    if report.models.openai:
+        summary_bits.append(f"OpenAI={report.models.openai}")
+    if report.models.xai:
+        summary_bits.append(f"xAI={report.models.xai}")
     lines.append(" | ".join(summary_bits))
     lines.append("")
 
     if report.mode == "web-only":
         lines.append("Web-only execution: supplement with external sources where possible.")
-        lines.append("Add `OPENAI_API_KEY` and/or `XAI_API_KEY` in `~/.config/briefbot/.env` for richer platform data.")
+        lines.append("Add `OPENAI_API_KEY` and/or `XAI_API_KEY` in `~/.config/briefbot/briefbot.env` (or legacy `.env`) for richer platform data.")
         lines.append("")
 
     if report.mode == "reddit-only" and missing_keys == "x":
@@ -107,7 +115,7 @@ def compact(
                     eng = f" [{', '.join(parts)}]"
 
             date_str = f" ({item.published})" if item.published else " (no date)"
-            conf = f" [{item.date_quality}]" if item.date_quality != "high" else ""
+            conf = f" [{item.date_confidence}]" if item.date_confidence != temporal.CONFIDENCE_SOLID else ""
             subreddit = item.meta.get("subreddit", item.author)
 
             lines.append(
@@ -150,7 +158,7 @@ def compact(
                     eng = f" [{', '.join(parts)}]"
 
             date_str = f" ({item.published})" if item.published else " (no date)"
-            conf = f" [{item.date_quality}]" if item.date_quality != "high" else ""
+            conf = f" [{item.date_confidence}]" if item.date_confidence != temporal.CONFIDENCE_SOLID else ""
 
             lines.append(
                 f"**{item.uid}** [{item.score}] @{item.author}{date_str}{conf}{eng}"
@@ -181,7 +189,7 @@ def compact(
                     eng = f" [{', '.join(parts)}]"
 
             date_str = f" ({item.published})" if item.published else " (no date)"
-            conf = f" [{item.date_quality}]" if item.date_quality != "high" else ""
+            conf = f" [{item.date_confidence}]" if item.date_confidence != temporal.CONFIDENCE_SOLID else ""
 
             lines.append(
                 f"**{item.uid}** [{item.score}] {item.author}{date_str}{conf}{eng}"
@@ -212,7 +220,7 @@ def compact(
                     eng = f" [{', '.join(parts)}]"
 
             date_str = f" ({item.published})" if item.published else " (no date)"
-            conf = f" [{item.date_quality}]" if item.date_quality != "high" else ""
+            conf = f" [{item.date_confidence}]" if item.date_confidence != temporal.CONFIDENCE_SOLID else ""
             author = item.author
             author_title = item.meta.get("author_title")
             if author_title:
@@ -237,7 +245,7 @@ def compact(
         lines.append("")
         for item in web_items[:max_per_source]:
             date_str = f" ({item.published})" if item.published else " (no date)"
-            conf = f" [{item.date_quality}]" if item.date_quality != "high" else ""
+            conf = f" [{item.date_confidence}]" if item.date_confidence != temporal.CONFIDENCE_SOLID else ""
             domain = item.meta.get("source_domain", item.author)
 
             lines.append(
@@ -290,6 +298,18 @@ def context_fragment(report: Report) -> str:
     return "\n".join(lines)
 
 
+def signal_cards(report: Report, max_items: int = 8) -> str:
+    """Produce a terse card-style view for quick scanning."""
+    combined = sorted(report.items, key=lambda item: item.score, reverse=True)
+    lines = [f"# Signal Cards: {report.topic}", ""]
+    for item in combined[:max_items]:
+        label = item.source.value.upper()
+        date_str = item.published or "unknown date"
+        lines.append(f"- [{label}] {item.title} ({date_str}, score {item.score})")
+        lines.append(f"  {item.link}")
+    return "\n".join(lines)
+
+
 def full_report(report: Report) -> str:
     """Produce the verbose markdown report."""
     lines = []
@@ -297,16 +317,16 @@ def full_report(report: Report) -> str:
     lines.append(f"# {report.topic} - Intelligence Brief")
     lines.append("")
     lines.append(f"**Generated:** {report.generated_at}")
-    lines.append(f"**Date Range:** {report.range_start} to {report.range_end}")
+    lines.append(f"**Date Range:** {report.window.start} to {report.window.end}")
     lines.append(f"**Mode:** {report.mode}")
     lines.append("")
 
     lines.append("## Models Used")
     lines.append("")
-    if report.xai_model_used:
-        lines.append(f"- **xAI:** {report.xai_model_used}")
-    if report.openai_model_used:
-        lines.append(f"- **OpenAI:** {report.openai_model_used}")
+    if report.models.xai:
+        lines.append(f"- **xAI:** {report.models.xai}")
+    if report.models.openai:
+        lines.append(f"- **OpenAI:** {report.models.openai}")
     lines.append("")
 
     reddit_items = report.reddit
@@ -320,7 +340,7 @@ def full_report(report: Report) -> str:
             lines.append(f"- **Subreddit:** r/{subreddit}")
             lines.append(f"- **URL:** {item.link}")
             lines.append(
-                f"- **Date:** {item.published or 'Unknown'} (confidence: {item.date_quality})"
+                f"- **Date:** {item.published or 'Unknown'} (confidence: {item.date_confidence})"
             )
             lines.append(f"- **Score:** {item.score}/100")
             lines.append(f"- **Relevance:** {item.reason}")
@@ -347,7 +367,7 @@ def full_report(report: Report) -> str:
             lines.append("")
             lines.append(f"- **URL:** {item.link}")
             lines.append(
-                f"- **Date:** {item.published or 'Unknown'} (confidence: {item.date_quality})"
+                f"- **Date:** {item.published or 'Unknown'} (confidence: {item.date_confidence})"
             )
             lines.append(f"- **Score:** {item.score}/100")
             lines.append(f"- **Relevance:** {item.reason}")
@@ -371,7 +391,7 @@ def full_report(report: Report) -> str:
             lines.append(f"- **Channel:** {item.author}")
             lines.append(f"- **URL:** {item.link}")
             lines.append(
-                f"- **Date:** {item.published or 'Unknown'} (confidence: {item.date_quality})"
+                f"- **Date:** {item.published or 'Unknown'} (confidence: {item.date_confidence})"
             )
             lines.append(f"- **Score:** {item.score}/100")
             lines.append(f"- **Relevance:** {item.reason}")
@@ -400,7 +420,7 @@ def full_report(report: Report) -> str:
             lines.append("")
             lines.append(f"- **URL:** {item.link}")
             lines.append(
-                f"- **Date:** {item.published or 'Unknown'} (confidence: {item.date_quality})"
+                f"- **Date:** {item.published or 'Unknown'} (confidence: {item.date_confidence})"
             )
             lines.append(f"- **Score:** {item.score}/100")
             lines.append(f"- **Relevance:** {item.reason}")
@@ -425,7 +445,7 @@ def full_report(report: Report) -> str:
             lines.append(f"- **Source:** {domain}")
             lines.append(f"- **URL:** {item.link}")
             lines.append(
-                f"- **Date:** {item.published or 'Unknown'} (confidence: {item.date_quality})"
+                f"- **Date:** {item.published or 'Unknown'} (confidence: {item.date_confidence})"
             )
             lines.append(f"- **Score:** {item.score}/100")
             lines.append(f"- **Relevance:** {item.reason}")
@@ -488,4 +508,3 @@ def save_artifacts(
 def context_path() -> str:
     """Return the filesystem path to the context fragment file."""
     return str(OUTPUT_DIR / "briefbot.context.md")
-

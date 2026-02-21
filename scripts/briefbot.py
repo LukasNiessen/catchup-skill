@@ -120,11 +120,11 @@ def _query_reddit(
 
                 by_url = {}
                 for base_item in items:
-                    item_url = str(base_item.get("url", "")).strip()
+                    item_url = str(base_item.get("link", base_item.get("url", ""))).strip()
                     if item_url:
                         by_url[item_url] = base_item
                 for extra_item in supplemental_items:
-                    item_url = str(extra_item.get("url", "")).strip()
+                    item_url = str(extra_item.get("link", extra_item.get("url", ""))).strip()
                     if item_url and item_url not in by_url:
                         by_url[item_url] = extra_item
                 if by_url:
@@ -517,14 +517,14 @@ def main():
     parser.add_argument(
         "--format",
         dest="emit",
-        choices=["compact", "json", "md", "context", "path"],
+        choices=["compact", "json", "md", "context", "path", "cards"],
         default="compact",
         help="Output mode",
     )
     parser.add_argument(
         "--emit",
         dest="emit",
-        choices=["compact", "json", "md", "context", "path"],
+        choices=["compact", "json", "md", "context", "path", "cards"],
         help=argparse.SUPPRESS,
     )
     parser.add_argument(
@@ -682,17 +682,18 @@ def main():
     if args.mock:
         platform = "both" if args.sources == "auto" else args.sources
     else:
-        platform, src_err = config.validate_sources(
+        resolution = config.resolve_sources(
             args.sources, platforms, args.include_web
         )
+        platform = resolution.mode
 
-        _log(f"Source validation: platform='{platform}', error={src_err}")
+        _log(f"Source resolution: platform='{platform}', severity={resolution.severity}, message={resolution.message}")
 
-        if src_err is not None:
-            if "WebSearch fallback" in src_err:
-                print(f"Note: {src_err}", file=sys.stderr)
-            else:
-                print(f"Error: {src_err}", file=sys.stderr)
+        if resolution.message:
+            if resolution.severity == "warn":
+                print(f"Note: {resolution.message}", file=sys.stderr)
+            elif resolution.severity == "error":
+                print(f"Error: {resolution.message}", file=sys.stderr)
                 sys.exit(1)
 
     days = args.days
@@ -810,6 +811,7 @@ def main():
     report.x_error = x_error
     report.youtube_error = youtube_error
     report.linkedin_error = linkedin_error
+    report.metrics.item_count = len(report.items)
 
     report.context_snippet_md = output.context_fragment(report)
 
@@ -1009,6 +1011,7 @@ def output_report(
         "md": lambda: print(output.full_report(report)),
         "context": lambda: print(report.context_snippet_md),
         "path": lambda: print(output.context_path()),
+        "cards": lambda: print(output.signal_cards(report)),
     }
 
     handler = format_handlers.get(output_format)

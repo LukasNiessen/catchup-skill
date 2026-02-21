@@ -1,9 +1,10 @@
-"""Configuration loading and source validation."""
+﻿"""Configuration loading and source validation."""
 
 import os
 import sys
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any
 
 from . import paths
 
@@ -19,6 +20,13 @@ CONFIG_DIR = paths.config_dir()
 CONFIG_FILE = paths.config_file()
 LEGACY_CONFIG_FILE = paths.legacy_config_file()
 _TRUTHY = {"1", "true", "yes", "on", "y", "t"}
+
+
+@dataclass
+class SourceResolution:
+    mode: str
+    message: Optional[str] = None
+    severity: str = "ok"  # ok, warn, error
 
 
 def _strip_inline_comment(value: str) -> str:
@@ -196,51 +204,57 @@ def identify_missing_credentials(configuration: Dict[str, Any]) -> str:
         return "both"
 
 
+def resolve_sources(
+    requested_sources: str,
+    available_platforms: str,
+    include_web_search: bool = False,
+) -> SourceResolution:
+    """Resolve requested sources against available credentials.
 
-
-def validate_sources(
-    requested_sources: str, available_platforms: str, include_web_search: bool = False
-) -> Tuple[str, Optional[str]]:
-    """Validate requested sources against available credentials.
-
-    Returns (effective_sources, error_message_or_none).
+    Returns a SourceResolution object with mode and optional message.
     """
-    _log("=== Validating sources ===")
+    _log("=== Resolving sources ===")
     _log(f"  Requested: '{requested_sources}', Available: '{available_platforms}', Include web: {include_web_search}")
 
+    requested = (requested_sources or "auto").strip().lower()
+
     if available_platforms == "web":
-        if requested_sources in ("auto", "web"):
-            return "web", None
-        return (
+        if requested in ("auto", "web"):
+            return SourceResolution("web")
+        return SourceResolution(
             "web",
             "No API keys found. Falling back to WebSearch only. Configure ~/.config/briefbot/.env (or legacy ~/.config/briefbot/.env) to enable Reddit, X, YouTube, and LinkedIn.",
+            severity="warn",
         )
 
-    mode_map = {
-        False: {"both": "both", "reddit": "reddit", "x": "x"},
-        True: {"both": "all", "reddit": "reddit-web", "x": "x-web"},
-    }
-    if requested_sources == "auto":
-        resolved = mode_map[bool(include_web_search)].get(available_platforms, available_platforms)
-        return resolved, None
+    web_suffix = "-web" if include_web_search else ""
 
-    if requested_sources == "web":
-        return "web", None
-
-    if requested_sources == "all":
+    if requested == "auto":
         if available_platforms == "both":
-            return "all", None
+            return SourceResolution("all" if include_web_search else "both")
         if available_platforms == "reddit":
-            return "all", "Note: X source unavailable (missing xAI key). X/Twitter will be skipped."
+            return SourceResolution(f"reddit{web_suffix}")
         if available_platforms == "x":
-            return "all", "Note: OpenAI key missing; Reddit/YouTube/LinkedIn will be skipped."
-        return "web", "No API keys configured."
+            return SourceResolution(f"x{web_suffix}")
+        return SourceResolution("web")
 
-    if requested_sources == "both":
+    if requested == "web":
+        return SourceResolution("web")
+
+    if requested == "all":
         if available_platforms == "both":
-            return ("all", None) if include_web_search else ("both", None)
+            return SourceResolution("all")
+        if available_platforms == "reddit":
+            return SourceResolution("all", "Note: X source unavailable (missing xAI key). X/Twitter will be skipped.", severity="warn")
+        if available_platforms == "x":
+            return SourceResolution("all", "Note: OpenAI key missing; Reddit/YouTube/LinkedIn will be skipped.", severity="warn")
+        return SourceResolution("web", "No API keys configured.", severity="warn")
+
+    if requested == "both":
+        if available_platforms == "both":
+            return SourceResolution("all" if include_web_search else "both")
         missing = "xAI" if available_platforms == "reddit" else "OpenAI"
-        return "none", f"Cannot use both sources: missing {missing} credentials. Try --sources=auto for automatic fallback."
+        return SourceResolution("none", f"Cannot use both sources: missing {missing} credentials. Try --sources=auto for automatic fallback.", severity="error")
 
     source_requirements = {
         "reddit": "openai",
@@ -248,14 +262,27 @@ def validate_sources(
         "linkedin": "openai",
         "x": "x",
     }
-    requirement = source_requirements.get(requested_sources)
+    requirement = source_requirements.get(requested)
     if requirement == "openai" and available_platforms == "x":
-        label = requested_sources.capitalize()
-        return "none", f"{label} was requested but only xAI credentials are configured."
+        label = requested.capitalize()
+        return SourceResolution("none", f"{label} was requested but only xAI credentials are configured.", severity="error")
     if requirement == "x" and available_platforms == "reddit":
-        return "none", "X source requires an xAI credential, but only an OpenAI key was found."
+        return SourceResolution("none", "X source requires an xAI credential, but only an OpenAI key was found.", severity="error")
 
-    if requested_sources == "reddit":
-        return ("reddit-web", None) if include_web_search else ("reddit", None)
-    return requested_sources, None
+    if requested in ("reddit", "x"):
+        return SourceResolution(f"{requested}{web_suffix}")
 
+    return SourceResolution(requested)
+
+
+def validate_sources(
+    requested_sources: str,
+    available_platforms: str,
+    include_web_search: bool = False,
+    strict: bool = True,
+) -> SourceResolution:
+    """Deprecated wrapper: prefer resolve_sources()."""
+    resolution = resolve_sources(requested_sources, available_platforms, include_web_search)
+    if strict and resolution.severity == "warn":
+        return SourceResolution(resolution.mode, resolution.message, severity="warn")
+    return resolution

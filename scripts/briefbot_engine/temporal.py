@@ -1,4 +1,4 @@
-"""Time-window and publication-date utilities."""
+﻿"""Time-window and publication-date utilities."""
 
 import re
 from datetime import date, datetime, timedelta, timezone
@@ -38,6 +38,10 @@ _MONTH_TO_INT = {
     "dec": 12,
     "december": 12,
 }
+
+CONFIDENCE_SOLID = "solid"
+CONFIDENCE_SOFT = "soft"
+CONFIDENCE_WEAK = "weak"
 
 
 # ---------------------------------------------------------------------------
@@ -109,14 +113,24 @@ def trust_level(
 ) -> str:
     """Return confidence of date against the target range."""
     if not date_input:
-        return "low"
+        return CONFIDENCE_WEAK
     try:
         parsed = datetime.strptime(date_input, "%Y-%m-%d").date()
         start_day = datetime.strptime(range_start, "%Y-%m-%d").date()
         end_day = datetime.strptime(range_end, "%Y-%m-%d").date()
-        return "high" if start_day <= parsed <= end_day else "low"
     except ValueError:
-        return "low"
+        return CONFIDENCE_WEAK
+
+    if start_day <= parsed <= end_day:
+        return CONFIDENCE_SOLID
+
+    # Near-edge dates are still partially trustworthy.
+    if parsed < start_day:
+        delta = (start_day - parsed).days
+    else:
+        delta = (parsed - end_day).days
+
+    return CONFIDENCE_SOFT if delta <= 7 else CONFIDENCE_WEAK
 
 
 def elapsed_days(date_input: Optional[str]) -> Optional[int]:
@@ -141,7 +155,7 @@ def freshness_score(date_input: Optional[str], max_days: int = 30) -> int:
     if age >= cap:
         return 0
     remaining = (cap - age) / cap
-    return int(100 * (remaining ** 0.93))
+    return int(100 * (remaining ** 1.15))
 
 
 # ---------------------------------------------------------------------------
@@ -173,9 +187,9 @@ def extract_from_text(text: str) -> Optional[str]:
     lowered = text.lower()
 
     month_first = re.search(
-        r'\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|'
-        r'jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)'
-        r'\s+(\d{1,2})(?:st|nd|rd|th)?,?\s*(\d{4})\b',
+        r"\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|"
+        r"jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)"
+        r"\s+(\d{1,2})(?:st|nd|rd|th)?,?\s*(\d{4})\b",
         lowered,
     )
     if month_first:
@@ -185,10 +199,10 @@ def extract_from_text(text: str) -> Optional[str]:
             return f"{year_str}-{month_num:02d}-{int(day_str):02d}"
 
     day_first = re.search(
-        r'\b(\d{1,2})(?:st|nd|rd|th)?\s+'
-        r'(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|'
-        r'jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)'
-        r'\s+(\d{4})\b',
+        r"\b(\d{1,2})(?:st|nd|rd|th)?\s+"
+        r"(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|"
+        r"jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)"
+        r"\s+(\d{4})\b",
         lowered,
     )
     if day_first:
@@ -197,7 +211,7 @@ def extract_from_text(text: str) -> Optional[str]:
         if month_num and 2019 <= int(year_str) <= 2032 and 1 <= int(day_str) <= 31:
             return f"{year_str}-{month_num:02d}-{int(day_str):02d}"
 
-    iso = re.search(r'\b(\d{4})-(\d{2})-(\d{2})\b', text)
+    iso = re.search(r"\b(\d{4})-(\d{2})-(\d{2})\b", text)
     if iso:
         year, month, day = iso.groups()
         if 2019 <= int(year) <= 2032 and 1 <= int(month) <= 12 and 1 <= int(day) <= 31:
@@ -239,14 +253,14 @@ def detect(
     """Choose best available date signal from URL/title/snippet."""
     url_date = extract_from_url(url)
     if url_date:
-        return url_date, "high"
+        return url_date, CONFIDENCE_SOLID
 
     title_date = extract_from_text(title)
     if title_date:
-        return title_date, "low"
+        return title_date, CONFIDENCE_SOFT
 
     snippet_date = extract_from_text(snippet)
     if snippet_date:
-        return snippet_date, "med"
+        return snippet_date, CONFIDENCE_SOFT
 
-    return None, "low"
+    return None, CONFIDENCE_WEAK
