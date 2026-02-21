@@ -22,18 +22,20 @@ def _info(msg: str) -> None:
     sys.stderr.flush()
 
 
+_ACCESS_PATTERNS = (
+    r"organization must be verified",
+    r"does not have access",
+    r"access denied",
+    r"model .*not found",
+    r"not available for your account",
+)
+
+
 def _is_access_err(err: http_client.HTTPError) -> bool:
-    if err.status_code not in (400, 403) or not err.body:
+    if err.status_code not in (400, 401, 403, 404, 429) or not err.body:
         return False
     lowered = err.body.lower()
-    indicators = (
-        "organization must be verified",
-        "does not have access",
-        "access denied",
-        "model not found",
-        "not available for your account",
-    )
-    return any(term in lowered for term in indicators)
+    return any(re.search(pattern, lowered) for pattern in _ACCESS_PATTERNS)
 
 
 API_URL = "https://api.openai.com/v1/responses"
@@ -46,8 +48,10 @@ SAMPLING_SPECS = {
 
 YOUTUBE_DISCOVERY_PROMPT = """Find YouTube videos about: {topic}
 
-Distill the topic into a short search phrase, then search YouTube via site:youtube.com.
-Return only actual video URLs (youtube.com/watch?v= or youtu.be).
+Window: {from_date} to {to_date}
+Query hint: {query_hint}
+
+Search YouTube (youtube.com / youtu.be). Return only actual video URLs.
 
 Target {min_items}-{max_items} videos.
 
@@ -70,6 +74,20 @@ Return JSON only:
   ]
 }}
 """
+
+
+def _trim_query(topic: str) -> str:
+    lowered = (topic or "").lower()
+    lowered = re.sub(r"\\b(how to|best|top|guide|review|tutorial)\\b", " ", lowered)
+    tokens = [tok for tok in re.findall(r"[a-z0-9]+", lowered) if len(tok) > 2]
+    seen = []
+    for tok in tokens:
+        if tok in seen:
+            continue
+        seen.append(tok)
+        if len(seen) >= 5:
+            break
+    return " ".join(seen) or topic
 
 
 def _extract_items(output_text: str) -> List[Dict[str, Any]]:
@@ -121,12 +139,14 @@ def search(
         if candidate not in models_chain:
             models_chain.append(candidate)
 
+    query_hint = _trim_query(topic)
     prompt = YOUTUBE_DISCOVERY_PROMPT.format(
         topic=topic,
         from_date=start,
         to_date=end,
         min_items=min_items,
         max_items=max_items,
+        query_hint=query_hint,
     )
 
     last_err = None
@@ -134,14 +154,18 @@ def search(
     for current_model in models_chain:
         payload = {
             "model": current_model,
-            "input": [{"role": "user", "content": prompt}],
+            "input": [
+                {"role": "system", "content": "You are a research scout for YouTube content."},
+                {"role": "user", "content": prompt},
+            ],
             "tools": [
                 {
                     "type": "web_search",
-                    "filters": {"allowed_domains": ["youtube.com", "youtu.be"]},
+                    "filters": {"allowed_domains": ["youtube.com", "youtu.be", "m.youtube.com"]},
                 }
             ],
             "include": ["web_search_call.action.sources"],
+            "metadata": {"query_hint": query_hint, "sampling": sampling},
         }
 
         try:

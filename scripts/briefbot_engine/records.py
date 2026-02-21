@@ -56,6 +56,9 @@ class Interaction:
         return payload or None
 
 
+Engagement = Interaction
+
+
 @dataclass
 class ThreadNote:
     """A notable thread comment."""
@@ -72,6 +75,9 @@ class ThreadNote:
         return payload
 
 
+Comment = ThreadNote
+
+
 @dataclass
 class Scorecard:
     """Score breakdown per dimension."""
@@ -83,6 +89,9 @@ class Scorecard:
 
     def to_dict(self) -> Dict[str, int]:
         return asdict(self)
+
+
+SubScores = Scorecard
 
 
 @dataclass
@@ -109,22 +118,90 @@ class Signal:
     def to_dict(self) -> Dict[str, Any]:
         return {
             "key": self.key,
+            "id": self.key,
             "channel": self.channel.value,
             "headline": self.headline,
+            "title": self.headline,
+            "text": self.blurb or self.headline,
             "url": self.url,
             "byline": self.byline,
             "blurb": self.blurb,
             "dated": self.dated,
+            "date": self.dated,
             "time_confidence": self.time_confidence,
+            "date_confidence": self.time_confidence,
             "interaction": self.interaction.to_dict() if self.interaction else None,
+            "engagement": self.interaction.to_dict() if self.interaction else None,
             "topicality": self.topicality,
+            "relevance": self.topicality,
             "rationale": self.rationale,
+            "why_relevant": self.rationale,
             "rank": self.rank,
+            "score": self.rank,
             "scorecard": self.scorecard.to_dict(),
             "thread_notes": [c.to_dict() for c in self.thread_notes],
             "notables": self.notables,
             "extras": self.extras,
         }
+
+    @property
+    def title(self) -> str:
+        return self.headline
+
+    @title.setter
+    def title(self, value: str) -> None:
+        self.headline = value
+
+    @property
+    def text(self) -> str:
+        return self.blurb or self.headline
+
+    @text.setter
+    def text(self, value: str) -> None:
+        if self.blurb:
+            self.blurb = value
+        else:
+            self.headline = value
+
+    @property
+    def date(self) -> Optional[str]:
+        return self.dated
+
+    @date.setter
+    def date(self, value: Optional[str]) -> None:
+        self.dated = value
+
+    @property
+    def date_confidence(self) -> str:
+        return self.time_confidence
+
+    @date_confidence.setter
+    def date_confidence(self, value: str) -> None:
+        self.time_confidence = value
+
+    @property
+    def score(self) -> int:
+        return self.rank
+
+    @score.setter
+    def score(self, value: int) -> None:
+        self.rank = value
+
+    @property
+    def relevance(self) -> float:
+        return self.topicality
+
+    @relevance.setter
+    def relevance(self, value: float) -> None:
+        self.topicality = value
+
+    @property
+    def why_relevant(self) -> str:
+        return self.rationale
+
+    @why_relevant.setter
+    def why_relevant(self, value: str) -> None:
+        self.rationale = value
 
 
 @dataclass
@@ -406,6 +483,9 @@ class Brief:
         )
 
 
+Report = Brief
+
+
 def _signal_from_dict(d: Dict[str, Any], channel: Channel) -> Signal:
     interaction_payload = d.get("interaction") or d.get("engagement") or d.get("metrics")
     interaction = Interaction(**interaction_payload) if isinstance(interaction_payload, dict) else None
@@ -414,17 +494,17 @@ def _signal_from_dict(d: Dict[str, Any], channel: Channel) -> Signal:
     scorecard = Scorecard(**score_part) if score_part else Scorecard()
 
     return Signal(
-        key=d.get("key", d.get("uid", "")),
+        key=d.get("key", d.get("id", d.get("uid", ""))),
         channel=channel,
-        headline=d.get("headline", d.get("title", "")),
+        headline=d.get("headline", d.get("title", d.get("text", ""))),
         url=d.get("url", d.get("link", "")),
         byline=d.get("byline", d.get("author", "")),
-        blurb=d.get("blurb", d.get("summary", "")),
-        dated=d.get("dated", d.get("published")),
-        time_confidence=d.get("time_confidence", d.get("date_confidence", d.get("date_quality", "low"))),
+        blurb=d.get("blurb", d.get("summary", d.get("text", ""))),
+        dated=d.get("dated", d.get("date", d.get("published"))),
+        time_confidence=d.get("time_confidence", d.get("date_confidence", d.get("date_quality", d.get("date_accuracy", "low")))),
         interaction=interaction,
         topicality=d.get("topicality", d.get("relevance", d.get("signal", 0.5))),
-        rationale=d.get("rationale", d.get("reason", "")),
+        rationale=d.get("rationale", d.get("why_relevant", d.get("reason", ""))),
         rank=d.get("rank", d.get("score", 0)),
         scorecard=scorecard,
         thread_notes=thread_notes,
@@ -533,7 +613,7 @@ def from_reddit_raw(entry: Dict[str, Any], start: str, end: str) -> Signal:
     ]
 
     item_date = entry.get("dated", entry.get("posted"))
-    trust = timeframe.date_confidence(item_date, start, end)
+    trust = timeframe.get_date_confidence(item_date, start, end)
 
     return Signal(
         key=entry.get("key", entry.get("uid", "")),
@@ -569,7 +649,7 @@ def from_x_raw(entry: Dict[str, Any], start: str, end: str) -> Signal:
             interaction.pulse = _x_pulse(interaction)
 
     item_date = entry.get("dated", entry.get("posted"))
-    trust = timeframe.date_confidence(item_date, start, end)
+    trust = timeframe.get_date_confidence(item_date, start, end)
 
     return Signal(
         key=entry.get("key", entry.get("uid", "")),
@@ -597,7 +677,7 @@ def from_youtube_raw(entry: Dict[str, Any], start: str, end: str) -> Signal:
         interaction.pulse = _youtube_pulse(interaction)
 
     item_date = entry.get("dated", entry.get("posted"))
-    trust = timeframe.date_confidence(item_date, start, end)
+    trust = timeframe.get_date_confidence(item_date, start, end)
 
     return Signal(
         key=entry.get("key", entry.get("uid", "")),
@@ -628,7 +708,7 @@ def from_linkedin_raw(entry: Dict[str, Any], start: str, end: str) -> Signal:
         interaction.pulse = _linkedin_pulse(interaction)
 
     item_date = entry.get("dated", entry.get("posted"))
-    trust = timeframe.date_confidence(item_date, start, end)
+    trust = timeframe.get_date_confidence(item_date, start, end)
 
     return Signal(
         key=entry.get("key", entry.get("uid", "")),

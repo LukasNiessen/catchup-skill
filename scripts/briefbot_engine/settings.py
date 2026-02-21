@@ -2,6 +2,7 @@
 
 import os
 import sys
+import shlex
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Dict, Any
@@ -29,21 +30,24 @@ class SourceResolution:
     severity: str = "ok"  # ok, warn, error
 
 
-def _strip_inline_comment(value: str) -> str:
-    in_quote = False
-    quote_char = ""
-    out = []
-    for ch in value:
-        if ch in ("'", '"'):
-            if not in_quote:
-                in_quote = True
-                quote_char = ch
-            elif ch == quote_char:
-                in_quote = False
-        if ch == "#" and not in_quote:
-            break
-        out.append(ch)
-    return "".join(out).strip()
+def _parse_env_value(value: str) -> str:
+    if value is None:
+        return ""
+    raw = value.strip()
+    if not raw:
+        return ""
+
+    lexer = shlex.shlex(raw, posix=True)
+    lexer.whitespace_split = False
+    lexer.commenters = "#"
+    tokens = list(lexer)
+    if not tokens:
+        return ""
+
+    parsed = "".join(tokens).strip()
+    if parsed and parsed[0] in ("'", '"') and parsed[-1] == parsed[0]:
+        parsed = parsed[1:-1]
+    return parsed.strip()
 
 
 def parse_dotenv(filepath: Path) -> Dict[str, str]:
@@ -70,11 +74,7 @@ def parse_dotenv(filepath: Path) -> Dict[str, str]:
 
             key, _, value = stripped.partition("=")
             key = key.strip()
-            value = _strip_inline_comment(value.strip())
-
-            if len(value) >= 2:
-                if value[0] in ('"', "'") and value[-1] == value[0]:
-                    value = value[1:-1]
+            value = _parse_env_value(value)
 
             if key:
                 parsed[key] = value
@@ -286,3 +286,20 @@ def validate_sources(
     if strict and resolution.severity == "warn":
         return SourceResolution(resolution.mode, resolution.message, severity="warn")
     return resolution
+
+
+# Compatibility aliases for alternate naming conventions
+def load_env_file(path: Path) -> Dict[str, str]:
+    return parse_dotenv(path)
+
+
+def get_config() -> Dict[str, Any]:
+    return load_config()
+
+
+def get_available_sources(configuration: Dict[str, Any]) -> str:
+    return determine_available_platforms(configuration)
+
+
+def get_missing_keys(configuration: Dict[str, Any]) -> str:
+    return identify_missing_credentials(configuration)

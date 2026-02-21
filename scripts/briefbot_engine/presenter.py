@@ -54,6 +54,8 @@ def _format_confidence(conf: str) -> str:
         return "high"
     if conf == timeframe.CONFIDENCE_SOFT:
         return "med"
+    if conf == timeframe.CONFIDENCE_UNKNOWN:
+        return "unknown"
     return "low"
 
 
@@ -386,3 +388,10 @@ def save_artifacts(
 def context_path() -> str:
     """Return the filesystem path to the context fragment file."""
     return str(OUTPUT_DIR / "briefbot.context.md")
+
+
+# Compatibility aliases for alternate naming conventions
+render_compact = compact
+render_full_report = full_report
+render_context_snippet = context_fragment
+_assess_data_freshness = _freshness_snapshot

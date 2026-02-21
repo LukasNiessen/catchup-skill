@@ -12,6 +12,7 @@ _LOW_VALUE_PATTERNS = (
     r"^(following|subscribed|bookmarking|saving this)\.?$",
     r"^(same here|me too|ditto|this is the way)\.?$",
     r"^(lol|lmao|rofl|haha|heh)+$",
+    r"^(nice|cool|wow|neat)\.?$",
     r"^\[(deleted|removed)\]$",
 )
 _SKIP_AUTHORS = {"[deleted]", "[removed]", "AutoModerator"}
@@ -23,7 +24,7 @@ def _thread_path_from_url(url: str) -> Optional[str]:
         parsed = urlparse(url)
     except Exception:
         return None
-    host = parsed.netloc.lower()
+    host = (parsed.netloc or "").lower()
     if "reddit.com" not in host:
         return None
     return parsed.path or None
@@ -35,11 +36,8 @@ def _load_thread_json(
     """Fetch the JSON representation of a Reddit thread."""
     if mock_data is not None:
         return mock_data
-    thread_path = _thread_path_from_url(url)
-    if not thread_path:
-        return None
     try:
-        return http_client.reddit_json(thread_path)
+        return http_client.reddit_json(url)
     except http_client.HTTPError:
         return None
 
@@ -108,17 +106,27 @@ def _decode_thread_payload(raw_data: Any) -> Tuple[Optional[Dict[str, Any]], Lis
 def _comment_weight(row: Dict[str, Any]) -> float:
     score = float(row.get("score") or 0)
     body = str(row.get("body") or "")
+    length = len(body)
     score_weight = math.log1p(max(0.0, score))
-    length_weight = math.log1p(len(body))
-    return (score_weight * 1.4) + (length_weight * 0.8)
+    length_weight = math.log1p(length) if length else 0.0
+    bonus = 0.0
+    if length > 180:
+        bonus += 0.6
+    if "http" in body.lower():
+        bonus -= 0.5
+    return (score_weight * 1.2) + (length_weight * 0.9) + bonus
 
 
 def _top_comments(comments: List[Dict], limit: int = 8) -> List[Dict[str, Any]]:
-    ranked = [
-        row
-        for row in comments
-        if row.get("author") not in _SKIP_AUTHORS and (row.get("score") or 0) >= 0
-    ]
+    ranked = []
+    for row in comments:
+        if row.get("author") in _SKIP_AUTHORS:
+            continue
+        if (row.get("score") or 0) < 0:
+            continue
+        if len(str(row.get("body") or "")) < 12:
+            continue
+        ranked.append(row)
     ranked.sort(key=_comment_weight, reverse=True)
     return ranked[: max(limit, 0)]
 
@@ -142,7 +150,7 @@ def _extract_insights(comments: List[Dict], limit: int = 6) -> List[str]:
     insights: List[str] = []
     for comment in comments[: limit * 5]:
         body = str(comment.get("body") or "").strip()
-        if len(body) < 32:
+        if len(body) < 40:
             continue
         lowered = body.lower()
         if any(re.match(pattern, lowered) for pattern in _LOW_VALUE_PATTERNS):
@@ -172,13 +180,13 @@ def hydrate(
         }
         created_utc = submission.get("created_utc")
         if created_utc is not None:
-            item["dated"] = timeframe.to_iso_date(created_utc)
+            item["dated"] = timeframe.timestamp_to_date(created_utc)
 
     top = _top_comments(comment_list, limit=8)
     item["thread_notes"] = [
         {
             "score": c.get("score", 0),
-            "stamped": timeframe.to_iso_date(c.get("created_utc")),
+            "stamped": timeframe.timestamp_to_date(c.get("created_utc")),
             "author": c.get("author", ""),
             "excerpt": str(c.get("body", ""))[:280],
             "url": f"https://www.reddit.com{c.get('permalink', '')}" if c.get("permalink") else "",
@@ -188,3 +196,24 @@ def hydrate(
     item["notables"] = _extract_insights(top)
 
     return item
+
+
+# Compatibility aliases for alternate naming conventions
+def fetch_thread_data(url: str, mock: Optional[Dict] = None) -> Optional[Dict[str, Any]]:
+    return _load_thread_json(url, mock)
+
+
+def parse_thread_data(data: Any) -> Tuple[Optional[Dict[str, Any]], List[Dict[str, Any]]]:
+    return _decode_thread_payload(data)
+
+
+def extract_reddit_path(url: str) -> Optional[str]:
+    return _thread_path_from_url(url)
+
+
+def get_top_comments(comments: List[Dict], limit: int = 8) -> List[Dict[str, Any]]:
+    return _top_comments(comments, limit=limit)
+
+
+def extract_comment_insights(comments: List[Dict], limit: int = 6) -> List[str]:
+    return _extract_insights(comments, limit=limit)

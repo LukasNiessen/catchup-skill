@@ -42,6 +42,7 @@ _MONTH_TO_INT = {
 CONFIDENCE_SOLID = "high"
 CONFIDENCE_SOFT = "medium"
 CONFIDENCE_WEAK = "low"
+CONFIDENCE_UNKNOWN = "unknown"
 
 
 def _today_utc() -> date:
@@ -108,13 +109,13 @@ def date_confidence(
 ) -> str:
     """Return confidence of date against the target range."""
     if not date_input:
-        return CONFIDENCE_WEAK
+        return CONFIDENCE_UNKNOWN
     try:
         parsed = datetime.strptime(date_input, "%Y-%m-%d").date()
         start_day = datetime.strptime(range_start, "%Y-%m-%d").date()
         end_day = datetime.strptime(range_end, "%Y-%m-%d").date()
     except ValueError:
-        return CONFIDENCE_WEAK
+        return CONFIDENCE_UNKNOWN
 
     if start_day <= parsed <= end_day:
         return CONFIDENCE_SOLID
@@ -124,7 +125,11 @@ def date_confidence(
     else:
         delta = (parsed - end_day).days
 
-    return CONFIDENCE_SOFT if delta <= 7 else CONFIDENCE_WEAK
+    if delta <= 7:
+        return CONFIDENCE_SOFT
+    if delta <= 30:
+        return CONFIDENCE_WEAK
+    return CONFIDENCE_UNKNOWN
 
 
 def days_since(date_input: Optional[str]) -> Optional[int]:
@@ -251,6 +256,35 @@ def detect_date(
 
     snippet_date = scan_text_date(snippet)
     if snippet_date:
-        return snippet_date, CONFIDENCE_SOFT
+        return snippet_date, CONFIDENCE_WEAK
 
-    return None, CONFIDENCE_WEAK
+    return None, CONFIDENCE_UNKNOWN
+
+
+def parse_date(date_str: Optional[str]) -> Optional[datetime]:
+    """Compatibility alias for parse_moment()."""
+    return parse_moment(date_str)
+
+
+def days_ago(date_str: Optional[str]) -> Optional[int]:
+    """Compatibility alias for days_since()."""
+    return days_since(date_str)
+
+
+def get_date_range(days: int = 30) -> Tuple[str, str]:
+    """Compatibility alias for span()."""
+    return span(days)
+
+
+def timestamp_to_date(unix_timestamp: Optional[float]) -> Optional[str]:
+    """Compatibility alias for to_iso_date()."""
+    return to_iso_date(unix_timestamp)
+
+
+def get_date_confidence(
+    date_value: Optional[str],
+    range_start: str,
+    range_end: str,
+) -> str:
+    """Compatibility alias for date_confidence()."""
+    return date_confidence(date_value, range_start, range_end)

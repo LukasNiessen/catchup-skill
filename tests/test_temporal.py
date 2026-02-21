@@ -6,6 +6,7 @@ from briefbot_engine.timeframe import (
     CONFIDENCE_SOLID,
     CONFIDENCE_SOFT,
     CONFIDENCE_WEAK,
+    CONFIDENCE_UNKNOWN,
     date_confidence,
     days_since,
     detect_date,
@@ -142,13 +143,13 @@ def test_date_confidence_soft_near_range():
 
 
 def test_date_confidence_weak_before_range():
-    result = date_confidence("2025-11-30", "2026-01-20", "2026-02-19")
+    result = date_confidence("2025-12-30", "2026-01-20", "2026-02-19")
 
     assert result == CONFIDENCE_WEAK
 
 
 def test_date_confidence_weak_after_range():
-    result = date_confidence("2026-04-01", "2026-01-20", "2026-02-19")
+    result = date_confidence("2026-03-10", "2026-01-20", "2026-02-19")
 
     assert result == CONFIDENCE_WEAK
 
@@ -156,7 +157,7 @@ def test_date_confidence_weak_after_range():
 def test_date_confidence_weak_for_none():
     result = date_confidence(None, "2026-01-20", "2026-02-19")
 
-    assert result == CONFIDENCE_WEAK
+    assert result == CONFIDENCE_UNKNOWN
 
 
 def test_date_confidence_solid_at_boundaries():
@@ -360,7 +361,7 @@ def test_detect_date_falls_back_to_snippet():
     date, confidence = detect_date(url, snippet, title)
 
     assert date == "2026-02-09"
-    assert confidence == CONFIDENCE_SOFT
+    assert confidence == CONFIDENCE_WEAK
 
 
 def test_detect_date_returns_none_when_no_date():
@@ -371,4 +372,4 @@ def test_detect_date_returns_none_when_no_date():
     date, confidence = detect_date(url, snippet, title)
 
     assert date is None
-    assert confidence == CONFIDENCE_WEAK
+    assert confidence == CONFIDENCE_UNKNOWN

@@ -113,7 +113,7 @@ def _query_reddit(
     should_retry = has_few_results and not mock and error is None
 
     if should_retry:
-        simplified_topic = reddit_source.compress_topic(topic)
+        simplified_topic = reddit_source.trim_query(topic)
         topics_differ = simplified_topic.strip().lower() != topic.strip().lower()
 
         if topics_differ:
@@ -648,7 +648,7 @@ def main():
                 sys.exit(1)
 
     days = args.days
-    start_date, end_date = timeframe.span(days)
+    start_date, end_date = timeframe.get_date_range(days)
 
     missing_keys = settings.identify_missing_credentials(cfg)
 
@@ -732,18 +732,13 @@ def main():
         bundle.items["linkedin"], Channel.LINKEDIN, start_date, end_date
     )
 
-    # Apply strict date filtering
-    filtered_reddit = filter_by_date(normalized_reddit, start_date, end_date)
-    filtered_x = filter_by_date(normalized_x, start_date, end_date)
-    filtered_youtube = filter_by_date(normalized_youtube, start_date, end_date)
-    filtered_linkedin = filter_by_date(normalized_linkedin, start_date, end_date)
-
-    # Combine all items then score -> dedupe -> rescore for final ranking
-    all_items = filtered_reddit + filtered_x + filtered_youtube + filtered_linkedin
+    # Combine all items then score -> dedupe -> filter -> rescore for final ranking
+    all_items = normalized_reddit + normalized_x + normalized_youtube + normalized_linkedin
     source_weights = analysis.stance_weights(epistemic_stance)
     initial_ranked = scoring.rank_items(all_items, source_weights=source_weights)
     deduped_items = scoring.deduplicate(initial_ranked)
-    scored_items = scoring.rank_items(deduped_items, source_weights=source_weights)
+    filtered_items = filter_by_date(deduped_items, start_date, end_date)
+    scored_items = scoring.rank_items(filtered_items, source_weights=source_weights)
 
     progress.finish_scoring()
 
@@ -762,7 +757,7 @@ def main():
         decomposition=decomposition,
         decomposition_source=decomposition_source,
     )
-    report.items = deduped_items
+    report.items = scored_items
     report.reddit_error = bundle.errors.get("reddit")
     report.x_error = bundle.errors.get("x")
     report.youtube_error = bundle.errors.get("youtube")

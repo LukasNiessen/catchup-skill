@@ -66,9 +66,11 @@ def _weighted_geometric(values: List[float], weights: List[float]) -> float:
 def _trust(item: Signal) -> int:
     base = SOURCE_TRUST_BASE.get(item.channel, 50)
     if item.time_confidence == timeframe.CONFIDENCE_SOLID:
-        base += 5
+        base += 6
     elif item.time_confidence == timeframe.CONFIDENCE_WEAK:
-        base -= 7
+        base -= 5
+    elif item.time_confidence == timeframe.CONFIDENCE_UNKNOWN:
+        base -= 10
     return max(0, min(100, int(base)))
 
 
@@ -139,6 +141,8 @@ def _score_platform_items(items: List[Signal]) -> None:
             score -= MISSING_INTERACTION_PENALTY
         if item.time_confidence == timeframe.CONFIDENCE_WEAK:
             score -= 5
+        elif item.time_confidence == timeframe.CONFIDENCE_UNKNOWN:
+            score -= 9
 
         item.rank = max(0, min(100, round(score)))
 
@@ -170,6 +174,8 @@ def _score_web_items(items: List[Signal]) -> None:
             total += WEB_DATE_BONUS
         elif item.time_confidence == timeframe.CONFIDENCE_WEAK:
             total -= WEB_DATE_PENALTY
+        elif item.time_confidence == timeframe.CONFIDENCE_UNKNOWN:
+            total -= WEB_DATE_PENALTY + 4
 
         item.rank = max(0, min(100, round(total)))
 
@@ -199,14 +205,72 @@ def _tokenize(text: str) -> List[str]:
     return re.findall(r"[a-z0-9]+", (text or "").lower())
 
 
-def _shingles(tokens: List[str], width: int = 3) -> Iterable[str]:
-    if not tokens:
-        return []
-    width = min(width, max(1, len(tokens)))
-    return [" ".join(tokens[idx : idx + width]) for idx in range(max(1, len(tokens) - width + 1))]
+def _squash(text: str) -> str:
+    tokens = _tokenize(text)
+    return " ".join(tokens)
 
 
-def _jaccard(a: Iterable[str], b: Iterable[str]) -> float:
+def _url_key(url: str) -> str:
+    if not url:
+        return ""
+    lowered = url.lower().strip()
+    if "?" in lowered:
+        lowered = lowered.split("?", 1)[0]
+    if "#" in lowered:
+        lowered = lowered.split("#", 1)[0]
+    return lowered.rstrip("/")
+
+
+def _soft_similarity(text_a: str, text_b: str) -> float:
+    from difflib import SequenceMatcher
+
+    if not text_a or not text_b:
+        return 0.0
+    ratio = SequenceMatcher(None, text_a, text_b).ratio()
+    if text_a in text_b or text_b in text_a:
+        ratio = max(ratio, 0.92)
+    return ratio
+
+
+def _text_of(item: Signal) -> str:
+    """Extract the primary text field from a signal."""
+    return " ".join([item.headline or "", item.byline or "", item.blurb or ""]).strip()
+
+
+def deduplicate(
+    items: List[Signal],
+    similarity_threshold: float = 0.88,
+) -> List[Signal]:
+    """Remove near-duplicates using soft string similarity."""
+    if len(items) <= 1:
+        return items
+
+    signatures = [
+        _squash(_text_of(item))
+        for item in items
+    ]
+    url_keys = [_url_key(item.url) for item in items]
+    discarded_indices = set()
+    for left in range(len(items)):
+        if left in discarded_indices:
+            continue
+        for right in range(left + 1, len(items)):
+            if right in discarded_indices:
+                continue
+            if url_keys[left] and url_keys[left] == url_keys[right]:
+                match_score = 1.0
+            else:
+                match_score = _soft_similarity(signatures[left], signatures[right])
+            if match_score >= similarity_threshold:
+                if items[left].rank >= items[right].rank:
+                    discarded_indices.add(right)
+                else:
+                    discarded_indices.add(left)
+                    break
+    return [item for idx, item in enumerate(items) if idx not in discarded_indices]
+
+
+def jaccard_similarity(a: Iterable[str], b: Iterable[str]) -> float:
     set_a = set(a)
     set_b = set(b)
     if not set_a and not set_b:
@@ -216,34 +280,4 @@ def _jaccard(a: Iterable[str], b: Iterable[str]) -> float:
     return len(set_a & set_b) / len(set_a | set_b)
 
 
-def _text_of(item: Signal) -> str:
-    """Extract the primary text field from a signal."""
-    return " ".join([item.headline or "", item.byline or "", item.url or ""]).strip()
-
-
-def deduplicate(
-    items: List[Signal],
-    similarity_threshold: float = 0.88,
-) -> List[Signal]:
-    """Remove near-duplicates using shingled Jaccard similarity."""
-    if len(items) <= 1:
-        return items
-
-    shingles = [
-        list(_shingles(_tokenize(_text_of(item)), width=3))
-        for item in items
-    ]
-    discarded_indices = set()
-    for left in range(len(items)):
-        if left in discarded_indices:
-            continue
-        for right in range(left + 1, len(items)):
-            if right in discarded_indices:
-                continue
-            if _jaccard(shingles[left], shingles[right]) >= similarity_threshold:
-                if items[left].rank >= items[right].rank:
-                    discarded_indices.add(right)
-                else:
-                    discarded_indices.add(left)
-                    break
-    return [item for idx, item in enumerate(items) if idx not in discarded_indices]
+dedupe_items = deduplicate

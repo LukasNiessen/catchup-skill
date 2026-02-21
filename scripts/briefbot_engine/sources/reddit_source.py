@@ -22,19 +22,21 @@ def _info(msg: str) -> None:
     sys.stderr.flush()
 
 
+_ACCESS_PATTERNS = (
+    r"organization must be verified",
+    r"does not have access",
+    r"model .*not found",
+    r"not available for your account",
+    r"access denied",
+    r"unauthorized",
+)
+
+
 def _is_access_err(err: http_client.HTTPError) -> bool:
-    if err.status_code not in (400, 401, 403) or not err.body:
+    if err.status_code not in (400, 401, 403, 404, 429) or not err.body:
         return False
     text = err.body.lower()
-    tokens = (
-        "organization must be verified",
-        "does not have access",
-        "model not found",
-        "not available for your account",
-        "access denied",
-        "unauthorized",
-    )
-    return any(token in text for token in tokens)
+    return any(re.search(pattern, text) for pattern in _ACCESS_PATTERNS)
 
 
 API_URL = "https://api.openai.com/v1/responses"
@@ -45,17 +47,17 @@ SAMPLING_SPECS = {
     "dense": {"min": 45, "max": 72},
 }
 
-REDDIT_DISCOVERY_PROMPT = """You are assembling Reddit threads for a research brief.
+REDDIT_DISCOVERY_PROMPT = """You are scouting Reddit threads for a research brief.
 
 Topic: {topic}
-Window: {from_date} through {to_date}
-Target: {min_items}-{max_items} solid threads
+Window: {from_date} to {to_date}
+Target volume: {min_items}-{max_items}
+Query hint: {query_hint}
 
-Process:
-- Compress the topic into a tight 2-4 word query.
-- Use broad searches across reddit.com and then refine if needed.
+Guidelines:
 - Prefer threads with concrete details, lessons learned, or firsthand experience.
-- Avoid low-effort meme posts or thin link dumps.
+- Mix recent posts with one or two evergreen deep dives if they are highly relevant.
+- Skip low-effort memes, thin link dumps, or pure opinion polls.
 
 Return JSON only in this structure:
 {{
@@ -88,11 +90,11 @@ _FILLERS = (
     r"\btutorial(s)?\b",
     r"\bprompting\b",
 )
-_STOPWORDS = {"using", "for", "with", "the", "of", "in", "on", "a", "an"}
+_STOPWORDS = {"using", "for", "with", "the", "of", "in", "on", "a", "an", "latest", "new"}
 _ID_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
-def compress_topic(verbose_query: str) -> str:
+def trim_query(verbose_query: str) -> str:
     """Reduce verbose queries to a compact search phrase."""
     lowered = verbose_query.lower()
     for pattern in _FILLERS:
@@ -102,9 +104,19 @@ def compress_topic(verbose_query: str) -> str:
         for tok in re.findall(r"[a-z0-9][a-z0-9.+_-]*", lowered)
         if tok not in _STOPWORDS
     ]
-    if len(tokens) <= 4:
-        return " ".join(tokens) or verbose_query
-    return " ".join(tokens[:4])
+    compact = []
+    for tok in tokens:
+        if tok in compact:
+            continue
+        compact.append(tok)
+        if len(compact) >= 5:
+            break
+    return " ".join(compact) or verbose_query
+
+
+def compress_topic(verbose_query: str) -> str:
+    """Compatibility alias for trim_query()."""
+    return trim_query(verbose_query)
 
 
 def _iter_text_chunks(output: Any) -> Iterable[str]:
@@ -213,6 +225,7 @@ def search(
     sampling_spec = SAMPLING_SPECS.get(sampling, SAMPLING_SPECS["standard"])
     min_items = sampling_spec["min"]
     max_items = sampling_spec["max"]
+    query_hint = trim_query(topic)
     headers = {"Authorization": f"Bearer {key}"}
     timeout = {"lite": 60, "standard": 90, "dense": 150}.get(sampling, 90)
     model_candidates = [model]
@@ -225,6 +238,7 @@ def search(
         to_date=end,
         min_items=min_items,
         max_items=max_items,
+        query_hint=query_hint,
     )
 
     final_error = None
@@ -236,10 +250,11 @@ def search(
                 {"role": "user", "content": prompt},
             ],
             "tools": [
-                {"type": "web_search", "filters": {"allowed_domains": ["reddit.com"]}}
+                {"type": "web_search", "filters": {"allowed_domains": ["reddit.com", "old.reddit.com"]}}
             ],
             "temperature": 0.2,
             "max_output_tokens": 1200,
+            "metadata": {"query_hint": query_hint, "sampling": sampling},
         }
         try:
             return http_client.request(
@@ -289,3 +304,11 @@ def parse_reddit_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]]:
         if normalized is not None:
             parsed.append(normalized)
     return parsed
+
+
+# Compatibility aliases for alternate naming conventions
+search_reddit = search
+
+
+def _extract_core_subject(topic: str) -> str:
+    return trim_query(topic)

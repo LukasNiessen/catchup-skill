@@ -68,7 +68,7 @@ def process_results(
             continue
 
         result_date = raw.get("date")
-        confidence = timeframe.CONFIDENCE_WEAK
+        confidence = timeframe.CONFIDENCE_UNKNOWN
 
         if result_date and re.match(r"^\d{4}-\d{2}-\d{2}$", str(result_date)):
             confidence = timeframe.CONFIDENCE_SOFT

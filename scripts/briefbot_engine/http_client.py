@@ -29,28 +29,35 @@ def _debug(msg: str) -> None:
         sys.stderr.flush()
 
 
-class HttpFailure(Exception):
+class TransportError(Exception):
     """Raised on HTTP or transport failures."""
 
-    def __init__(self, message: str, status_code: Optional[int] = None, response_body: Optional[str] = None):
+    def __init__(self, message: str, status_code: Optional[int] = None, response_body: Optional[str] = None, url: Optional[str] = None):
         super().__init__(message)
         self.status_code = status_code
         self.body = response_body
+        self.url = url
 
 
-HTTPError = HttpFailure
+HTTPError = TransportError
 
 
 @dataclass
 class RetryPolicy:
     attempts: int = DEFAULT_ATTEMPTS
-    min_wait: float = 0.35
-    max_wait: float = 4.0
+    base: float = 0.4
+    cap: float = 4.0
+    jitter: float = 0.25
 
-    def sleep(self, attempt_index: int) -> None:
-        base = self.min_wait * (2 ** attempt_index)
-        jitter = random.uniform(0.0, 0.2)
-        time.sleep(min(self.max_wait, base + jitter))
+    def delays(self):
+        total = max(1, int(self.attempts))
+        for attempt in range(total):
+            if attempt == 0:
+                yield 0.0
+                continue
+            backoff = min(self.cap, self.base * (2 ** (attempt - 1)))
+            wiggle = random.uniform(0.0, self.jitter)
+            yield backoff + wiggle
 
 
 def _retryable(code: int) -> bool:
@@ -63,7 +70,7 @@ def _decode_json(payload: str) -> Dict[str, Any]:
     try:
         parsed = json.loads(payload)
     except json.JSONDecodeError as exc:
-        raise HttpFailure(f"Malformed JSON payload: {exc}") from exc
+        raise TransportError(f"Malformed JSON payload: {exc}") from exc
     if isinstance(parsed, dict):
         return parsed
     return {"data": parsed}
@@ -75,7 +82,16 @@ def _prepare_payload(json_body: Optional[Mapping[str, Any]]) -> Optional[bytes]:
     return json.dumps(dict(json_body), ensure_ascii=False).encode("utf-8")
 
 
-class HttpClient:
+def _build_request(url: str, method: str, headers: Optional[Mapping[str, str]], payload: Optional[bytes]) -> urllib.request.Request:
+    combined = dict(headers or {})
+    combined.setdefault("User-Agent", USER_AGENT)
+    combined.setdefault("Accept", "application/json")
+    if payload is not None:
+        combined.setdefault("Content-Type", "application/json")
+    return urllib.request.Request(url, data=payload, headers=combined, method=method.upper())
+
+
+class JsonSession:
     """Minimal JSON HTTP client with retry handling."""
 
     def __init__(self, timeout: int = DEFAULT_TIMEOUT_SECONDS, retry_policy: Optional[RetryPolicy] = None):
@@ -90,20 +106,12 @@ class HttpClient:
         json_body: Optional[Mapping[str, Any]] = None,
     ) -> Dict[str, Any]:
         payload = _prepare_payload(json_body)
-        combined = dict(headers or {})
-        combined.setdefault("User-Agent", USER_AGENT)
-        if json_body is not None:
-            combined.setdefault("Content-Type", "application/json")
+        last_error: Optional[TransportError] = None
 
-        last_error: Optional[HttpFailure] = None
-        attempts = max(1, int(self.retry.attempts))
-        for attempt in range(attempts):
-            req = urllib.request.Request(
-                url,
-                data=payload,
-                headers=combined,
-                method=method.upper(),
-            )
+        for delay in self.retry.delays():
+            if delay:
+                time.sleep(delay)
+            req = _build_request(url, method, headers, payload)
             try:
                 with urllib.request.urlopen(req, timeout=self.timeout) as response:
                     raw = response.read().decode("utf-8")
@@ -115,24 +123,21 @@ class HttpClient:
                     body = exc.read().decode("utf-8")
                 except Exception:
                     body = ""
-                last_error = HttpFailure(f"Status {exc.code} {exc.reason}", exc.code, body or None)
+                last_error = TransportError(f"Status {exc.code} {exc.reason}", exc.code, body or None, url)
                 _debug(f"{method.upper()} {url} -> HTTP {exc.code}")
                 if not _retryable(exc.code):
                     raise last_error
             except urllib.error.URLError as exc:
                 reason = getattr(exc, "reason", exc)
-                last_error = HttpFailure(f"Transport error: {reason}")
+                last_error = TransportError(f"Transport error: {reason}", url=url)
                 _debug(f"Transport error for {url}: {reason}")
             except (ConnectionError, TimeoutError, OSError) as exc:
-                last_error = HttpFailure(f"{type(exc).__name__}: {exc}")
+                last_error = TransportError(f"{type(exc).__name__}: {exc}", url=url)
                 _debug(f"Connection failure for {url}: {exc}")
-
-            if attempt + 1 < attempts:
-                self.retry.sleep(attempt)
 
         if last_error is not None:
             raise last_error
-        raise HttpFailure("Request failed after retries")
+        raise TransportError("Request failed after retries", url=url)
 
 
 def request(
@@ -143,7 +148,7 @@ def request(
     timeout: int = DEFAULT_TIMEOUT_SECONDS,
     retries: int = DEFAULT_ATTEMPTS,
 ) -> Dict[str, Any]:
-    client = HttpClient(timeout=timeout, retry_policy=RetryPolicy(attempts=retries))
+    client = JsonSession(timeout=timeout, retry_policy=RetryPolicy(attempts=retries))
     return client.request_json(method, url, headers=headers, json_body=json_body)
 
 
@@ -160,19 +165,21 @@ def post(
     return request("POST", url, headers=headers, json_body=json_body, **kwargs)
 
 
-def _reddit_endpoint(path: str) -> str:
-    piece = (path or "").strip().rstrip("/")
-    if not piece:
-        piece = "/"
-    if not piece.startswith("/"):
-        piece = f"/{piece}"
-    if not piece.endswith(".json"):
-        piece = f"{piece}.json"
-    return piece
+def reddit_thread_url(path_or_url: str) -> str:
+    raw = (path_or_url or "").strip()
+    if not raw:
+        raw = "/"
+    if raw.startswith("http://") or raw.startswith("https://"):
+        parsed = urllib.parse.urlparse(raw)
+        raw = parsed.path or "/"
+    if not raw.startswith("/"):
+        raw = f"/{raw}"
+    if not raw.endswith(".json"):
+        raw = f"{raw}.json"
+    query = urllib.parse.urlencode({"raw_json": "1", "context": "0", "depth": "1", "limit": "50", "sort": "top"})
+    return f"https://www.reddit.com{raw}?{query}"
 
 
-def reddit_json(path: str) -> Dict[str, Any]:
-    endpoint = _reddit_endpoint(path)
-    query = urllib.parse.urlencode({"raw_json": "1", "context": "0"})
-    url = f"https://www.reddit.com{endpoint}?{query}"
+def reddit_json(path_or_url: str) -> Dict[str, Any]:
+    url = reddit_thread_url(path_or_url)
     return get(url, headers={"Accept": "application/json"})
