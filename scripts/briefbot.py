@@ -33,6 +33,7 @@ sys.path.insert(0, str(ROOT))
 from briefbot_engine import (
     config,
     content,
+    intent,
     net,
     output,
     ranking,
@@ -728,6 +729,17 @@ def main():
 
     _log(f"Models picked: openai={models_picked.get('openai')}, xai={models_picked.get('xai')}")
 
+    complexity_class, complexity_reason = intent.classify_complexity(args.topic)
+    epistemic_stance, epistemic_reason = intent.classify_epistemic_stance(args.topic)
+    decomposition = []
+    decomposition_source = "skipped"
+    if complexity_class == intent.COMPLEX_ANALYTICAL:
+        decomposition, decomposition_source = intent.decompose_query(
+            args.topic,
+            cfg.get("OPENAI_API_KEY"),
+            models_picked.get("openai"),
+        )
+
     mode_aliases = [
         ("both", "both"),
         ("all", "all"),
@@ -791,9 +803,10 @@ def main():
 
     # Combine all items then score -> dedupe -> rescore for final ranking
     all_items = filtered_reddit + filtered_x + filtered_youtube + filtered_linkedin
-    initial_ranked = ranking.rank_items(all_items)
+    source_weights = intent.stance_weights(epistemic_stance)
+    initial_ranked = ranking.rank_items(all_items, source_weights=source_weights)
     deduped_items = ranking.deduplicate(initial_ranked)
-    scored_items = ranking.rank_items(deduped_items)
+    scored_items = ranking.rank_items(deduped_items, source_weights=source_weights)
 
     progress.end_processing()
 
@@ -805,6 +818,12 @@ def main():
         display_mode,
         models_picked.get("openai"),
         models_picked.get("xai"),
+        complexity_class=complexity_class,
+        complexity_reason=complexity_reason,
+        epistemic_stance=epistemic_stance,
+        epistemic_reason=epistemic_reason,
+        decomposition=decomposition,
+        decomposition_source=decomposition_source,
     )
     report.items = deduped_items
     report.reddit_error = reddit_error
@@ -1033,8 +1052,17 @@ def output_report(
         print(f"Prioritize docs, blogs, changelogs, and news from the last {days} days.")
         print()
         print("Merge web findings with platform findings into a single synthesis.")
-        print("When confidence is close, prefer Reddit/X evidence above plain web links")
-        print("because social items include richer engagement signals.")
+        stance = (report.epistemic_stance or "").upper()
+        if stance == "FACTUAL_TEMPORAL":
+            print("When confidence is close, prefer authoritative web sources for factual claims.")
+        elif stance == "TRENDING_BREAKING":
+            print("When confidence is close, prefer X for real-time momentum signals.")
+        elif stance == "HOW_TO_TUTORIAL":
+            print("When confidence is close, prefer YouTube + docs for procedural guidance.")
+        elif stance == "EXPERIENTIAL_OPINION":
+            print("When confidence is close, prefer Reddit/X for lived experience and sentiment.")
+        else:
+            print("When confidence is close, prefer sources with the strongest engagement signals.")
         print(separator_line)
 
 

@@ -84,7 +84,7 @@ def _credibility(item: ContentItem) -> int:
 # Main ranking function
 # ---------------------------------------------------------------------------
 
-def rank_items(items: List[ContentItem]) -> List[ContentItem]:
+def rank_items(items: List[ContentItem], source_weights: Optional[dict] = None) -> List[ContentItem]:
     """Assign scores then return globally sorted items."""
     if not items:
         return items
@@ -94,8 +94,22 @@ def rank_items(items: List[ContentItem]) -> List[ContentItem]:
 
     _score_platform_items(platform_items)
     _score_web_items(web_items)
+    _apply_source_weights([*platform_items, *web_items], source_weights or {})
 
     return _sort_by_score([*platform_items, *web_items])
+
+
+def _apply_source_weights(items: List[ContentItem], source_weights: dict) -> None:
+    """Apply epistemic routing weights to final scores."""
+    if not items or not source_weights:
+        return
+    for item in items:
+        weight = float(source_weights.get(item.source.value, 1.0))
+        if weight == 1.0:
+            continue
+        adjusted = max(0, min(100, round(item.score * weight)))
+        item.score = adjusted
+        item.meta["stance_weight"] = weight
 
 
 def _score_platform_items(items: List[ContentItem]) -> None:

@@ -182,6 +182,12 @@ class Report:
     generated_at: str
     mode: str
     models: ModelUsage = field(default_factory=ModelUsage)
+    complexity_class: str = ""
+    complexity_reason: str = ""
+    epistemic_stance: str = ""
+    epistemic_reason: str = ""
+    decomposition: List[str] = field(default_factory=list)
+    decomposition_source: str = ""
     items: List[ContentItem] = field(default_factory=list)
     insights: InsightBundle = field(default_factory=InsightBundle)
     errors: ErrorBag = field(default_factory=ErrorBag)
@@ -263,6 +269,14 @@ class Report:
             "generated_at": self.generated_at,
             "mode": self.mode,
             "models": {"openai": self.models.openai, "xai": self.models.xai},
+            "intent": {
+                "complexity_class": self.complexity_class,
+                "complexity_reason": self.complexity_reason,
+                "epistemic_stance": self.epistemic_stance,
+                "epistemic_reason": self.epistemic_reason,
+                "decomposition": list(self.decomposition),
+                "decomposition_source": self.decomposition_source,
+            },
             "items": {
                 "reddit": [item.to_dict() for item in self.reddit],
                 "x": [item.to_dict() for item in self.x],
@@ -367,12 +381,20 @@ class Report:
             xai=models_block.get("xai", data.get("xai_model_used")),
         )
 
+        intent_block = data.get("intent", {}) if isinstance(data.get("intent"), dict) else {}
+
         return cls(
             topic=data["topic"],
             window=Window(start=start, end=end),
             generated_at=data["generated_at"],
             mode=data["mode"],
             models=models,
+            complexity_class=intent_block.get("complexity_class", ""),
+            complexity_reason=intent_block.get("complexity_reason", ""),
+            epistemic_stance=intent_block.get("epistemic_stance", ""),
+            epistemic_reason=intent_block.get("epistemic_reason", ""),
+            decomposition=intent_block.get("decomposition", []),
+            decomposition_source=intent_block.get("decomposition_source", ""),
             items=items,
             insights=insights,
             errors=errors,

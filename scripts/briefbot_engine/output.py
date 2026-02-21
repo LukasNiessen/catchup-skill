@@ -77,6 +77,26 @@ def compact(
     lines.append(" | ".join(summary_bits))
     lines.append("")
 
+    if report.complexity_class or report.epistemic_stance:
+        lines.append("### Query Diagnostics")
+        lines.append("")
+        if report.complexity_class:
+            lines.append(
+                f"- Complexity: {report.complexity_class} ({report.complexity_reason})"
+            )
+        if report.epistemic_stance:
+            lines.append(
+                f"- Epistemic stance: {report.epistemic_stance} ({report.epistemic_reason})"
+            )
+        if report.decomposition:
+            lines.append("- Decomposition:")
+            for idx, subq in enumerate(report.decomposition, start=1):
+                lines.append(f"  {idx}. {subq}")
+        elif report.complexity_class:
+            source = report.decomposition_source or "skipped"
+            lines.append(f"- Decomposition: {source}")
+        lines.append("")
+
     if report.mode == "web-only":
         lines.append("Web-only execution: supplement with external sources where possible.")
         lines.append("Add `OPENAI_API_KEY` and/or `XAI_API_KEY` in `~/.config/briefbot/briefbot.env` (or legacy `.env`) for richer platform data.")
@@ -328,6 +348,27 @@ def full_report(report: Report) -> str:
     if report.models.openai:
         lines.append(f"- **OpenAI:** {report.models.openai}")
     lines.append("")
+
+    if report.complexity_class or report.epistemic_stance:
+        lines.append("## Query Diagnostics")
+        lines.append("")
+        if report.complexity_class:
+            lines.append(
+                f"- **Complexity:** {report.complexity_class} ({report.complexity_reason})"
+            )
+        if report.epistemic_stance:
+            lines.append(
+                f"- **Epistemic stance:** {report.epistemic_stance} ({report.epistemic_reason})"
+            )
+        if report.decomposition:
+            lines.append("")
+            lines.append("**Decomposition:**")
+            for idx, subq in enumerate(report.decomposition, start=1):
+                lines.append(f"{idx}. {subq}")
+        elif report.complexity_class:
+            source = report.decomposition_source or "skipped"
+            lines.append(f"- **Decomposition:** {source}")
+        lines.append("")
 
     reddit_items = report.reddit
     if reddit_items:

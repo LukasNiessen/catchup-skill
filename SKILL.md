@@ -35,6 +35,8 @@ Before any tool calls, classify the request into these internal fields:
 4. **TURNED_OFF_SEARCH**: Whether user requested no web search
 5. **MOOD**: Tone preference inferred from wording (`hyped`, `skeptical`, `urgent`, `curious`, `neutral`)
 6. **REQUEST_STYLE**: Which response mode matches best:
+7. **COMPLEXITY_CLASS**: `BROAD_EXPLORATORY` vs `COMPLEX_ANALYTICAL`
+8. **EPISTEMIC_STANCE**: `EXPERIENTIAL_OPINION`, `FACTUAL_TEMPORAL`, `TRENDING_BREAKING`, `HOW_TO_TUTORIAL`, or `BALANCED`
 
 - **PROMPTING** - "X prompts", "prompting for X", "X best practices"
 - **RANKED_CHOICES** - "best X", "top X", "what X should I use", "recommended X"
@@ -60,6 +62,15 @@ Improved intent heuristics:
 - "paper/study/preprint/arxiv/journal/systematic review/meta-analysis" -> REQUEST_STYLE = PAPER
 - "celebrity/actor/singer/influencer/public figure" with update intent -> REQUEST_STYLE = CELEBRITY
 - "explain/what is/how does/X vs Y" -> REQUEST_STYLE = KNOWLEDGE
+- Complexity rules:
+  - Entity/topic or generic request ("NVIDIA", "Tech news") -> `BROAD_EXPLORATORY`
+  - Multi-hop/analytical question ("Why is NVIDIA's stock dropping despite high AI chip sales?") -> `COMPLEX_ANALYTICAL`
+- Epistemic stance rules:
+  - Opinion/sentiment/community -> `EXPERIENTIAL_OPINION`
+  - Factual/technical/timeline -> `FACTUAL_TEMPORAL`
+  - Trending/breaking news -> `TRENDING_BREAKING`
+  - How-to/tutorial -> `HOW_TO_TUTORIAL`
+  - Otherwise -> `BALANCED`
 
 **MUST DO: Store these internal variables:**
 
@@ -69,6 +80,8 @@ Improved intent heuristics:
 - `TARGET_PERSON_OR_COMPANY = [name or "none"]`
 - `MOOD = [hyped | skeptical | urgent | curious | neutral]`
 - `REQUEST_STYLE = [RANKED_CHOICES | PAPER | CELEBRITY | NEWS | PROMPTING | GENERAL | KNOWLEDGE]`
+- `COMPLEXITY_CLASS = [BROAD_EXPLORATORY | COMPLEX_ANALYTICAL]`
+- `EPISTEMIC_STANCE = [EXPERIENTIAL_OPINION | FACTUAL_TEMPORAL | TRENDING_BREAKING | HOW_TO_TUTORIAL | BALANCED]`
 
 ---
 
@@ -256,9 +269,25 @@ I will start researching now. This may take between 1 and 10 minutes.
 
 ---
 
+**Step 2: Optional query decomposition (after greeting, before Python)**
+
+If `COMPLEXITY_CLASS = COMPLEX_ANALYTICAL`, use the LLM to decompose the query into 3-5 sub-questions (what/when/why/who/technical barriers). If `BROAD_EXPLORATORY`, skip decomposition.
+
+**IMPORTANT:** Do NOT force it on simple entities or generic requests.
+
+**ALSO PRINT TO USER** the decomposition result right here (short list). If skipped, say so.
+
+---
+
+**Step 3: Light WebSearch seed pass**
+
+If search is allowed, run a LIGHT WebSearch first (2-3 quick queries). Wait for results. Extract 3-6 seed terms, entities, or sub-questions to guide deeper retrieval.
+
+---
+
 **If TURNED_OFF_SEARCH or REQUEST_STYLE = KNOWLEDGE, skip the rest of this entire section.**
 
-**Step 2: Run the research script**
+**Step 4: Run the research script**
 
 ONLY AFTER outputting the text above, invoke your Bash tool in the exact same turn using the command below.
 
@@ -282,7 +311,7 @@ Use a timeout of 10 minutes on this bash call. The script does:
 
 **MUST DO:** Read the FULL output. All of it is critical for you to know.
 
-**Step 3: Read run mode**
+**Step 5: Read run mode**
 
 Interpret run mode from script output:
 
@@ -290,11 +319,13 @@ Interpret run mode from script output:
 - **"Mode: both"** or **"Mode: reddit-only"** or **"Mode: x-only"**: Script found results, WebSearch is supplementary
 - **"Mode: web-only"**: No API keys, Claude must do ALL research via WebSearch
 
-**Step 4: Run WebSearch**
+**Step 6: Run WebSearch**
 
-**MUST DO:** IMPORTANT: Before you do a websearch, WAIT FOR THE SCRIPT TO FINISH.
+**MUST DO:** If tooling allows, run deep WebSearch in parallel with the script; otherwise wait for the script to finish first.
 
 This step, running the WebSearch, is ALWAYS NEEDED. In other words, RUN THE WEBSEARCH REGARDLESS OF WHICH REQUEST_STYLE.
+
+Use the LIGHT WebSearch seed terms from Step 3 to craft targeted, deeper queries. These deep WebSearch queries should run in parallel with the script whenever possible (or immediately after if tooling constraints prevent true parallelism). The goal is to let light WebSearch results steer both the WebSearch deep dive and the X/Reddit targeting.
 
 However, tailor your search queries to match the REQUEST_STYLE:
 
@@ -358,7 +389,7 @@ Apply these rules regardless of query class:
   - If the user typed "Flux LoRA training", search exactly that phrase
   - Do NOT inject related terms like "Stable Diffusion", "ComfyUI", etc. on your own
 
-**Step 5: Wait for background script to complete**
+**Step 7: Wait for background script to complete**
 Read TaskOutput and wait for script completion before synthesis.
 
 **Depth options** (from the user's command):
@@ -456,8 +487,9 @@ When ALL searches are finished, consolidate using a science-style evidence model
 4. **Spam penalty (LIGHT weight)**: De-rank spammy signals such as referral stuffing, copied listicles, thin affiliate pages, bot-like repost bursts
 5. **Consensus strength**: If something appears across all major source classes, treat as very high confidence
 6. **Contradictions**: Explicitly flag disagreements and say which side has stronger support
-7. **Output focus**: Distill 2-6 actionable insights
-8. **Metaphor layer**: Add short metaphors with emojis for key insights
+7. **Dialectical synthesis**: Do NOT homogenize conflicting information. If sources disagree, explicitly state the divergence.
+8. **Output focus**: Distill 2-6 actionable insights
+9. **Metaphor layer**: Add short metaphors with emojis for key insights
 
 ---
 
@@ -783,7 +815,9 @@ Hold onto these for the duration of the session:
 
 Do not launch fresh web searches for follow-up questions unless the topic changes materially. Keep answers practical, specific, and evidence-first. Draw on the Reddit threads, X posts, YouTube transcripts, web pages, and papers you already collected.
 
-The only reason to re-run the research pipeline is if the user explicitly changes to a completely different topic.
+**CRAG Self-Reflection Gate:** If the user asks a follow-up and your confidence that the existing context contains the answer is below 0.8, trigger a new micro-search (small, targeted WebSearch) before responding. If confidence is 0.8 or higher, answer using existing context.
+
+The only reason to re-run the full research pipeline is if the user explicitly changes to a completely different topic.
 
 ---
 

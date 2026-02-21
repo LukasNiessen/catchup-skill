@@ -80,10 +80,12 @@ def _build_prompt(
         "Date range: {} to {}".format(start_date, end_date),
         "",
         "Instructions:",
-        "1. Use WebSearch to find 8-15 relevant web pages about this topic",
-        "2. Exclude reddit.com, x.com, twitter.com (already covered by APIs)",
-        "3. Focus on: blogs, news articles, tutorials, documentation, GitHub repos",
-        "4. Prefer recent content within the date range",
+        "1. Run a LIGHT WebSearch (3-5 results) to discover key terms and sources",
+        "2. Use what you found to run TARGETED WebSearch queries",
+        "3. From the targeted searches, collect 8-15 relevant web pages",
+        "4. Exclude reddit.com, x.com, twitter.com (already covered by APIs)",
+        "5. Focus on: blogs, news articles, tutorials, documentation, GitHub repos",
+        "6. Prefer recent content within the date range",
     ]
 
     if existing_summary:
