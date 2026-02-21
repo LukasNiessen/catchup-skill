@@ -162,10 +162,14 @@ def parse_linkedin_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]
 
     if api_response.get("error"):
         err_data = api_response["error"]
-        err_msg = err_data.get("message", str(err_data)) if isinstance(err_data, dict) else str(err_data)
+        err_msg = (
+            err_data.get("message", str(err_data))
+            if isinstance(err_data, dict)
+            else str(err_data)
+        )
         _err(f"OpenAI API error: {err_msg}")
         if net.DEBUG:
-            _err(f"Full error response: {json.dumps(api_response, indent=2)[:1000]}")
+            _err(f"Full error response: {json.dumps(api_response, indent=2)[:700]}")
         return extracted
 
     output_text = ""
@@ -177,7 +181,10 @@ def parse_linkedin_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]
             if isinstance(elem, dict):
                 if elem.get("type") == "message":
                     for block in elem.get("content", []):
-                        if isinstance(block, dict) and block.get("type") == "output_text":
+                        if (
+                            isinstance(block, dict)
+                            and block.get("type") == "output_text"
+                        ):
                             output_text = block.get("text", "")
                             break
                 elif "text" in elem:
@@ -194,7 +201,10 @@ def parse_linkedin_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]
                 break
 
     if not output_text:
-        print(f"[LINKEDIN WARNING] No output text found in response. Keys: {list(api_response.keys())}", flush=True)
+        print(
+            f"[LINKEDIN WARNING] No output text found in response. Keys: {list(api_response.keys())}",
+            flush=True,
+        )
         return extracted
 
     raw_items = _extract_items(output_text)
@@ -216,15 +226,23 @@ def parse_linkedin_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]
             "role": str(raw.get("role", "")).strip(),
             "posted": raw.get("posted"),
             "metrics": {
-                "reactions": int(raw.get("metrics", {}).get("reactions", 0)) if raw.get("metrics", {}).get("reactions") else None,
-                "comments": int(raw.get("metrics", {}).get("comments", 0)) if raw.get("metrics", {}).get("comments") else None,
+                "reactions": (
+                    int(raw.get("metrics", {}).get("reactions", 0))
+                    if raw.get("metrics", {}).get("reactions")
+                    else None
+                ),
+                "comments": (
+                    int(raw.get("metrics", {}).get("comments", 0))
+                    if raw.get("metrics", {}).get("comments")
+                    else None
+                ),
             },
             "reason": str(raw.get("reason", "")).strip(),
             "signal": min(1.0, max(0.0, float(raw.get("signal", 0.5)))),
         }
 
         if item["posted"]:
-            if not re.match(r'^\d{4}-\d{2}-\d{2}$', str(item["posted"])):
+            if not re.match(r"^\d{4}-\d{2}-\d{2}$", str(item["posted"])):
                 item["posted"] = None
 
         validated.append(item)

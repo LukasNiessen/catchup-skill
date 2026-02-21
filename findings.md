@@ -1,344 +1,437 @@
-# Comparative Analysis: BriefBot vs Last30Days
+# Comparative Analysis: BriefBot vs. Last30Days
 
-**Date of analysis:** 2026-02-21
-**Method:** Full source-code comparison of current repo states (no git history examined)
-**Scope:** SKILL.md instruction files, Python engine code, architecture, data models, CLI design, output formatting
+**Date:** 2026-02-21
+**Scope:** Current repository states only (no git history)
+**Method:** File-by-file structural, algorithmic, and textual comparison of all source files
 
 ---
 
-## Strong Indicators
+## TL;DR
 
-These are findings where the similarity is so specific and structural that coincidence is highly unlikely.
+BriefBot's research engine is a systematic rename-and-restructure of Last30Days. Every core library module maps 1:1 to a renamed counterpart. Algorithms, control flow, error handling strings, test inputs, fixture structures, CLI flags, and even the README demo scenario are recognizably the same codebase with variable names swapped. BriefBot adds ~4,000+ lines of genuinely original code (scheduling, delivery, Telegram bot, audio/PDF generation), but the research pipeline foundation is derived from Last30Days.
 
-### S1. Identical Pipeline Architecture in SKILL.md
+---
 
-Both skills follow the **exact same execution pipeline** in the same order:
+## STRONG INDICATORS
 
-1. YAML frontmatter with `allowed-tools: Bash, Read, Write, AskUserQuestion, WebSearch`
-2. Parse user intent into named variables before any tool calls
-3. Display parsed intent to user before research
-4. Run Python script in **foreground** (explicitly: "do NOT use run_in_background")
-5. After script finishes, run WebSearch to supplement
-6. Synthesize all sources with weight hierarchy (Reddit/X > YouTube > Web)
-7. Display results by query type
-8. Show stats block with engagement totals
-9. Invitation with specific follow-up suggestions
-10. Wait for user response; answer from research, no new searches
+These findings alone would likely be sufficient to establish derivation.
 
-This is not a generic "research skill" pattern. The specific combination of steps, the explicit foreground instruction, the two-phase (Python + WebSearch) architecture, and the exact ordering are distinctive enough to constitute a signature.
+### S1. Perfect 1:1 Module Mapping
 
-### S2. Same Intent Classification System (Renamed)
+Every Last30Days library module has a direct renamed counterpart in BriefBot:
 
-| last30days        | briefbot         | Notes                  |
-| ----------------- | ---------------- | ---------------------- |
-| `TOPIC`           | `FOCUS_AREA`     | Same concept, renamed  |
-| `TARGET_TOOL`     | `USAGE_TARGET`   | Same concept, renamed  |
-| `QUERY_TYPE`      | `REQUEST_STYLE`  | Same concept, renamed  |
-| `PROMPTING`       | `PROMPTING`      | Identical category     |
-| `RECOMMENDATIONS` | `RANKED_CHOICES` | Same category, renamed |
-| `NEWS`            | `NEWS`           | Identical category     |
-| `GENERAL`         | `GENERAL`        | Identical category     |
+| Last30Days (`scripts/lib/`)  | BriefBot (`scripts/briefbot_engine/`) |
+| ---------------------------- | ------------------------------------- |
+| `env.py`                     | `config.py`                           |
+| `dates.py`                   | `temporal.py`                         |
+| `http.py`                    | `net.py`                              |
+| `models.py`                  | `providers/registry.py`               |
+| `openai_reddit.py`           | `providers/reddit.py`                 |
+| `xai_x.py`                   | `providers/twitter.py`                |
+| `reddit_enrich.py`           | `providers/enrich.py`                 |
+| `normalize.py` + `schema.py` | `content.py`                          |
+| `score.py` + `dedupe.py`     | `ranking.py`                          |
+| `render.py`                  | `output.py`                           |
+| `ui.py`                      | `terminal.py`                         |
+| `cache.py`                   | (cache in `providers/registry.py`)    |
 
-Briefbot adds `PAPER`, `CELEBRITY`, `KNOWLEDGE`, and `MOOD` — extensions beyond the original four, but the core 4-type system is a 1:1 mapping.
+No module is missing from this mapping. The only additions are `linkedin.py`, `web.py`, `claude_web.py`, `intent.py`, `paths.py`, and the delivery/scheduling subsystems.
 
-### S3. Nearly Identical WebSearch Query Templates
+### S2. Verbatim or Near-Verbatim Code Blocks
 
-Side-by-side comparison (last30days left, briefbot right):
+**Error message (character-for-character identical in both Python scripts):**
 
-**PROMPTING:**
+```python
+# last30days/scripts/last30days.py AND briefbot/scripts/briefbot.py:
+print("Error: Cannot use both --quick and --deep", file=sys.stderr)
+sys.exit(1)
+```
 
-- `{TOPIC} prompts examples 2026` vs `{FOCUS_AREA} prompt examples 2026`
-- `{TOPIC} techniques tips` vs `{FOCUS_AREA} prompt framework`
+**Error formatting pattern (identical template in both):**
 
-**NEWS:**
+```python
+# last30days:
+raw_openai = {"error": str(e)}
+reddit_error = f"API error: {e}"
+reddit_error = f"{type(e).__name__}: {e}"
 
-- `{TOPIC} news 2026` vs `{FOCUS_AREA} latest news 2026`
-- `{TOPIC} announcement update` vs `{FOCUS_AREA} breaking updates this week`
+# briefbot:
+response = {"error": str(network_err)}
+error = f"API error: {network_err}"
+error = f"{type(generic_err).__name__}: {generic_err}"
+```
 
-**RECOMMENDATIONS / RANKED_CHOICES:**
+**Logging format strings (identical):**
 
-- `best {TOPIC} recommendations` vs `best {FOCUS_AREA} 2026`
-- `most popular {TOPIC}` vs `most used {FOCUS_AREA} by teams`
+```python
+# last30days AND briefbot:
+sys.stderr.write(f"[REDDIT ERROR] {msg}\n")
+sys.stderr.write(f"[X ERROR] {msg}\n")
+```
 
-**GENERAL:**
+**xAI error debug dump (identical including the 1000-char truncation):**
 
-- `{TOPIC} 2026` vs `{FOCUS_AREA} 2026` (identical pattern)
-- `{TOPIC} discussion` vs `{FOCUS_AREA} community discussion`
+```python
+# both:
+f"xAI API error: {message}"
+f"Full error response: {json.dumps(response, indent=2)[:1000]}"
+```
 
-Both also share the **identical exclusion rule**: "SKIP reddit.com, x.com, twitter.com (the script already covers those)" and the **identical inclusion priority**: "blogs, tutorials, docs, news, GitHub repos."
+**Cached results message (identical down to the `--refresh` hint):**
 
-### S4. Report Dataclass — Same Fields, Same Structure
+```python
+# last30days:
+f"Using cached results{age_str} - use --refresh for fresh data"
 
-Both `Report` classes contain these fields (names differ slightly but semantics are 1:1):
+# briefbot:
+f"Using cached results{age_display} - use --refresh for fresh data"
+```
 
-| last30days `Report`             | briefbot `Report`                    |
-| ------------------------------- | ------------------------------------ |
-| `topic`                         | `topic`                              |
-| `range_from` / `range_to`       | `range_start` / `range_end`          |
-| `generated_at`                  | `generated_at`                       |
-| `mode`                          | `mode`                               |
-| `openai_model_used`             | `openai_model_used`                  |
-| `xai_model_used`                | `xai_model_used`                     |
-| `reddit: List[RedditItem]`      | `items` filtered by `Source.REDDIT`  |
-| `x: List[XItem]`                | `items` filtered by `Source.X`       |
-| `youtube: List[YouTubeItem]`    | `items` filtered by `Source.YOUTUBE` |
-| `web: List[WebSearchItem]`      | `items` filtered by `Source.WEB`     |
-| `best_practices: List[str]`     | `best_practices: List[str]`          |
-| `prompt_pack: List[str]`        | `prompt_pack: List[str]`             |
-| `context_snippet_md: str`       | `context_snippet_md: str`            |
-| `reddit_error`, `x_error`, etc. | `errors: Dict[str, str]`             |
-| `from_cache: bool`              | `from_cache: bool`                   |
-| `cache_age_hours`               | `cache_age_hours`                    |
+### S3. Mock Model Loading with Identical Dict-Spread Pattern
 
-The `best_practices`, `prompt_pack`, and `context_snippet_md` fields are particularly distinctive — they are not standard for a "research report" dataclass and appear in both with identical names and types.
+```python
+# last30days:
+selected_models = models.get_models(
+    {"OPENAI_API_KEY": "mock", "XAI_API_KEY": "mock", **config},
+    mock_openai_models, mock_xai_models,
+)
 
-### S5. Same Engagement Scoring Formula (log1p with Nearly Identical Weights)
+# briefbot:
+models_picked = registry.get_models(
+    {"OPENAI_API_KEY": "mock", "XAI_API_KEY": "mock", **cfg},
+    mock_openai_models, mock_xai_models,
+)
+```
 
-**Reddit engagement:**
+The dict-spread `{"OPENAI_API_KEY": "mock", "XAI_API_KEY": "mock", **config}` is a distinctive pattern unlikely to arise independently.
 
-- last30days: `0.55*log1p(score) + 0.40*log1p(comments) + 0.05*(ratio*10)`
-- briefbot: `0.48*log1p(upvotes) + 0.37*log1p(comments) + 0.15*(ratio*12)`
+### S4. Identical Test Inputs and Expected Outputs
 
-**X engagement:**
+Test files use the **same mock data values**:
 
-- last30days: `0.55*log1p(likes) + 0.25*log1p(reposts) + 0.15*log1p(replies) + 0.05*log1p(quotes)`
-- briefbot: `0.45*log1p(likes) + 0.28*log1p(reposts) + 0.17*log1p(replies) + 0.10*log1p(quotes)`
+- API key: `"fake-key"` (both)
+- Model IDs tested: `"gpt-5"`, `"gpt-5.2"`, `"gpt-5.2.1"`, `"gpt-5-mini"`, `"gpt-4"`, `"custom-model"` (both)
+- Mock timestamps: `1704067200`, `1701388800`, `1698710400` (both)
+- Error body for "unrelated 400" test: `"Invalid JSON in request body"` (both)
+- Expected results: identical tuples `(5,)`, `(5, 2)`, `(5, 2, 1)` (both)
+- Same test scenario structure: every last30days test has a corresponding briefbot test with renamed function name but same inputs/outputs
 
-Both use the same `math.log1p()` approach with four weighted components for X and three for Reddit. The weight ordering is identical (likes > reposts > replies > quotes). Both include a `safe_log1p` wrapper handling None/negative values identically.
+### S5. Identical CLI Flags with Same Names, Choices, Defaults, and Help Text
 
-### S6. Same Reddit Provider Architecture
+| Flag                 | Both                                                                 |
+| -------------------- | -------------------------------------------------------------------- |
+| `topic` (positional) | `nargs="?"`, help: `"Topic to research"`                             |
+| `--mock`             | `action="store_true"`, help: `"Use fixtures"`                        |
+| `--emit`             | choices include `"compact"`, `"json"`, `"md"`, `"context"`, `"path"` |
+| `--sources`          | choices include `"auto"`, `"reddit"`, `"x"`, `"both"`                |
+| `--quick`            | `action="store_true"`                                                |
+| `--deep`             | `action="store_true"`                                                |
+| `--debug`            | `action="store_true"`                                                |
+| `--days`             | `type=int`, default `30`                                             |
 
-Both use OpenAI's Responses API at `https://api.openai.com/v1/responses` with:
+### S6. Identical `run_research()` Function Structure
 
-- `"tools": [{"type": "web_search", "filters": {"allowed_domains": ["reddit.com"]}}]`
-- `"include": ["web_search_call.action.sources"]`
-- Model fallback chains (briefbot: gpt-4o-mini → gpt-4o; last30days: gpt-4.1 → gpt-4o → gpt-4o-mini)
-- Same error detection logic checking for "verified", "does not have access", "not available" in HTTP 400/403 responses
-- Same depth configurations (quick/default/deep with min/max targets)
-- Same search prompt structure: "extract core subject → search broadly → include all matches → return JSON"
+Both define a `run_research()` function with:
 
-### S7. Same Output Emit Modes
+- Same parameter pattern: `(topic, sources, config, models, from_date, to_date, depth="default", mock=False, progress=...)`
+- Same variable initialization:
 
-Both support the **exact same five modes** with the same names:
+```python
+# both:
+reddit_items = []
+x_items = []
+youtube_items = []
+raw_openai = None
+raw_xai = None
+raw_reddit_enriched = []
+reddit_error = None
+x_error = None
+youtube_error = None
+```
 
-- `compact` (default) — markdown for synthesis
-- `json` — full normalized data
-- `md` — human-readable markdown
-- `context` — compact snippet for embedding
-- `path` — file path only
+- Same `ThreadPoolExecutor` submit-and-collect pattern
+- Same progress callbacks: `progress.start_reddit()`, `progress.end_reddit(len(items))`, etc.
 
-### S8. Same CLI Flags and Semantics
+### S7. Cache Key Generation (Identical Algorithm)
 
-| Flag          | last30days                   | briefbot                     |
-| ------------- | ---------------------------- | ---------------------------- |
-| `--quick`     | 8-12 sources                 | 6-10 sources                 |
-| `--deep`      | 50-70 sources                | 50-80 sources                |
-| `--days=N`    | Lookback N days (default 30) | Lookback N days (default 30) |
-| `--emit=MODE` | Output format                | Output format                |
-| `--sources=`  | Source selection             | Source selection             |
-| `--mock`      | Test fixtures                | Test fixtures                |
-| `--debug`     | Verbose logging              | Verbose logging              |
+```python
+# last30days:
+raw = f"{topic}|{from_date}|{to_date}|{mode}"
+return hashlib.blake2s(raw.encode(), digest_size=8).hexdigest()
 
-### S9. Same Prompt Delivery Format
+# briefbot:
+raw = f"{topic}|{start}|{end}|{platform}"
+digest = hashlib.blake2s(raw.encode("utf-8"), digest_size=16).hexdigest()
+```
 
-Both SKILL.md files specify this exact output structure for delivering prompts:
+Same pipe-delimited format string, same `blake2s` hash function. Only digest size differs.
+
+### S8. Model Fallback Chain (Identical List Comprehension Pattern)
+
+```python
+# last30days:
+models_to_try = [model] + [m for m in MODEL_FALLBACK_ORDER if m != model]
+
+# briefbot:
+model_candidates = [model] + [candidate for candidate in FALLBACK_MODELS if candidate != model]
+```
+
+### S9. Identical Regex for GPT Mainline Check
+
+```python
+# both:
+re.match(r"^gpt-5(\.\d+)*$", model_id.lower())
+```
+
+Same regex, same `.lower()` normalization, same excluded variant list (`"mini"`, `"nano"`, `"chat"`, etc.).
+
+### S10. Reddit Enrichment -- Same Algorithm, Same Fields, Same Defaults
+
+Both parse Reddit thread JSON with:
+
+- Same `data[0]` for submission, `data[1]` for comments
+- Same `.get("data", {}).get("children", [])` traversal
+- Same `kind == "t1"` check for comments
+- Same `"[deleted]"` default for author
+- Same skip-pattern words: `"this"`, `"same"`, `"agreed"`, `"exactly"`, `"yep"`, `"nope"`, `"lol"`, `"lmao"`, `"haha"`, `"[deleted]"`, `"[removed]"`
+- Same `get_top_comments(limit=10)` sorting by score descending, filtering `{"[deleted]", "[removed]"}`
+
+### S11. Compact Rendering -- Same Section Order and Markdown Format
+
+Both `render_compact()` / `compact()` produce markdown with identical section ordering:
+
+1. Header with topic
+2. Sparse data warning
+3. Cache indicator
+4. Date range and mode metadata
+5. Missing key tips
+6. Reddit Threads (with engagement, date, confidence, insights `[:3]`)
+7. X Posts (with engagement, date, confidence)
+8. YouTube Videos
+9. Web Results
+
+The per-item format is structurally identical:
+
+```
+# last30days:
+**{item.id}** (score:{item.score}) r/{item.subreddit}{date_str}{conf_str}{eng_str}
+  {item.title}
+  {item.url}
+  *{item.why_relevant}*
+  Insights:
+    - {insight}
+
+# briefbot:
+**{item.uid}** [{item.score}] r/{subreddit}{date_str}{conf}{eng}
+  {item.title}
+  {item.link}
+  *{item.reason}*
+  Insights:
+    - {insight}
+```
+
+### S12. Terminal UI -- Same Method-for-Method Progress Class
+
+Both `ProgressDisplay`/`Progress` classes have identical method signatures:
+
+`start_reddit()`, `end_reddit(count)`, `start_reddit_enrich(current, total)`, `update_reddit_enrich(current, total)`, `end_reddit_enrich()`, `start_x()`, `end_x(count)`, `start_processing()`, `end_processing()`, `show_complete(reddit, x, youtube)`, `show_cached(age)`, `show_error(message)`, `start_web_only()`, `end_web_only()`, `show_web_only_complete()`, `show_promo(missing)`
+
+Same phase-to-color mapping: `"reddit"` -> yellow/amber, `"x"` -> cyan/azure, `"process"` -> purple/magenta, `"done"` -> green/lime, `"error"` -> red/crimson.
+
+### S13. Fixture Files -- Same Model IDs and Timestamps
+
+- Both `models_openai_sample.json` / `api_openai_models.json`: Same `{"object": "list", "data": [...]}` structure with same model IDs: `gpt-5.2`, `gpt-5.1`, `gpt-5`, `gpt-5-mini`, `gpt-4o`, `gpt-4-turbo`
+- Both `models_xai_sample.json` / `api_xai_models.json`: Same model IDs: `grok-4-latest`, `grok-4`, `grok-3`
+- Reddit thread fixtures: Both have array of two Listing objects with 8 comments each
+
+---
+
+## MEDIOCRE INDICATORS
+
+Significant but could theoretically arise from similar requirements.
+
+### M1. Systematic Field Renaming Table
+
+A consistent rename mapping applied across ALL modules simultaneously:
+
+| Last30Days              | BriefBot             |
+| ----------------------- | -------------------- |
+| `id`                    | `uid`                |
+| `url`                   | `link`               |
+| `date`                  | `posted`             |
+| `relevance`             | `signal`             |
+| `why_relevant`          | `reason`             |
+| `subreddit`             | `community`          |
+| `engagement`            | `metrics`            |
+| `score` (upvotes)       | `upvotes`            |
+| `num_comments`          | `comments`           |
+| `upvote_ratio`          | `vote_ratio`         |
+| `top_comments`          | `comment_cards`      |
+| `comment_insights`      | `comment_highlights` |
+| `text` (X posts)        | `excerpt`            |
+| `author_handle`         | `handle`             |
+| `source_domain`         | `domain`             |
+| `from_date` / `to_date` | `start` / `end`      |
+| `config`                | `cfg`                |
+| `selected_models`       | `models_picked`      |
+
+The uniformity of this mapping across every module suggests mechanical transformation.
+
+### M2. SKILL.md Intent Classification (Same Four Request Types with Same Trigger Phrases)
+
+```
+# last30days:
+- PROMPTING - "X prompts", "prompting for X"
+- RECOMMENDATIONS - "best X", "top X", "what X should I use"
+- NEWS - "what's happening with X", "X news"
+- GENERAL - anything else
+
+# briefbot:
+- PROMPTING - "X prompts", "prompting for X", "X best practices"
+- RANKED_CHOICES - "best X", "top X", "what X should I use", "recommended X"
+- NEWS - "what's happening with X", "X news", "latest on X"
+- GENERAL - community research requests not covered above
+```
+
+### M3. SKILL.md Three Critical WebSearch Rules (Same Order, Same Rationale)
+
+1. **Use user's exact wording** -- L30D: "USE THE USER'S EXACT TERMINOLOGY" / BB: "PRESERVE THE USER'S EXACT WORDING"
+2. **Exclude reddit/x/twitter** -- L30D: "EXCLUDE reddit.com, x.com, twitter.com (covered by script)" / BB: "SKIP reddit.com, x.com, twitter.com (the script already covers those)"
+3. **No sources list** -- L30D: "DO NOT output 'Sources:' list" / BB: "SUPPRESS any 'Sources:' list in output"
+
+### M4. SKILL.md Prompt-Writing Checklist (Same Five Items, Same Order)
+
+1. Format matches what research recommends
+2. Directly addresses what the user said they want
+3. Uses terminology/patterns from actual research
+4. Paste-ready with clearly marked `[PLACEHOLDER]` slots
+5. Appropriate length/style for the target tool
+
+Both use the same output template:
 
 ```
 Here's your prompt for {TARGET_TOOL / USAGE_TARGET}:
-
 ---
-
-[The actual prompt]
-
+[THE PROMPT]
 ---
-
-This uses [explanation of research insight applied].
+{explanation of research insight applied}
 ```
 
-Both also specify: "write ONE perfect prompt", "format must match what the research recommends", and warn against writing prose when research says JSON.
+### M5. HTTP Client -- Same stdlib-only Architecture
 
-### S10. Same "Nano Banana Pro" Example Throughout
+Both implement a custom HTTP client using `urllib.request` with:
 
-Both skills use "nano banana pro" as the primary worked example in SKILL.md, README.md, and argument hints. While this could reflect a shared interest in the topic, using the same niche example across both codebases is notable.
+- Custom error class `HTTPError(message, status_code, body)` with same fields
+- Same retry loop (catch `urllib.error.HTTPError`, `URLError`, `OSError/TimeoutError`)
+- Same "don't retry client errors except rate limits" logic
+- Same convenience `get()` and `post()` wrappers
+- Same `reddit_json()` function: ensure leading `/`, strip trailing `/`, append `.json`, construct `https://www.reddit.com{path}?raw_json=1`
 
-### S11. Same Freshness Assessment Function
+### M6. Scoring System -- Same Weighted Formula Architecture
 
-Both `output.py` (briefbot) and `render.py` (last30days) contain a freshness check function that:
+Both use multi-factor scoring:
 
-1. Counts recent items per source
-2. Returns a dict with `reddit_recent`, `x_recent`, `web_recent`, `total_recent`, `total_items`, `is_sparse`, `mostly_evergreen`
-3. `is_sparse` = total_recent < N (4 vs 5)
-4. `mostly_evergreen` = total_recent < total_items \* 0.25 (vs 0.3)
+1. Compute raw engagement composites per platform (Reddit: upvotes + comments + ratio; X: likes + reposts + replies + quotes)
+2. Normalize to 0-100 percentile
+3. Combine via weighted average of relevance + recency + engagement
+4. Apply penalty for missing engagement data
+5. Apply penalty for low date confidence
+6. Clamp to `max(0, min(100, ...))`
 
-The field names in the returned dict are **identical** across both projects.
+### M7. Config System -- Same env-over-file Pattern
 
-### S12. Same Date Confidence System
-
-Both use a three-tier system with identical names:
-
-- `"high"` — date falls within search window
-- `"med"` — date parsed but uncertain
-- `"low"` — date missing or outside range
-
-Both implement this via a function that takes `(date_str, from_date, to_date)` and returns the confidence string.
-
-### S13. Same Follow-Up Conversation Rules
-
-Both SKILL.md files contain nearly identical instructions:
-
-- "DO NOT run new WebSearches — you already have the research"
-- "Answer from what you learned"
-- "Only do new research if the user explicitly asks about a DIFFERENT topic"
-- "If they ask a question → answer from research, no new searches, no prompt"
-- "If they describe something to create → write ONE perfect prompt"
-- "Only produce 2-3 alternatives when explicitly asked"
-
----
-
-## Mediocre Indicators
-
-These findings show meaningful similarity but could plausibly arise from shared domain knowledge or common patterns.
-
-### M1. Same Config File Pattern
-
-Both store configuration at `~/.config/{skillname}/.env` with:
+Both load config from `~/.config/{skillname}/.env` with:
 
 - Same dotenv parsing (comments, quotes, key=value)
-- Environment variables taking precedence over file values
+- Environment variables taking precedence
 - Same key names: `OPENAI_API_KEY`, `XAI_API_KEY`, `OPENAI_MODEL_POLICY`, `XAI_MODEL_POLICY`
-- Same default values: `OPENAI_MODEL_POLICY=auto`, `XAI_MODEL_POLICY=latest`
+- Same source availability detection: check `has_openai` and `has_xai`, return `'both'`, `'reddit'`, `'x'`, or `'web'`
 
-### M2. Same `validate_sources()` Function Signature and Logic
+### M8. Same `validate_sources()` Branching Logic
 
-Both have a function: `validate_sources(requested, available, include_web) → (effective_sources, error_message)`
+Both handle: `auto` -> available, `web` -> always succeed, `both` -> check both keys, source-specific -> check matching key. Same mode strings.
 
-Both handle the same cases:
+### M9. Same Excluded Domains Set
 
-- `auto` maps to available platforms
-- `web` always succeeds
-- `both` checks if both keys exist
-- Source-specific requests check for matching keys
-- Same mode strings: "both", "reddit", "x", "web", "all", "reddit-web", "x-web"
+```python
+# last30days:
+{"reddit.com", "www.reddit.com", "old.reddit.com", "twitter.com", "www.twitter.com", "x.com", "www.x.com"}
 
-### M3. Same Three-Factor Scoring Architecture
+# briefbot (superset):
+{"reddit.com", "www.reddit.com", "old.reddit.com", "m.reddit.com", "twitter.com", "www.twitter.com", "x.com", "www.x.com", "nitter.net"}
+```
 
-Both score items on three dimensions:
+### M10. README Demo Scenario -- Same Flow with Substitutions
 
-1. Relevance (model-provided signal, 0-1 scaled to 0-100)
-2. Recency (days-ago based score, 0-100)
-3. Engagement (log-normalized, 0-100)
+Both READMEs demonstrate:
 
-Both apply:
+1. Research a Google image generation model's prompting techniques
+2. Then ask to "make a mockup of an app for moms who [activity]"
 
-- Separate scoring for web items (no engagement dimension)
-- Source penalty for web items
-- Date confidence penalties (low → penalty, high → bonus for web)
-- `max(0, min(100, score))` clamping
-
-### M4. Same ScoreParts / SubScores Concept
-
-Both have a dataclass tracking per-dimension scores:
-
-- last30days: `SubScores(relevance, recency, engagement)`
-- briefbot: `ScoreParts(signal, freshness, engagement)`
-
-Same fields, renamed.
-
-### M5. Same Source Priority in Sorting
-
-Both sort by: score (desc) → date (desc) → source priority (Reddit=0, X=1, YouTube=2, Web=3/4) → text (alphabetical tiebreaker).
-
-### M6. Both Use ThreadPoolExecutor(max_workers=4) for Parallel Searches
-
-Both launch Reddit, X, YouTube, and web searches in parallel using Python's `concurrent.futures.ThreadPoolExecutor`.
-
-### M7. Same Stats Block Content
-
-Both display engagement totals per platform with item counts. Briefbot uses a table format, last30days uses a tree format with emoji, but the content shown is the same: N threads/posts/videos, sum of upvotes/likes/views, top voices.
-
-### M8. Same "Grounding" Instruction
-
-Both SKILL.md files contain a nearly identical "grounding" section telling the assistant to:
-
-- Use research content as the only source of truth
-- Not conflate similar-named projects
-- Use exact product names, @handles, subreddit names as they appear
-- Not project pre-existing knowledge onto results
-
-### M9. Same `to_dict()` / `from_dict()` Serialization Pattern
-
-Both Report classes have `to_dict()` and `from_dict()` class methods with the same structure:
-
-- `to_dict()` serializes nested objects
-- `from_dict()` reconstructs from dict with engagement and comment reconstruction
-- Both handle the `range` field as a nested dict: `{"from": ..., "to": ...}`
+L30D: "Nano Banana Pro prompting" then "moms who swim"
+BB: "Aurora Canvas prompting" then "moms who cook"
 
 ---
 
-## Light Indicators
+## LIGHT INDICATORS
 
-These are similarities that are common in the domain or could arise independently.
+Individually weak, but part of the overall pattern.
 
-### L1. Both Use Python Dataclasses for Domain Models
+### L1. Same `--emit=compact` Flag Name
 
-Standard Python practice; not distinctive.
+Unusual flag name for output format selection, shared by both.
 
-### L2. Both Parse Dates with Multiple strptime Formats
+### L2. Same Date Utility Function Set
 
-Common pattern for handling API responses.
+Both implement the exact same set: `get_date_range(30)`, `parse_date()`, `timestamp_to_date()`, `get_date_confidence()`, `days_ago()`, `recency_score(max_days=30)`.
 
-### L3. Both Have README Examples with Worked Scenarios
+### L3. Same "Store These Variables" Pattern in SKILL.md
 
-Standard documentation practice.
+Both instruct the agent to store topic, target tool, patterns, and findings with `"unknown"` default.
 
-### L4. Both Use stderr for Logging
+### L4. Same Grounding Instructions
 
-Common pattern for CLI tools that output data on stdout.
+Both: "ground synthesis in ACTUAL research content, not pre-existing knowledge."
 
-### L5. Different Deduplication Algorithms
+### L5. Same Context Memory Rules
 
-last30days uses Jaccard similarity on character n-grams (threshold 0.7). Briefbot uses SimHash with FNV-1a and Hamming distance (threshold 10 bits). Different approaches, though both serve the same purpose and both keep the higher-scored item.
+Both: "Do not launch fresh web searches unless the topic changes."
 
-### L6. Different HTTP Clients (Both stdlib-based)
+### L6. Same Depth Tier Names
 
-Both implement HTTP without external dependencies, but the implementations differ: briefbot's `net.py` has a `RetryPolicy` class with configurable backoff; last30days' `http.py` has simpler retry logic.
+Both use `"quick"`, `"default"`, `"deep"` with min/max result counts.
 
-### L7. Briefbot Has Substantial Original Additions
+### L7. Same ANSI Color Class Pattern
 
-Features not present in last30days:
+Purple/magenta, blue/azure, cyan/teal, green/lime, yellow/amber, red/crimson, bold/emphasized, dim/subdued, reset/normal.
 
-- LinkedIn as a 5th source
-- Email delivery with HTML newsletter and PDF attachment
-- Telegram bot listener (receive and respond to messages)
-- Audio generation (ElevenLabs / edge-tts)
-- CRON scheduling with job registry
-- Setup wizard (interactive config)
-- KNOWLEDGE query type (direct-answer, no search)
-- MOOD system (hyped, skeptical, urgent, curious, neutral)
-- Evidence-Weighted Triangulation (EWT) framework
-- Harmonic mean scoring (vs linear weighted sum)
-- `> **Try next:**` auto-suggestion system
+### L8. Same `to_dict()` / `from_dict()` Sparse Serialization Pattern
 
-These additions represent significant engineering effort beyond what last30days provides.
+Both dataclasses use "only include non-None fields" in `to_dict()` and backward-compatible deserialization in `from_dict()`.
 
-### L8. Unified vs Per-Source Item Models
+### L9. Same Windows UTF-8 Fix
 
-last30days uses separate `RedditItem`, `XItem`, `YouTubeItem`, `WebSearchItem` classes. Briefbot unifies these into a single `ContentItem` with a `Source` enum. This is a structural refactoring, not just renaming.
+Both detect `sys.platform == "win32"` and call `sys.stdout.reconfigure(encoding="utf-8", errors="replace")`.
 
----
+### L10. No Attribution
 
-## Summary Statistics
+Zero mention of Last30Days in any BriefBot documentation, README, TODO, or SCIENCE_BEHIND_BOT.md.
 
-| Metric                           | Similarity Level                       |
-| -------------------------------- | -------------------------------------- |
-| Pipeline architecture (SKILL.md) | Near-identical                         |
-| Intent classification system     | 1:1 mapping (renamed)                  |
-| WebSearch query templates        | Near-identical                         |
-| Data model (Report)              | Identical fields                       |
-| Scoring approach                 | Same algorithm family, tweaked weights |
-| Provider architecture (Reddit)   | Same API, same pattern                 |
-| CLI flags                        | Same set                               |
-| Config system                    | Same pattern                           |
-| Output modes                     | Identical set                          |
-| Follow-up rules                  | Near-identical                         |
-| Additional features              | Substantial original work              |
+- Verbatim strings (`"Error: Cannot use both --quick and --deep"`), identical format patterns (`f"{type(e).__name__}: {e}"`), identical test data values (`1704067200`, `"fake-key"`)
+
+- the 1:1 module mapping
+  - Identical error format strings
+  - Identical test data values (timestamps like `1704067200`, mock keys like `"fake-key"`)
+  - Identical CLI flag names and help text
+  - A perfect 1:1 module mapping with systematic field renaming
+  - The same demo scenario (image model prompting -> app mockup for moms)
+
+2. **"Agentic coding" does not launder copyright**: If an AI coding tool was used to rewrite the code, the question is what the AI was given as input. If the AI was instructed to "rewrite this codebase with different variable names" or was given Last30Days code as context, the output is still a derivative work. Copyright law focuses on the _result_, not the _tool_ used to create it. Using a power tool to replicate a sculpture does not make the copy non-infringing.
+
+3. **The systematic renaming is itself evidence**: A developer who was "merely inspired" would not produce a codebase where every field, module, and function has a 1:1 renamed counterpart. The consistency of the renaming table (always `url`->`link`, always `date`->`posted`, always `relevance`->`signal`) suggests mechanical transformation, not independent creative expression.
+
+4. **Merger doctrine does not apply**: While there may be limited ways to call the OpenAI API or parse Reddit JSON, the _specific combination_ of algorithms, the _specific_ prompt-writing checklist, the _specific_ error messages, and the _specific_ scoring formula weights are creative choices with many alternatives. The merger doctrine (which excuses copying when there is only one way to express an idea) does not protect wholesale reproduction of a creative system's particular expression.
+
+5. **However, the original additions help somewhat**: BriefBot's ~4,000 lines of genuinely original code (scheduling, delivery, Telegram bot) show that the author added substantial value. This could mitigate damages but does not negate the infringement of the derived portions. A court might view BriefBot as a partially infringing work where the derived research engine is infringing but the original delivery/scheduling layer is not.
+
+**Bottom line**: The "inspiration only" defense is undermined by the volume and specificity of the textual evidence. Ideas are not copyrightable, but the particular _expression_ of those ideas is -- and the evidence shows expression-level copying, not mere idea-level inspiration.

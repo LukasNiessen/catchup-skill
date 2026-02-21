@@ -13,7 +13,7 @@ from . import registry
 
 
 def _err(msg: str) -> None:
-    sys.stderr.write(f"[X ERROR] {msg}\n")
+    sys.stderr.write(f"Error (X): {msg}\n")
     sys.stderr.flush()
 
 
@@ -77,7 +77,9 @@ def _make_request(
     }
 
     _log(f"  Endpoint: {API_URL}")
-    _log(f"  Payload model: {payload['model']}, tools: {[t['type'] for t in payload['tools']]}, input_length: {len(payload['input'][0]['content'])} chars")
+    _log(
+        f"  Payload model: {payload['model']}, tools: {[t['type'] for t in payload['tools']]}, input_length: {len(payload['input'][0]['content'])} chars"
+    )
     response = net.post(API_URL, payload, headers=headers, timeout=timeout)
     return response
 
@@ -248,7 +250,9 @@ def search(
     for fallback_model in fallbacks:
         tried.add(fallback_model)
         try:
-            response = _make_request(key, fallback_model, prompt_content, headers, timeout)
+            response = _make_request(
+                key, fallback_model, prompt_content, headers, timeout
+            )
             _err(f"Fallback succeeded with model '{fallback_model}'")
             registry.set_cached_model("xai", fallback_model)
             _log("=== search END (via fallback) ===")
@@ -260,12 +264,16 @@ def search(
             raise
 
     discovered = registry.discover_xai_models(key)
-    dynamic_candidates = [m for m in discovered if m.startswith("grok-") and m not in tried]
+    dynamic_candidates = [
+        m for m in discovered if m.startswith("grok-") and m not in tried
+    ]
 
     for fallback_model in dynamic_candidates:
         tried.add(fallback_model)
         try:
-            response = _make_request(key, fallback_model, prompt_content, headers, timeout)
+            response = _make_request(
+                key, fallback_model, prompt_content, headers, timeout
+            )
             _err(f"Dynamic fallback succeeded with model '{fallback_model}'")
             registry.set_cached_model("xai", fallback_model)
             _log("=== search END (via dynamic discovery) ===")
@@ -291,10 +299,12 @@ def parse_x_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]]:
 
     api_error = api_response.get("error")
     if api_error:
-        message = api_error.get("message") if isinstance(api_error, dict) else str(api_error)
+        message = (
+            api_error.get("message") if isinstance(api_error, dict) else str(api_error)
+        )
         _err(f"xAI API error: {message}")
         if net.DEBUG:
-            _err(f"Full error response: {json.dumps(api_response, indent=2)[:1000]}")
+            _err(f"Full error response: {json.dumps(api_response, indent=2)[:700]}")
         _log("=== parse_x_response END (api error) ===")
         return items
 

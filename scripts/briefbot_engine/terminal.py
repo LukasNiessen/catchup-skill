@@ -14,6 +14,7 @@ def _enable_windows_vt_processing():
         return
     try:
         import ctypes
+
         kernel32 = ctypes.windll.kernel32
         for handle_id in (-11, -12):
             handle = kernel32.GetStdHandle(handle_id)
@@ -33,20 +34,30 @@ IS_TTY = bool(getattr(sys.stderr, "isatty", lambda: False)())
 
 class Style:
     """ANSI escape codes for terminal styling."""
-    MAGENTA = '\033[38;5;171m'
-    AZURE = '\033[38;5;75m'
-    TEAL = '\033[38;5;44m'
-    LIME = '\033[38;5;40m'
-    AMBER = '\033[38;5;214m'
-    CRIMSON = '\033[38;5;196m'
-    EMPHASIZED = '\033[1m'
-    SUBDUED = '\033[2m'
-    NORMAL = '\033[0m'
+
+    MAGENTA = "\033[38;5;171m"
+    AZURE = "\033[38;5;75m"
+    TEAL = "\033[38;5;44m"
+    LIME = "\033[38;5;40m"
+    AMBER = "\033[38;5;214m"
+    CRIMSON = "\033[38;5;196m"
+    EMPHASIZED = "\033[1m"
+    SUBDUED = "\033[2m"
+    NORMAL = "\033[0m"
 
 
 if "NO_COLOR" in os.environ:
-    for _attr in ("MAGENTA", "AZURE", "TEAL", "LIME", "AMBER", "CRIMSON",
-                   "EMPHASIZED", "SUBDUED", "NORMAL"):
+    for _attr in (
+        "MAGENTA",
+        "AZURE",
+        "TEAL",
+        "LIME",
+        "AMBER",
+        "CRIMSON",
+        "EMPHASIZED",
+        "SUBDUED",
+        "NORMAL",
+    ):
         setattr(Style, _attr, "")
 
 
@@ -136,7 +147,7 @@ SINGLE_KEY_HINTS = {
     "x": f"\n{Style.SUBDUED}\U0001f4a1 Tip: Add {Style.TEAL}XAI_API_KEY{Style.NORMAL}{Style.SUBDUED} to ~/.config/briefbot/briefbot.env (or legacy .env) for X/Twitter data with real likes & reposts!{Style.NORMAL}\n",
 }
 
-SPIN_CHARS = ['\u25dc', '\u25dd', '\u25de', '\u25df']
+SPIN_CHARS = ["\u25dc", "\u25dd", "\u25de", "\u25df"]
 
 
 class Spinner:
@@ -153,7 +164,9 @@ class Spinner:
     def _animate(self):
         while self.active:
             frame = SPIN_CHARS[self.frame_position % len(SPIN_CHARS)]
-            sys.stderr.write(f"\r{self.style_code}{frame}{Style.NORMAL} {self.status_text}  ")
+            sys.stderr.write(
+                f"\r{self.style_code}{frame}{Style.NORMAL} {self.status_text}  "
+            )
             sys.stderr.flush()
             self.frame_position += 1
             time.sleep(0.1)
@@ -165,7 +178,9 @@ class Spinner:
             self.animation_thread.start()
         else:
             if not self.static_displayed:
-                sys.stderr.write(f"{self.style_code}\u25cf{Style.NORMAL} {self.status_text}\n")
+                sys.stderr.write(
+                    f"{self.style_code}\u25cf{Style.NORMAL} {self.status_text}\n"
+                )
                 sys.stderr.flush()
                 self.static_displayed = True
 
@@ -199,33 +214,46 @@ class Progress:
 
     def _display_header(self):
         sys.stderr.write(f"{COMPACT_HEADER}\n")
-        sys.stderr.write(f"{Style.SUBDUED}Topic: {Style.NORMAL}{Style.EMPHASIZED}{self.subject_matter}{Style.NORMAL}\n\n")
+        sys.stderr.write(
+            f"{Style.SUBDUED}Topic: {Style.NORMAL}{Style.EMPHASIZED}{self.subject_matter}{Style.NORMAL}\n\n"
+        )
         sys.stderr.flush()
 
     def start_reddit(self):
         msg = random.choice(REDDIT_MSGS)
-        self.indicator = Spinner(f"{Style.AMBER}Reddit{Style.NORMAL} {msg}", Style.AMBER)
+        self.indicator = Spinner(
+            f"{Style.AMBER}Reddit{Style.NORMAL} {msg}", Style.AMBER
+        )
         self.indicator.start()
 
     def end_reddit(self, item_count: int):
         if self.indicator:
-            self.indicator.stop(f"{Style.AMBER}Reddit{Style.NORMAL} Found {item_count} threads")
+            self.indicator.stop(
+                f"{Style.AMBER}Reddit{Style.NORMAL} Found {item_count} threads"
+            )
 
     def start_reddit_enrich(self, current_position: int, total_count: int):
         if self.indicator:
             self.indicator.stop()
         msg = random.choice(ENRICH_MSGS)
-        self.indicator = Spinner(f"{Style.AMBER}Reddit{Style.NORMAL} [{current_position}/{total_count}] {msg}", Style.AMBER)
+        self.indicator = Spinner(
+            f"{Style.AMBER}Reddit{Style.NORMAL} [{current_position}/{total_count}] {msg}",
+            Style.AMBER,
+        )
         self.indicator.start()
 
     def update_reddit_enrich(self, current_position: int, total_count: int):
         if self.indicator:
             msg = random.choice(ENRICH_MSGS)
-            self.indicator.update(f"{Style.AMBER}Reddit{Style.NORMAL} [{current_position}/{total_count}] {msg}")
+            self.indicator.update(
+                f"{Style.AMBER}Reddit{Style.NORMAL} [{current_position}/{total_count}] {msg}"
+            )
 
     def end_reddit_enrich(self):
         if self.indicator:
-            self.indicator.stop(f"{Style.AMBER}Reddit{Style.NORMAL} Enriched with engagement data")
+            self.indicator.stop(
+                f"{Style.AMBER}Reddit{Style.NORMAL} Enriched with engagement data"
+            )
 
     def start_x(self):
         msg = random.choice(X_MSGS)
@@ -234,39 +262,63 @@ class Progress:
 
     def end_x(self, item_count: int):
         if self.indicator:
-            self.indicator.stop(f"{Style.AZURE}X{Style.NORMAL} Found {item_count} posts")
+            self.indicator.stop(
+                f"{Style.AZURE}X{Style.NORMAL} Found {item_count} posts"
+            )
 
     def start_processing(self):
         msg = random.choice(PROCESS_MSGS)
-        self.indicator = Spinner(f"{Style.MAGENTA}Processing{Style.NORMAL} {msg}", Style.MAGENTA)
+        self.indicator = Spinner(
+            f"{Style.MAGENTA}Processing{Style.NORMAL} {msg}", Style.MAGENTA
+        )
         self.indicator.start()
 
     def end_processing(self):
         if self.indicator:
             self.indicator.stop()
 
-    def show_complete(self, reddit_count: int, x_count: int, youtube_count: int = 0, linkedin_count: int = 0):
+    def show_complete(
+        self,
+        reddit_count: int,
+        x_count: int,
+        youtube_count: int = 0,
+        linkedin_count: int = 0,
+    ):
         elapsed = time.time() - self.start_timestamp
         sep = f"{Style.SUBDUED}{Style.EMPHASIZED}\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500{Style.NORMAL}"
         sys.stderr.write(f"\n{sep}\n")
-        sys.stderr.write(f"{Style.LIME}{Style.EMPHASIZED}\u2713 Research complete{Style.NORMAL} ")
+        sys.stderr.write(
+            f"{Style.LIME}{Style.EMPHASIZED}\u2713 Research complete{Style.NORMAL} "
+        )
         sys.stderr.write(f"{Style.SUBDUED}({elapsed:.1f}s){Style.NORMAL}\n")
-        sys.stderr.write(f"  {Style.AMBER}Reddit:{Style.NORMAL} {reddit_count} threads  ")
+        sys.stderr.write(
+            f"  {Style.AMBER}Reddit:{Style.NORMAL} {reddit_count} threads  "
+        )
         sys.stderr.write(f"{Style.AZURE}X:{Style.NORMAL} {x_count} posts")
         if youtube_count > 0:
-            sys.stderr.write(f"  {Style.CRIMSON}YouTube:{Style.NORMAL} {youtube_count} videos")
+            sys.stderr.write(
+                f"  {Style.CRIMSON}YouTube:{Style.NORMAL} {youtube_count} videos"
+            )
         if linkedin_count > 0:
-            sys.stderr.write(f"  {Style.AZURE}LinkedIn:{Style.NORMAL} {linkedin_count} posts")
+            sys.stderr.write(
+                f"  {Style.AZURE}LinkedIn:{Style.NORMAL} {linkedin_count} posts"
+            )
         sys.stderr.write(f"\n{sep}\n\n")
         sys.stderr.flush()
 
     def show_cached(self, cache_age_hours: float = None):
-        age_display = f" ({cache_age_hours:.1f}h old)" if cache_age_hours is not None else ""
-        sys.stderr.write(f"{Style.LIME}\u26a1{Style.NORMAL} {Style.SUBDUED}Using cached results{age_display} - use --refresh for fresh data{Style.NORMAL}\n\n")
+        age_display = (
+            f" ({cache_age_hours:.1f}h old)" if cache_age_hours is not None else ""
+        )
+        sys.stderr.write(
+            f"{Style.LIME}\u26a1{Style.NORMAL} {Style.SUBDUED}Hint: Using cached results {age_display}. You can use --refresh to circumvent the cache{Style.NORMAL}\n\n"
+        )
         sys.stderr.flush()
 
     def show_error(self, error_description: str):
-        sys.stderr.write(f"{Style.CRIMSON}\u2717 Error:{Style.NORMAL} {error_description}\n")
+        sys.stderr.write(
+            f"{Style.CRIMSON}\u2717 Error:{Style.NORMAL} {error_description}\n"
+        )
         sys.stderr.flush()
 
     def start_web_only(self):
@@ -276,26 +328,36 @@ class Progress:
 
     def end_web_only(self):
         if self.indicator:
-            self.indicator.stop(f"{Style.LIME}Web{Style.NORMAL} Claude will search the web")
+            self.indicator.stop(
+                f"{Style.LIME}Web{Style.NORMAL} Claude will search the web"
+            )
 
     def show_web_only_complete(self):
         elapsed = time.time() - self.start_timestamp
         sep = f"{Style.SUBDUED}{Style.EMPHASIZED}\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500{Style.NORMAL}"
         sys.stderr.write(f"\n{sep}\n")
-        sys.stderr.write(f"{Style.LIME}{Style.EMPHASIZED}\u2713 Ready for web search{Style.NORMAL} ")
+        sys.stderr.write(
+            f"{Style.LIME}{Style.EMPHASIZED}\u2713 Ready for web search{Style.NORMAL} "
+        )
         sys.stderr.write(f"{Style.SUBDUED}({elapsed:.1f}s){Style.NORMAL}\n")
-        sys.stderr.write(f"  {Style.LIME}Web:{Style.NORMAL} Claude will search blogs, docs & news\n")
+        sys.stderr.write(
+            f"  {Style.LIME}Web:{Style.NORMAL} Claude will search blogs, docs & news\n"
+        )
         sys.stderr.write(f"{sep}\n\n")
         sys.stderr.flush()
 
     def start_tts(self):
         msg = random.choice(TTS_MSGS)
-        self.indicator = Spinner(f"{Style.MAGENTA}Audio{Style.NORMAL} {msg}", Style.MAGENTA)
+        self.indicator = Spinner(
+            f"{Style.MAGENTA}Audio{Style.NORMAL} {msg}", Style.MAGENTA
+        )
         self.indicator.start()
 
     def end_tts(self, output_file: str):
         if self.indicator:
-            self.indicator.stop(f"{Style.MAGENTA}Audio{Style.NORMAL} Saved to {output_file}")
+            self.indicator.stop(
+                f"{Style.MAGENTA}Audio{Style.NORMAL} Saved to {output_file}"
+            )
 
     def show_promo(self, missing_keys: str = "both"):
         if missing_keys == "both":
@@ -319,4 +381,3 @@ def phase_status(phase_name: str, status_text: str):
     color = phase_styles.get(phase_name, Style.NORMAL)
     sys.stderr.write(f"{color}\u25b8{Style.NORMAL} {status_text}\n")
     sys.stderr.flush()
-

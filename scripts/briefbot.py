@@ -8,6 +8,7 @@ import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
+
 def _configure_stdio_utf8() -> None:
     """Ensure Windows consoles can render unicode output safely."""
     if sys.platform != "win32":
@@ -25,6 +26,7 @@ def _log(message: str):
     if os.environ.get("BRIEFBOT_DEBUG", "").lower() in ("1", "true", "yes", "on"):
         sys.stderr.write(f"[BRIEFBOT] {message}\n")
         sys.stderr.flush()
+
 
 # Ensure library modules are discoverable
 ROOT = Path(__file__).parent.resolve()
@@ -115,17 +117,19 @@ def _query_reddit(
                     end_date,
                     depth=depth,
                 )
-                supplemental_items = reddit.parse_reddit_response(
-                    supplemental_response
-                )
+                supplemental_items = reddit.parse_reddit_response(supplemental_response)
 
                 by_url = {}
                 for base_item in items:
-                    item_url = str(base_item.get("link", base_item.get("url", ""))).strip()
+                    item_url = str(
+                        base_item.get("link", base_item.get("url", ""))
+                    ).strip()
                     if item_url:
                         by_url[item_url] = base_item
                 for extra_item in supplemental_items:
-                    item_url = str(extra_item.get("link", extra_item.get("url", ""))).strip()
+                    item_url = str(
+                        extra_item.get("link", extra_item.get("url", ""))
+                    ).strip()
                     if item_url and item_url not in by_url:
                         by_url[item_url] = extra_item
                 if by_url:
@@ -173,7 +177,9 @@ def _query_x(
 
     if has_xai:
         _log("  PATH: xAI API (paid, direct)")
-        _log(f"  Calling twitter.search(key={xai_key_preview}, model={models_picked.get('xai')}, topic='{topic[:50]}', dates={start_date}->{end_date}, depth={depth})")
+        _log(
+            f"  Calling twitter.search(key={xai_key_preview}, model={models_picked.get('xai')}, topic='{topic[:50]}', dates={start_date}->{end_date}, depth={depth})"
+        )
         try:
             response = twitter.search(
                 cfg["XAI_API_KEY"],
@@ -183,11 +189,15 @@ def _query_x(
                 end_date,
                 depth=depth,
             )
-            _log(f"  xAI API call succeeded, response keys: {list(response.keys()) if isinstance(response, dict) else type(response).__name__}")
+            _log(
+                f"  xAI API call succeeded, response keys: {list(response.keys()) if isinstance(response, dict) else type(response).__name__}"
+            )
         except net.HTTPError as network_err:
             response = {"error": str(network_err)}
             error = f"API error: {network_err}"
-            _log(f"  xAI API HTTP ERROR: {network_err} (status={getattr(network_err, 'status_code', '?')}, body={(getattr(network_err, 'body', '') or '')[:300]})")
+            _log(
+                f"  xAI API HTTP ERROR: {network_err} (status={getattr(network_err, 'status_code', '?')}, body={(getattr(network_err, 'body', '') or '')[:300]})"
+            )
         except Exception as generic_err:
             response = {"error": str(generic_err)}
             error = f"{type(generic_err).__name__}: {generic_err}"
@@ -197,9 +207,7 @@ def _query_x(
         _log(f"  xAI parsed {len(items)} items")
     else:
         _log("  PATH: NO X BACKEND AVAILABLE (no xAI key)")
-        response = {
-            "error": "No X search backend available (no xAI key configured)"
-        }
+        response = {"error": "No X search backend available (no xAI key configured)"}
         error = "No X search backend available"
         items = []
 
@@ -352,9 +360,7 @@ def run_research(
     should_query_reddit = platform in reddit_platforms and openai_available
     should_query_x = platform in x_platforms and x_available
     should_query_youtube = platform in youtube_platforms and openai_available
-    should_query_linkedin = (
-        platform in linkedin_platforms and openai_available
-    )
+    should_query_linkedin = platform in linkedin_platforms and openai_available
 
     _log(f"  should_query_reddit: {should_query_reddit}")
     _log(f"  should_query_x: {should_query_x}")
@@ -436,7 +442,7 @@ def run_research(
                 reddit_error = source_error
                 if progress is not None:
                     if reddit_error:
-                        progress.show_error(f"Reddit error: {reddit_error}")
+                        progress.show_error(f"Error (Reddit): {reddit_error}")
                     progress.end_reddit(len(reddit_items))
             elif source == "x":
                 x_items = items
@@ -444,7 +450,7 @@ def run_research(
                 x_error = source_error
                 if progress is not None:
                     if x_error:
-                        progress.show_error(f"X error: {x_error}")
+                        progress.show_error(f"Error (X): {x_error}")
                     progress.end_x(len(x_items))
             elif source == "youtube":
                 youtube_items = items
@@ -683,12 +689,12 @@ def main():
     if args.mock:
         platform = "both" if args.sources == "auto" else args.sources
     else:
-        resolution = config.resolve_sources(
-            args.sources, platforms, args.include_web
-        )
+        resolution = config.resolve_sources(args.sources, platforms, args.include_web)
         platform = resolution.mode
 
-        _log(f"Source resolution: platform='{platform}', severity={resolution.severity}, message={resolution.message}")
+        _log(
+            f"Source resolution: platform='{platform}', severity={resolution.severity}, message={resolution.message}"
+        )
 
         if resolution.message:
             if resolution.severity == "warn":
@@ -708,12 +714,8 @@ def main():
         progress.show_promo(missing_keys)
 
     if args.mock:
-        mock_openai_models = load_fixture("api_openai_models.json").get(
-            "data", []
-        )
-        mock_xai_models = load_fixture("api_xai_models.json").get(
-            "data", []
-        )
+        mock_openai_models = load_fixture("api_openai_models.json").get("data", [])
+        mock_xai_models = load_fixture("api_xai_models.json").get("data", [])
 
         models_picked = registry.get_models(
             {
@@ -727,7 +729,9 @@ def main():
     else:
         models_picked = registry.get_models(cfg)
 
-    _log(f"Models picked: openai={models_picked.get('openai')}, xai={models_picked.get('xai')}")
+    _log(
+        f"Models picked: openai={models_picked.get('openai')}, xai={models_picked.get('xai')}"
+    )
 
     complexity_class, complexity_reason = intent.classify_complexity(args.topic)
     epistemic_stance, epistemic_reason = intent.classify_epistemic_stance(args.topic)
@@ -790,10 +794,16 @@ def main():
     # Convert raw dicts to unified ContentItems
     from briefbot_engine.content import Source, items_from_raw, filter_by_date
 
-    normalized_reddit = items_from_raw(reddit_items, Source.REDDIT, start_date, end_date)
+    normalized_reddit = items_from_raw(
+        reddit_items, Source.REDDIT, start_date, end_date
+    )
     normalized_x = items_from_raw(x_items, Source.X, start_date, end_date)
-    normalized_youtube = items_from_raw(youtube_items, Source.YOUTUBE, start_date, end_date)
-    normalized_linkedin = items_from_raw(linkedin_items, Source.LINKEDIN, start_date, end_date)
+    normalized_youtube = items_from_raw(
+        youtube_items, Source.YOUTUBE, start_date, end_date
+    )
+    normalized_linkedin = items_from_raw(
+        linkedin_items, Source.LINKEDIN, start_date, end_date
+    )
 
     # Apply strict date filtering
     filtered_reddit = filter_by_date(normalized_reddit, start_date, end_date)
@@ -901,7 +911,9 @@ def _list_jobs():
             print("    Audio:    enabled")
         print(f"    Runs:     {job.get('run_count', 0)}")
         if job.get("last_run"):
-            print(f"    Last run: {job['last_run']} ({job.get('last_status', 'unknown')})")
+            print(
+                f"    Last run: {job['last_run']} ({job.get('last_status', 'unknown')})"
+            )
         if job.get("last_error"):
             print(f"    Error:    {job['last_error']}")
         print()
@@ -1049,20 +1061,30 @@ def output_report(
         print()
         print("Run WebSearch and gather 8-15 non-social sources.")
         print("Exclude reddit.com, x.com, and twitter.com (already covered above).")
-        print(f"Prioritize docs, blogs, changelogs, and news from the last {days} days.")
+        print(
+            f"Prioritize docs, blogs, changelogs, and news from the last {days} days."
+        )
         print()
         print("Merge web findings with platform findings into a single synthesis.")
         stance = (report.epistemic_stance or "").upper()
         if stance == "FACTUAL_TEMPORAL":
-            print("When confidence is close, prefer authoritative web sources for factual claims.")
+            print(
+                "When confidence is close, prefer authoritative web sources for factual claims."
+            )
         elif stance == "TRENDING_BREAKING":
             print("When confidence is close, prefer X for real-time momentum signals.")
         elif stance == "HOW_TO_TUTORIAL":
-            print("When confidence is close, prefer YouTube + docs for procedural guidance.")
+            print(
+                "When confidence is close, prefer YouTube + docs for procedural guidance."
+            )
         elif stance == "EXPERIENTIAL_OPINION":
-            print("When confidence is close, prefer Reddit/X for lived experience and sentiment.")
+            print(
+                "When confidence is close, prefer Reddit/X for lived experience and sentiment."
+            )
         else:
-            print("When confidence is close, prefer sources with the strongest engagement signals.")
+            print(
+                "When confidence is close, prefer sources with the strongest engagement signals."
+            )
         print(separator_line)
 
 

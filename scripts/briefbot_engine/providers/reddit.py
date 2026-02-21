@@ -13,12 +13,12 @@ FALLBACK_MODELS = ["gpt-4o", "gpt-4o-mini"]
 
 
 def _err(msg: str) -> None:
-    sys.stderr.write(f"[REDDIT ERROR] {msg}\n")
+    sys.stderr.write(f"Error (Reddit): {msg}\n")
     sys.stderr.flush()
 
 
 def _info(msg: str) -> None:
-    sys.stderr.write(f"[REDDIT] {msg}\n")
+    sys.stderr.write(f"(Reddit): {msg}\n")
     sys.stderr.flush()
 
 
@@ -97,7 +97,11 @@ def compress_topic(verbose_query: str) -> str:
     lowered = verbose_query.lower()
     for pattern in _FILLERS:
         lowered = re.sub(pattern, " ", lowered)
-    tokens = [tok for tok in re.findall(r"[a-z0-9][a-z0-9.+_-]*", lowered) if tok not in _STOPWORDS]
+    tokens = [
+        tok
+        for tok in re.findall(r"[a-z0-9][a-z0-9.+_-]*", lowered)
+        if tok not in _STOPWORDS
+    ]
     if len(tokens) <= 4:
         return " ".join(tokens) or verbose_query
     return " ".join(tokens[:4])
@@ -211,7 +215,9 @@ def search(
     max_items = depth_spec["max"]
     headers = {"Authorization": f"Bearer {key}"}
     timeout = {"quick": 60, "default": 90, "deep": 150}.get(depth, 90)
-    model_candidates = [model] + [candidate for candidate in FALLBACK_MODELS if candidate != model]
+    model_candidates = [model] + [
+        candidate for candidate in FALLBACK_MODELS if candidate != model
+    ]
     prompt = REDDIT_DISCOVERY_PROMPT.format(
         topic=topic,
         from_date=start,
@@ -228,7 +234,9 @@ def search(
                 {"role": "system", "content": "You are a research scout for Reddit."},
                 {"role": "user", "content": prompt},
             ],
-            "tools": [{"type": "web_search", "filters": {"allowed_domains": ["reddit.com"]}}],
+            "tools": [
+                {"type": "web_search", "filters": {"allowed_domains": ["reddit.com"]}}
+            ],
             "temperature": 0.2,
             "max_output_tokens": 1200,
         }
@@ -256,15 +264,19 @@ def search(
 def parse_reddit_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]]:
     api_error = api_response.get("error")
     if api_error:
-        message = api_error.get("message") if isinstance(api_error, dict) else str(api_error)
+        message = (
+            api_error.get("message") if isinstance(api_error, dict) else str(api_error)
+        )
         _err(f"OpenAI API error: {message}")
         if net.DEBUG:
-            _err(f"Error payload snapshot: {json.dumps(api_response, indent=2)[:1000]}")
+            _err(f"Error payload snapshot: {json.dumps(api_response, indent=2)[:700]}")
         return []
 
     raw_text = _pick_output_text(api_response)
     if not raw_text:
-        _err(f"No text output returned by model. Response keys: {sorted(api_response.keys())}")
+        _err(
+            f"No text output returned by model. Response keys: {sorted(api_response.keys())}"
+        )
         return []
 
     raw_items = _extract_threads_blob(raw_text)
