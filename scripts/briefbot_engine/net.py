@@ -1,80 +1,138 @@
-"""HTTP client with retry logic using only stdlib."""
+"""HTTP utilities and lightweight retry logic."""
+
+from __future__ import annotations
 
 import json
 import os
+import random
 import sys
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from typing import Any, Dict, Optional
+from dataclasses import dataclass
+from typing import Any, Dict, Mapping, Optional
 
-TIMEOUT = 25
-MAX_RETRIES = 4
-BACKOFF = 0.75
-USER_AGENT = "briefbot-skill/1.0 (Claude Code Skill)"
-
-DEBUG = os.environ.get("BRIEFBOT_DEBUG", "").lower() in ("1", "true", "yes")
+DEFAULT_TIMEOUT_SECONDS = 26
+DEFAULT_ATTEMPTS = 3
+USER_AGENT = "briefbot-net/2026.2"
+DEBUG = False
 
 
-def _debug(msg: str):
-    """Write a debug message to stderr if debug mode is on."""
-    if DEBUG:
+def _debug_enabled() -> bool:
+    return DEBUG or os.environ.get("BRIEFBOT_DEBUG", "").lower() in ("1", "true", "yes", "on")
+
+
+def _debug(msg: str) -> None:
+    if _debug_enabled():
         sys.stderr.write(f"[NET] {msg}\n")
         sys.stderr.flush()
 
 
-class NetworkFailure(Exception):
-    """Network request failure with optional status code and raw body."""
+class ApiError(Exception):
+    """Raised on HTTP or transport failures."""
 
-    def __init__(
-        self,
-        description: str,
-        status_code: Optional[int] = None,
-        response_body: Optional[str] = None,
-    ):
-        super().__init__(description)
+    def __init__(self, message: str, status_code: Optional[int] = None, response_body: Optional[str] = None):
+        super().__init__(message)
         self.status_code = status_code
         self.body = response_body
 
 
-# Backward-compatible alias used across the codebase and tests.
-HTTPError = NetworkFailure
+HTTPError = ApiError
 
 
-def _retry_delay(attempt_index: int) -> float:
-    return BACKOFF * (1.6 ** attempt_index) + (attempt_index * 0.09)
+@dataclass
+class RetryPolicy:
+    attempts: int = DEFAULT_ATTEMPTS
+    min_wait: float = 0.35
+    max_wait: float = 4.0
+
+    def sleep(self, attempt_index: int) -> None:
+        base = self.min_wait * (2 ** attempt_index)
+        jitter = random.uniform(0.0, 0.2)
+        time.sleep(min(self.max_wait, base + jitter))
 
 
-def _can_retry_status(status_code: int) -> bool:
-    if status_code in (429, 503, 504):
-        return True
-    return status_code >= 500
+def _retryable(code: int) -> bool:
+    return code in (408, 425, 429, 500, 502, 503, 504) or code >= 520
 
 
-def _prepare_request(
-    method: str,
-    url: str,
-    headers: Optional[Dict[str, str]],
-    json_body: Optional[Dict[str, Any]],
-) -> urllib.request.Request:
-    outgoing_headers = dict(headers or {})
-    outgoing_headers.setdefault("User-Agent", USER_AGENT)
-    payload = None
-    if json_body is not None:
-        outgoing_headers.setdefault("Content-Type", "application/json")
-        payload = json.dumps(json_body).encode("utf-8")
-    return urllib.request.Request(url, data=payload, headers=outgoing_headers, method=method.upper())
-
-
-def _decode_json_or_raise(body_text: str) -> Dict[str, Any]:
-    if not body_text:
+def _decode_json(payload: str) -> Dict[str, Any]:
+    if not payload:
         return {}
     try:
-        return json.loads(body_text)
+        parsed = json.loads(payload)
     except json.JSONDecodeError as exc:
-        _debug(f"JSON decode error: {exc}")
-        raise NetworkFailure(f"Invalid JSON response: {exc}") from exc
+        raise ApiError(f"Invalid JSON payload: {exc}") from exc
+    if isinstance(parsed, dict):
+        return parsed
+    return {"data": parsed}
+
+
+def _prepare_payload(json_body: Optional[Mapping[str, Any]]) -> Optional[bytes]:
+    if json_body is None:
+        return None
+    return json.dumps(dict(json_body), ensure_ascii=False).encode("utf-8")
+
+
+class HttpClient:
+    """Minimal JSON HTTP client with retry handling."""
+
+    def __init__(self, timeout: int = DEFAULT_TIMEOUT_SECONDS, retry_policy: Optional[RetryPolicy] = None):
+        self.timeout = timeout
+        self.retry = retry_policy or RetryPolicy()
+
+    def request_json(
+        self,
+        method: str,
+        url: str,
+        headers: Optional[Mapping[str, str]] = None,
+        json_body: Optional[Mapping[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        payload = _prepare_payload(json_body)
+        combined = dict(headers or {})
+        combined.setdefault("User-Agent", USER_AGENT)
+        if json_body is not None:
+            combined.setdefault("Content-Type", "application/json")
+
+        last_error: Optional[ApiError] = None
+        attempts = max(1, int(self.retry.attempts))
+        for attempt in range(attempts):
+            req = urllib.request.Request(
+                url,
+                data=payload,
+                headers=combined,
+                method=method.upper(),
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=self.timeout) as response:
+                    raw = response.read().decode("utf-8")
+                    _debug(f"{method.upper()} {url} -> {response.status} ({len(raw)} bytes)")
+                    return _decode_json(raw)
+            except urllib.error.HTTPError as exc:
+                body = ""
+                try:
+                    body = exc.read().decode("utf-8")
+                except Exception:
+                    body = ""
+                last_error = ApiError(f"HTTP {exc.code}: {exc.reason}", exc.code, body or None)
+                _debug(f"{method.upper()} {url} -> HTTP {exc.code}")
+                if not _retryable(exc.code):
+                    raise last_error
+            except urllib.error.URLError as exc:
+                reason = getattr(exc, "reason", exc)
+                last_error = ApiError(f"Transport error: {reason}")
+                _debug(f"Transport error for {url}: {reason}")
+            except (ConnectionError, TimeoutError, OSError) as exc:
+                last_error = ApiError(f"{type(exc).__name__}: {exc}")
+                _debug(f"Connection failure for {url}: {exc}")
+
+            if attempt + 1 < attempts:
+                self.retry.sleep(attempt)
+
+        if last_error is not None:
+            raise last_error
+        raise ApiError("Request failed without a captured error")
 
 
 def request(
@@ -82,55 +140,14 @@ def request(
     url: str,
     headers: Optional[Dict[str, str]] = None,
     json_body: Optional[Dict[str, Any]] = None,
-    timeout: int = TIMEOUT,
-    retries: int = MAX_RETRIES,
+    timeout: int = DEFAULT_TIMEOUT_SECONDS,
+    retries: int = DEFAULT_ATTEMPTS,
 ) -> Dict[str, Any]:
-    """Execute an HTTP request with automatic retry and return parsed JSON."""
-    _debug(f"{method.upper()} {url}")
-    if isinstance(json_body, dict):
-        _debug(f"Payload keys: {sorted(json_body.keys())}")
-
-    last_error: Optional[NetworkFailure] = None
-    for attempt in range(max(1, retries)):
-        req = _prepare_request(method, url, headers, json_body)
-        try:
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
-                body = resp.read().decode("utf-8")
-                _debug(f"Response: {resp.status} ({len(body)} bytes)")
-                return _decode_json_or_raise(body)
-        except urllib.error.HTTPError as exc:
-            raw_body = None
-            try:
-                raw_body = exc.read().decode("utf-8")
-            except Exception:
-                raw_body = None
-            _debug(f"HTTP Error {exc.code}: {exc.reason}")
-            if raw_body:
-                _debug(f"Error body: {raw_body[:500]}")
-            last_error = NetworkFailure(
-                f"HTTP {exc.code}: {exc.reason}", exc.code, raw_body
-            )
-            if not _can_retry_status(exc.code):
-                raise last_error
-        except urllib.error.URLError as exc:
-            reason = getattr(exc, "reason", exc)
-            _debug(f"URL Error: {reason}")
-            last_error = NetworkFailure(f"URL Error: {reason}")
-        except (OSError, TimeoutError, ConnectionResetError) as exc:
-            label = type(exc).__name__
-            _debug(f"Connection error: {label}: {exc}")
-            last_error = NetworkFailure(f"Connection error: {label}: {exc}")
-
-        if attempt < retries - 1:
-            time.sleep(_retry_delay(attempt))
-
-    if last_error is not None:
-        raise last_error
-    raise NetworkFailure("All retry attempts exhausted without a response")
+    client = HttpClient(timeout=timeout, retry_policy=RetryPolicy(attempts=retries))
+    return client.request_json(method, url, headers=headers, json_body=json_body)
 
 
 def get(url: str, headers: Optional[Dict[str, str]] = None, **kwargs) -> Dict[str, Any]:
-    """Convenience wrapper for GET requests."""
     return request("GET", url, headers=headers, **kwargs)
 
 
@@ -140,28 +157,22 @@ def post(
     headers: Optional[Dict[str, str]] = None,
     **kwargs,
 ) -> Dict[str, Any]:
-    """Convenience wrapper for POST requests with JSON body."""
     return request("POST", url, headers=headers, json_body=json_body, **kwargs)
 
 
-def _normalize_reddit_endpoint(path: str) -> str:
-    candidate = (path or "").strip().rstrip("/")
-    if not candidate:
-        candidate = "/"
-    if not candidate.startswith("/"):
-        candidate = f"/{candidate}"
-    if not candidate.endswith(".json"):
-        candidate = f"{candidate}.json"
-    return candidate
+def _reddit_endpoint(path: str) -> str:
+    piece = (path or "").strip().rstrip("/")
+    if not piece:
+        piece = "/"
+    if not piece.startswith("/"):
+        piece = f"/{piece}"
+    if not piece.endswith(".json"):
+        piece = f"{piece}.json"
+    return piece
 
 
 def reddit_json(path: str) -> Dict[str, Any]:
-    """Fetch Reddit JSON payload for a thread-like URL path."""
-    endpoint = _normalize_reddit_endpoint(path)
+    endpoint = _reddit_endpoint(path)
     query = urllib.parse.urlencode({"raw_json": "1"})
-    target = f"https://www.reddit.com{endpoint}?{query}"
-    request_headers = {
-        "User-Agent": USER_AGENT,
-        "Accept": "application/json",
-    }
-    return get(target, headers=request_headers)
+    url = f"https://www.reddit.com{endpoint}?{query}"
+    return get(url, headers={"Accept": "application/json"})

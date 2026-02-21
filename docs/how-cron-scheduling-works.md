@@ -66,3 +66,5 @@ Scheduled jobs invoke `claude -p` (non-interactive print mode) to perform web se
 | `scripts/lib/jobs.py` | Job registry CRUD (`~/.config/briefbot/jobs.json`) |
 | `scripts/lib/cron_parse.py` | Cron expression parser + Windows schtasks translation |
 | `scripts/lib/email_sender.py` | SMTP email with markdown-to-HTML |
+
+

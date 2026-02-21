@@ -1,4 +1,4 @@
-"""Terminal UI components: spinners, progress bars, and styled output."""
+"""Terminal progress UI primitives."""
 
 import os
 import sys
@@ -28,17 +28,17 @@ def _enable_windows_vt_processing():
 
 _enable_windows_vt_processing()
 
-IS_TTY = sys.stderr.isatty()
+IS_TTY = bool(getattr(sys.stderr, "isatty", lambda: False)())
 
 
 class Style:
     """ANSI escape codes for terminal styling."""
-    MAGENTA = '\033[95m'
-    AZURE = '\033[94m'
-    TEAL = '\033[96m'
-    LIME = '\033[92m'
-    AMBER = '\033[93m'
-    CRIMSON = '\033[91m'
+    MAGENTA = '\033[38;5;171m'
+    AZURE = '\033[38;5;75m'
+    TEAL = '\033[38;5;44m'
+    LIME = '\033[38;5;40m'
+    AMBER = '\033[38;5;214m'
+    CRIMSON = '\033[38;5;196m'
     EMPHASIZED = '\033[1m'
     SUBDUED = '\033[2m'
     NORMAL = '\033[0m'
@@ -136,7 +136,7 @@ SINGLE_KEY_HINTS = {
     "x": f"\n{Style.SUBDUED}\U0001f4a1 Tip: Add {Style.TEAL}XAI_API_KEY{Style.NORMAL}{Style.SUBDUED} to ~/.config/briefbot/.env for X/Twitter data with real likes & reposts!{Style.NORMAL}\n",
 }
 
-SPIN_CHARS = ['\u2190', '\u2196', '\u2191', '\u2197', '\u2192', '\u2198', '\u2193', '\u2199']
+SPIN_CHARS = ['\u25dc', '\u25dd', '\u25de', '\u25df']
 
 
 class Spinner:
@@ -151,12 +151,12 @@ class Spinner:
         self.static_displayed = False
 
     def _animate(self):
-        for tick in iter(lambda: self.active, False):
+        while self.active:
             frame = SPIN_CHARS[self.frame_position % len(SPIN_CHARS)]
             sys.stderr.write(f"\r{self.style_code}{frame}{Style.NORMAL} {self.status_text}  ")
             sys.stderr.flush()
             self.frame_position += 1
-            time.sleep(0.12)
+            time.sleep(0.1)
 
     def start(self):
         self.active = True
@@ -180,7 +180,7 @@ class Spinner:
         if self.animation_thread:
             self.animation_thread.join(timeout=0.35)
         if IS_TTY:
-            sys.stderr.write("\r" + " " * 120 + "\r")
+            sys.stderr.write("\r" + (" " * 120) + "\r")
         if completion_message:
             sys.stderr.write(f"{Style.LIME}\u2713{Style.NORMAL} {completion_message}\n")
         sys.stderr.flush()
@@ -319,3 +319,4 @@ def phase_status(phase_name: str, status_text: str):
     color = phase_styles.get(phase_name, Style.NORMAL)
     sys.stderr.write(f"{color}\u25b8{Style.NORMAL} {status_text}\n")
     sys.stderr.flush()
+

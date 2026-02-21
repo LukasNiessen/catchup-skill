@@ -1,4 +1,4 @@
-"""Reddit thread hydration utilities."""
+"""Reddit thread hydration and comment-signal extraction."""
 
 import re
 from typing import Any, Dict, List, Optional, Tuple
@@ -7,8 +7,8 @@ from urllib.parse import urlparse
 from .. import net, temporal
 
 _TRIVIAL_REPLIES = (
-    r"^(yep|nope|same|agreed|this|exactly|thanks|thank\s*you|yes|no|ok|okay|got it)\.?!?$",
-    r"^(lol|lmao|rofl|haha|heh|lmfao)+$",
+    r"^(yep|nope|same|agreed|this|exactly|yes|no|ok|okay|got it|\+1)\.?!?$",
+    r"^(lol|lmao|rofl|haha|heh|lmfao|based)+$",
     r"^\[(deleted|removed)\]$",
 )
 _SKIP_AUTHORS = {"[deleted]", "[removed]"}
@@ -54,7 +54,8 @@ def _children(raw_listing: Any) -> List[Dict[str, Any]]:
 def _read_submission(raw_data: Any) -> Optional[Dict[str, Any]]:
     if not isinstance(raw_data, list) or not raw_data:
         return None
-    for child in _children(raw_data[0]):
+    submission_listing = raw_data[0]
+    for child in _children(submission_listing):
         payload = child.get("data", {})
         if not isinstance(payload, dict):
             continue
@@ -73,7 +74,7 @@ def _read_submission(raw_data: Any) -> Optional[Dict[str, Any]]:
 def _read_comments(raw_data: Any) -> List[Dict[str, Any]]:
     if not isinstance(raw_data, list) or len(raw_data) < 2:
         return []
-    parsed: List[Dict[str, Any]] = []
+    comments: List[Dict[str, Any]] = []
     for child in _children(raw_data[1]):
         if not isinstance(child, dict) or child.get("kind") != "t1":
             continue
@@ -83,7 +84,7 @@ def _read_comments(raw_data: Any) -> List[Dict[str, Any]]:
         body = str(payload.get("body") or "").strip()
         if not body:
             continue
-        parsed.append(
+        comments.append(
             {
                 "score": payload.get("score", 0),
                 "created_utc": payload.get("created_utc"),
@@ -92,7 +93,7 @@ def _read_comments(raw_data: Any) -> List[Dict[str, Any]]:
                 "permalink": payload.get("permalink"),
             }
         )
-    return parsed
+    return comments
 
 
 def _decode_thread_payload(raw_data: Any) -> Tuple[Optional[Dict[str, Any]], List[Dict[str, Any]]]:
@@ -104,9 +105,9 @@ def _decode_thread_payload(raw_data: Any) -> Tuple[Optional[Dict[str, Any]], Lis
 
 def _top_comments(comments: List[Dict], limit: int = 10) -> List[Dict[str, Any]]:
     """Return highest-scoring comments from non-removed authors."""
-    filtered = [c for c in comments if c.get("author") not in _SKIP_AUTHORS]
-    filtered.sort(key=lambda c: int(c.get("score") or 0), reverse=True)
-    return filtered[: max(limit, 0)]
+    ranked = [row for row in comments if row.get("author") not in _SKIP_AUTHORS]
+    ranked.sort(key=lambda row: int(row.get("score") or 0), reverse=True)
+    return ranked[: max(limit, 0)]
 
 
 def _excerpt(text: str, hard_limit: int = 180, min_boundary_index: int = 60) -> str:
@@ -122,9 +123,9 @@ def _excerpt(text: str, hard_limit: int = 180, min_boundary_index: int = 60) -> 
 def _extract_insights(comments: List[Dict], limit: int = 6) -> List[str]:
     """Pull substantive insights from top comments, skipping low-value noise."""
     insights: List[str] = []
-    for comment in comments[: limit * 3]:
+    for comment in comments[: limit * 4]:
         body = str(comment.get("body") or "").strip()
-        if len(body) < 25:
+        if len(body) < 28:
             continue
         lowered = body.lower()
         if any(re.match(pattern, lowered) for pattern in _TRIVIAL_REPLIES):
@@ -140,33 +141,33 @@ def enrich(
     mock_json: Optional[Dict] = None,
 ) -> Dict[str, Any]:
     """Augment a Reddit item with thread-derived engagement metadata."""
-    thread_data = _load_thread_json(item.get("url", ""), mock_json)
+    thread_data = _load_thread_json(item.get("link", ""), mock_json)
     if thread_data is None:
         return item
 
     submission, comment_list = _decode_thread_payload(thread_data)
 
     if submission is not None:
-        item["engagement"] = {
-            "score": submission.get("score"),
-            "num_comments": submission.get("num_comments"),
-            "upvote_ratio": submission.get("upvote_ratio"),
+        item["metrics"] = {
+            "upvotes": submission.get("score"),
+            "comments": submission.get("num_comments"),
+            "vote_ratio": submission.get("upvote_ratio"),
         }
         created_utc = submission.get("created_utc")
         if created_utc is not None:
-            item["date"] = temporal.to_date_str(created_utc)
+            item["posted"] = temporal.to_date_str(created_utc)
 
     top = _top_comments(comment_list, limit=10)
-    item["top_comments"] = [
+    item["comment_cards"] = [
         {
             "score": c.get("score", 0),
-            "date": temporal.to_date_str(c.get("created_utc")),
+            "posted": temporal.to_date_str(c.get("created_utc")),
             "author": c.get("author", ""),
             "excerpt": str(c.get("body", ""))[:250],
-            "url": f"https://www.reddit.com{c.get('permalink', '')}" if c.get("permalink") else "",
+            "link": f"https://www.reddit.com{c.get('permalink', '')}" if c.get("permalink") else "",
         }
         for c in top
     ]
-    item["comment_insights"] = _extract_insights(top)
+    item["comment_highlights"] = _extract_insights(top)
 
     return item

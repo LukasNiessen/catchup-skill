@@ -129,15 +129,15 @@ def test_parse_x_response_handles_json_with_metadata_before_items():
 Here is the data:
 {
   "meta": {"model": "grok-4-1-fast"},
-  "items": [
+  "posts": [
     {
-      "text": "hello world",
-      "url": "https://x.com/u/status/1",
-      "author_handle": "u",
-      "date": "2026-02-20",
-      "engagement": {"likes": 1, "reposts": 2, "replies": 3, "quotes": 4},
-      "why_relevant": "test",
-      "relevance": 0.9
+      "excerpt": "hello world",
+      "link": "https://x.com/u/status/1",
+      "handle": "u",
+      "posted": "2026-02-20",
+      "metrics": {"likes": 1, "reposts": 2, "replies": 3, "quotes": 4},
+      "reason": "test",
+      "signal": 0.9
     }
   ]
 }
@@ -149,5 +149,5 @@ Here is the data:
     }
     items = twitter.parse_x_response(response)
     assert len(items) == 1
-    assert items[0]["id"] == "X1"
-    assert items[0]["author_handle"] == "u"
+    assert items[0]["uid"] == "X1"
+    assert items[0]["handle"] == "u"

@@ -363,3 +363,5 @@ def send_report_email(
         server.sendmail(sender, recipients, msg.as_string())
     finally:
         server.quit()
+
+

@@ -55,11 +55,11 @@ def process_results(
         if not isinstance(raw, dict):
             continue
 
-        url = raw.get("url", "")
-        if not url:
+        link = raw.get("url", "")
+        if not link:
             continue
 
-        if _is_excluded(url):
+        if _is_excluded(link):
             continue
 
         title = str(raw.get("title", "")).strip()
@@ -75,7 +75,7 @@ def process_results(
         if result_date and re.match(r'^\d{4}-\d{2}-\d{2}$', str(result_date)):
             confidence = "med"
         else:
-            detected, det_conf = temporal.detect(url, snippet, title)
+            detected, det_conf = temporal.detect(link, snippet, title)
             if detected:
                 result_date = detected
                 confidence = det_conf
@@ -96,15 +96,15 @@ def process_results(
             relevance = 0.45
 
         processed.append({
-            "id": f"W{len(processed) + 1}",
+            "uid": f"W{len(processed) + 1}",
             "title": title[:250],
-            "url": url,
-            "source_domain": _domain(url),
+            "link": link,
+            "domain": _domain(link),
             "snippet": snippet[:400],
-            "date": result_date,
-            "date_confidence": confidence,
-            "relevance": relevance,
-            "why_relevant": str(raw.get("why_relevant", "")).strip(),
+            "posted": result_date,
+            "date_quality": confidence,
+            "signal": relevance,
+            "reason": str(raw.get("why_relevant", "")).strip(),
         })
 
     return processed
@@ -130,7 +130,7 @@ def dedup_urls(items: List[ContentItem]) -> List[ContentItem]:
     unique = []
 
     for item in items:
-        normalised = item.permalink.lower().rstrip("/")
+        normalised = item.link.lower().rstrip("/")
         # Strip www. prefix for more aggressive dedup
         normalised = re.sub(r'^(https?://)www\.', r'\1', normalised)
         # Remove query parameters

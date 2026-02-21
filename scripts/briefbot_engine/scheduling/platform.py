@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 from . import cron
+from .. import paths
 
 
 # Tag format used to identify briefbot entries in crontab
@@ -70,8 +71,9 @@ def _register_crontab(job: Dict[str, Any], runner_path: Path) -> str:
     tag = "{}{}".format(CRONTAB_TAG_PREFIX, job_id)
 
     # Build the cron line
-    cron_command = '{} "{}" {} >> ~/.config/briefbot/logs/{}.log 2>&1'.format(
-        python_exe, runner_path, job_id, job_id
+    log_dir = paths.logs_dir()
+    cron_command = '{} "{}" {} >> "{}/{}.log" 2>&1'.format(
+        python_exe, runner_path, job_id, str(log_dir).replace('"', ""), job_id
     )
     cron_line = "{} {} {}".format(schedule, cron_command, tag)
 
@@ -182,3 +184,4 @@ def _unregister_schtasks(job: Dict[str, Any]) -> str:
         raise RuntimeError("Failed to delete scheduled task: {}".format(stderr))
 
     return "Removed Windows task: {}".format(task_name)
+

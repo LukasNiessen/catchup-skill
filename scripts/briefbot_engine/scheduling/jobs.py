@@ -13,9 +13,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from .. import paths
 
-JOBS_DIRECTORY = Path.home() / ".config" / "briefbot"
-JOBS_FILEPATH = JOBS_DIRECTORY / "jobs.json"
+
+JOBS_DIRECTORY = paths.root_dir()
+JOBS_FILEPATH = paths.jobs_file()
 
 
 def _generate_job_id() -> str:
@@ -172,3 +174,5 @@ def update_job_run_status(
             return True
 
     return False
+
+

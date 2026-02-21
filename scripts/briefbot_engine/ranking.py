@@ -1,20 +1,20 @@
-"""Percentile-harmonic scoring and SimHash deduplication for content items."""
+"""Ranking and near-duplicate suppression for aggregated items."""
 
 from datetime import datetime
 from typing import List, Optional
 
 from . import temporal
-from .content import ContentItem, ScoreBreakdown, Source
+from .content import ContentItem, ScoreParts, Source
 
 
 # ---------------------------------------------------------------------------
 # Scoring weights and penalties
 # ---------------------------------------------------------------------------
 
-DIMENSION_WEIGHTS = {"relevance": 0.42, "recency": 0.31, "engagement": 0.27}
-WEB_DIMENSION_WEIGHTS = {"relevance": 0.64, "recency": 0.36}
+PLATFORM_WEIGHTS = {"signal": 0.42, "freshness": 0.31, "engagement": 0.27}
+WEB_WEIGHTS = {"signal": 0.64, "freshness": 0.36}
 
-BASELINE_ENGAGEMENT = 48
+MISSING_ENGAGEMENT_FALLBACK = 48
 MISSING_ENGAGEMENT_PENALTY = 6
 WEB_SOURCE_PENALTY = 7
 WEB_DATE_BONUS = 9
@@ -27,41 +27,30 @@ WEB_DATE_PENALTY = 10
 
 def _percentile_ranks(values: List[Optional[float]], fallback: float = 50) -> List[float]:
     """Convert raw values to percentile ranks (0-100) across the batch."""
-    valid = [(i, v) for i, v in enumerate(values) if v is not None]
+    valid = [(idx, value) for idx, value in enumerate(values) if value is not None]
     if not valid:
         return [fallback if v is None else 50.0 for v in values]
 
-    # Sort by value to assign percentile ranks
     sorted_valid = sorted(valid, key=lambda pair: pair[1])
     n = len(sorted_valid)
 
-    rank_map = {}
-    for rank_idx, (orig_idx, _val) in enumerate(sorted_valid):
-        rank_map[orig_idx] = (rank_idx / max(n - 1, 1)) * 100
+    rank_by_index = {}
+    for rank_idx, (item_idx, _value) in enumerate(sorted_valid):
+        rank_by_index[item_idx] = (rank_idx / max(1, n - 1)) * 100
 
-    result = []
-    for i, v in enumerate(values):
-        if v is None:
-            result.append(None)
-        else:
-            result.append(rank_map[i])
-    return result
+    return [None if value is None else rank_by_index[idx] for idx, value in enumerate(values)]
 
 
 # ---------------------------------------------------------------------------
 # Harmonic mean combiner
 # ---------------------------------------------------------------------------
 
-def _weighted_harmonic_mean(
-    values: List[float],
-    weights: List[float],
-    epsilon: float = 1.0,
-) -> float:
+def _weighted_harmonic_mean(values: List[float], weights: List[float], epsilon: float = 1.0) -> float:
     """Compute a weighted harmonic mean, floored by epsilon to avoid division by zero."""
     total_weight = sum(weights)
     if total_weight == 0:
         return 0.0
-    denominator = sum(w / max(v, epsilon) for w, v in zip(weights, values))
+    denominator = sum(weight / max(value, epsilon) for weight, value in zip(weights, values))
     return total_weight / denominator if denominator > 0 else 0.0
 
 
@@ -70,78 +59,54 @@ def _weighted_harmonic_mean(
 # ---------------------------------------------------------------------------
 
 def rank_items(items: List[ContentItem]) -> List[ContentItem]:
-    """Score and sort a batch of ContentItems using percentile-harmonic ranking.
-
-    - Converts raw relevance, recency, and engagement values to percentile ranks
-    - Combines via weighted harmonic mean (not linear sum)
-    - Applies post-harmonic confidence adjustments
-    - Web items use a two-dimensional (engagement-free) formula
-    """
+    """Assign scores then return globally sorted items."""
     if not items:
         return items
 
-    # Separate web items (no engagement dimension) from platform items
-    web_items = [i for i in items if i.source == Source.WEB]
-    platform_items = [i for i in items if i.source != Source.WEB]
+    platform_items = [item for item in items if item.source != Source.WEB]
+    web_items = [item for item in items if item.source == Source.WEB]
 
     _score_platform_items(platform_items)
     _score_web_items(web_items)
 
-    all_items = platform_items + web_items
-    return _sort_by_score(all_items)
+    return _sort_by_score([*platform_items, *web_items])
 
 
 def _score_platform_items(items: List[ContentItem]) -> None:
-    """Score items that have engagement metrics (Reddit, X, YouTube, LinkedIn)."""
+    """Score non-web items via percentile normalization + harmonic blend."""
     if not items:
         return
 
-    # Extract raw values
-    raw_relevance = [item.relevance * 100 for item in items]
+    raw_signal = [item.signal * 100 for item in items]
     raw_recency = [temporal.freshness_score(item.published) for item in items]
-    raw_engagement = [
-        item.signals.composite if item.signals and item.signals.composite is not None else None
-        for item in items
-    ]
+    raw_engagement = [item.engagement.composite if item.engagement else None for item in items]
 
-    # Convert to percentile ranks
-    pct_relevance = _percentile_ranks([float(v) for v in raw_relevance])
+    pct_signal = _percentile_ranks([float(v) for v in raw_signal])
     pct_recency = _percentile_ranks([float(v) for v in raw_recency])
-    pct_engagement = _percentile_ranks(raw_engagement, fallback=BASELINE_ENGAGEMENT)
+    pct_engagement = _percentile_ranks(raw_engagement, fallback=MISSING_ENGAGEMENT_FALLBACK)
 
-    weights = [
-        DIMENSION_WEIGHTS["relevance"],
-        DIMENSION_WEIGHTS["recency"],
-        DIMENSION_WEIGHTS["engagement"],
-    ]
+    weights = [PLATFORM_WEIGHTS["signal"], PLATFORM_WEIGHTS["freshness"], PLATFORM_WEIGHTS["engagement"]]
 
-    for i, item in enumerate(items):
-        rel_pct = pct_relevance[i]
-        rec_pct = pct_recency[i]
-        eng_pct = pct_engagement[i] if pct_engagement[i] is not None else BASELINE_ENGAGEMENT
+    for idx, item in enumerate(items):
+        rel_pct = pct_signal[idx]
+        rec_pct = pct_recency[idx]
+        eng_pct = pct_engagement[idx] if pct_engagement[idx] is not None else MISSING_ENGAGEMENT_FALLBACK
 
-        # Store breakdown for debugging / display
-        item.breakdown = ScoreBreakdown(
-            relevance=int(rel_pct),
-            recency=int(rec_pct),
+        item.score_parts = ScoreParts(
+            signal=int(rel_pct),
+            freshness=int(rec_pct),
             engagement=int(eng_pct),
         )
 
-        # Weighted harmonic mean
-        total = _weighted_harmonic_mean(
-            [rel_pct, rec_pct, eng_pct],
-            weights,
-        )
+        score = _weighted_harmonic_mean([rel_pct, rec_pct, eng_pct], weights)
+        if raw_engagement[idx] is None:
+            score -= MISSING_ENGAGEMENT_PENALTY
+        if item.date_quality == "low":
+            score -= 7
+        elif item.date_quality == "med":
+            score -= 3
 
-        # Post-harmonic confidence adjustments (additive)
-        if raw_engagement[i] is None:
-            total -= MISSING_ENGAGEMENT_PENALTY
-        if item.date_trust == "low":
-            total -= 7
-        elif item.date_trust == "med":
-            total -= 3
-
-        item.score = max(0, min(100, round(total)))
+        item.score = max(0, min(100, round(score)))
 
 
 def _score_web_items(items: List[ContentItem]) -> None:
@@ -150,20 +115,17 @@ def _score_web_items(items: List[ContentItem]) -> None:
         return
 
     for item in items:
-        rel = int(item.relevance * 100)
+        rel = int(item.signal * 100)
         rec = temporal.freshness_score(item.published)
 
-        item.breakdown = ScoreBreakdown(relevance=rel, recency=rec, engagement=0)
+        item.score_parts = ScoreParts(signal=rel, freshness=rec, engagement=0)
 
-        total = (
-            WEB_DIMENSION_WEIGHTS["relevance"] * rel
-            + WEB_DIMENSION_WEIGHTS["recency"] * rec
-        )
+        total = WEB_WEIGHTS["signal"] * rel + WEB_WEIGHTS["freshness"] * rec
         total -= WEB_SOURCE_PENALTY
 
-        if item.date_trust == "high":
+        if item.date_quality == "high":
             total += WEB_DATE_BONUS
-        elif item.date_trust == "low":
+        elif item.date_quality == "low":
             total -= WEB_DATE_PENALTY
 
         item.score = max(0, min(100, round(total)))
@@ -188,8 +150,8 @@ def _sort_by_score(items: List[ContentItem]) -> List[ContentItem]:
             return -1
 
     def sort_key(item: ContentItem):
-        src = source_order.get(item.source, 4)
-        return (-item.score, -_date_ordinal(item.published), src, item.headline.lower())
+        src_rank = source_order.get(item.source, 4)
+        return (-item.score, -_date_ordinal(item.published), src_rank, item.title.lower())
 
     return sorted(items, key=sort_key)
 
@@ -214,19 +176,15 @@ def _fnv1a_64(token: str) -> int:
 
 def _simhash(text: str) -> int:
     """Compute a 64-bit SimHash fingerprint for the given text."""
-    # Tokenize: lowercase, split on non-alphanumeric
     import re
-    tokens = re.findall(r'[a-z0-9]+', text.lower())
+
+    tokens = re.findall(r"[a-z0-9]+", text.lower())
     if not tokens:
         return 0
 
-    # Build 3-gram shingles
-    shingles = []
-    for i in range(max(1, len(tokens) - 2)):
-        shingle = " ".join(tokens[i:i + 3])
-        shingles.append(shingle)
+    width = min(4, max(1, len(tokens)))
+    shingles = [" ".join(tokens[idx : idx + width]) for idx in range(max(1, len(tokens) - width + 1))]
 
-    # Accumulate bit weights
     bit_counts = [0] * 64
     for shingle in shingles:
         h = _fnv1a_64(shingle)
@@ -236,12 +194,10 @@ def _simhash(text: str) -> int:
             else:
                 bit_counts[bit] -= 1
 
-    # Build fingerprint
     fingerprint = 0
     for bit in range(64):
         if bit_counts[bit] > 0:
             fingerprint |= (1 << bit)
-
     return fingerprint
 
 
@@ -257,7 +213,7 @@ def _hamming_distance(a: int, b: int) -> int:
 
 def _text_of(item: ContentItem) -> str:
     """Extract the primary text field from a content item."""
-    return item.headline
+    return item.title
 
 
 def deduplicate(
@@ -273,19 +229,17 @@ def deduplicate(
         return items
 
     fingerprints = [_simhash(_text_of(item)) for item in items]
-
-    discard = set()
-    for i in range(len(items)):
-        if i in discard:
+    discarded_indices = set()
+    for left in range(len(items)):
+        if left in discarded_indices:
             continue
-        for j in range(i + 1, len(items)):
-            if j in discard:
+        for right in range(left + 1, len(items)):
+            if right in discarded_indices:
                 continue
-            if _hamming_distance(fingerprints[i], fingerprints[j]) <= max_hamming:
-                if items[i].score >= items[j].score:
-                    discard.add(j)
+            if _hamming_distance(fingerprints[left], fingerprints[right]) <= max_hamming:
+                if items[left].score >= items[right].score:
+                    discarded_indices.add(right)
                 else:
-                    discard.add(i)
-                    break  # i is discarded, no need to check more pairs
-
-    return [item for idx, item in enumerate(items) if idx not in discard]
+                    discarded_indices.add(left)
+                    break
+    return [item for idx, item in enumerate(items) if idx not in discarded_indices]

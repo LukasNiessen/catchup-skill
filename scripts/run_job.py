@@ -36,9 +36,10 @@ MODULE_ROOT = Path(__file__).parent.resolve()
 sys.path.insert(0, str(MODULE_ROOT))
 
 from briefbot_engine.scheduling import cron, jobs
+from briefbot_engine import paths
 
 
-LOG_DIRECTORY = Path.home() / ".config" / "briefbot" / "logs"
+LOG_DIRECTORY = paths.logs_dir()
 
 BANNER_PAUSE_SECONDS = 15
 
@@ -417,3 +418,4 @@ if __name__ == "__main__":
         sys.exit(1)
 
     run_job(sys.argv[1])
+

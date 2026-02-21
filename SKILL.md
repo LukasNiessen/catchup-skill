@@ -74,7 +74,7 @@ Improved intent heuristics:
 
 ## Initial Configuration (Optional)
 
-Execution mode is selected from available keys/cookies:
+Execution mode is selected from available keys:
 
 1. **Full Mode** (both keys): Reddit + X + YouTube + LinkedIn + WebSearch - best results with engagement metrics
 2. **OpenAI Only** (OPENAI_API_KEY): Reddit + YouTube + LinkedIn + WebSearch
@@ -91,7 +91,7 @@ If the user wants to configure API keys, email, Telegram, or other settings, run
 PY=$(python3 -c "" 2>/dev/null && echo python3 || echo python) && $PY ~/.claude/skills/briefbot/scripts/setup.py
 ```
 
-The wizard walks through all settings (API keys, audio, email/SMTP, Telegram, X cookies) and for each one shows the current value (masked for secrets) with options to keep, update, or clear it. It also offers to start/stop the Telegram bot listener.
+The wizard walks through all settings (API keys, audio, email/SMTP, Telegram) and for each one shows the current value (masked for secrets) with options to keep, update, or clear it. It also offers to start/stop the Telegram bot listener.
 
 Users can also create config manually:
 
@@ -453,7 +453,7 @@ When ALL searches are finished, consolidate using a science-style evidence model
 - Reddit/X community signals: medium prior (high trend value)
 - Generic web pages: lower prior
 
-4. **Spam penalty (LIGHT weight)**: De-rank spammy signals such as all-caps hype, referral stuffing, copied listicles, thin affiliate pages, bot-like repost bursts
+4. **Spam penalty (LIGHT weight)**: De-rank spammy signals such as referral stuffing, copied listicles, thin affiliate pages, bot-like repost bursts
 5. **Consensus strength**: If something appears across all major source classes, treat as very high confidence
 6. **Contradictions**: Explicitly flag disagreements and say which side has stronger support
 7. **Output focus**: Distill 2-6 actionable insights
@@ -820,8 +820,8 @@ After every prompt you deliver, close with:
 ```
 ---
 🔎 **{FOCUS_AREA}** for {USAGE_TARGET}
-🎯 Target: {TARGET_PERSON_OR_COMPANY or "none"} · Mood: {MOOD}
-📊 {n} Reddit threads ({sum} upvotes) · {n} X posts ({sum} likes) · {n} YouTube videos · {n} LinkedIn posts · {n} web pages · {n} papers (if any)
+- Target: {TARGET_PERSON_OR_COMPANY or "none"} · Mood: {MOOD}
+- {n} Reddit threads ({sum} upvotes) · {n} X posts ({sum} likes) · {n} YouTube videos · {n} LinkedIn posts · {n} web pages · {n} papers (if any)
 
 > **Try next:** [a different angle — short, vivid, concrete]
 ```
@@ -831,8 +831,8 @@ After every prompt you deliver, close with:
 ```
 ---
 🔎 **{FOCUS_AREA}** for {USAGE_TARGET}
-🎯 Target: {TARGET_PERSON_OR_COMPANY or "none"} · Mood: {MOOD}
-📊 {n} web pages from {domains} · {n} papers (if any)
+- Target: {TARGET_PERSON_OR_COMPANY or "none"} · Mood: {MOOD}
+- {n} web pages from {domains} · {n} papers (if any)
 
 > **Try next:** [a different angle — short, vivid, concrete]
 

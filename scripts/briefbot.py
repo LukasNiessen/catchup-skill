@@ -8,15 +8,16 @@ import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-# Fix Windows console encoding (cp1252 cannot handle emoji/box-drawing chars)
-if sys.platform == "win32":
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    if hasattr(sys.stderr, "reconfigure"):
-        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+def _configure_stdio_utf8() -> None:
+    """Ensure Windows consoles can render unicode output safely."""
+    if sys.platform != "win32":
+        return
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
 
-# Set to True to skip Bird X search and force xAI API usage
-DISABLE_BIRD = True
+
+_configure_stdio_utf8()
 
 
 def _log(message: str):
@@ -39,7 +40,6 @@ from briefbot_engine import (
     terminal,
 )
 from briefbot_engine.providers import (
-    bird,
     enrich,
     linkedin,
     reddit,
@@ -53,14 +53,14 @@ from briefbot_engine.delivery import email, telegram
 
 
 def load_fixture(name: str) -> dict:
-    """Load mock data from the fixtures directory."""
+    """Load fixture payload from repository fixtures dir."""
     path = ROOT.parent / "fixtures" / name
 
     if not path.exists():
         return {}
 
-    with open(path) as f:
-        return json.load(f)
+    with open(path, "r", encoding="utf-8") as handle:
+        return json.load(handle)
 
 
 def _query_reddit(
@@ -95,15 +95,13 @@ def _query_reddit(
             response = {"error": str(generic_err)}
             error = f"{type(generic_err).__name__}: {generic_err}"
 
-    # Transform raw response into structured items
     items = reddit.parse_reddit_response(response or {})
 
-    # Sparse results trigger automatic retry with simplified query
-    has_few_results = len(items) <= 3
+    has_few_results = len(items) < 4
     should_retry = has_few_results and not mock and error is None
 
     if should_retry:
-        simplified_topic = reddit._core_subject(topic)
+        simplified_topic = reddit.compress_topic(topic)
         topics_differ = simplified_topic.strip().lower() != topic.strip().lower()
 
         if topics_differ:
@@ -120,19 +118,17 @@ def _query_reddit(
                     supplemental_response
                 )
 
-                deduped_by_url = {
-                    str(entry.get("url", "")).strip(): entry
-                    for entry in items
-                    if entry.get("url")
-                }
-                for supplemental_entry in supplemental_items:
-                    url = str(supplemental_entry.get("url", "")).strip()
-                    if not url:
-                        continue
-                    if url not in deduped_by_url:
-                        deduped_by_url[url] = supplemental_entry
-                if deduped_by_url:
-                    items = list(deduped_by_url.values())
+                by_url = {}
+                for base_item in items:
+                    item_url = str(base_item.get("url", "")).strip()
+                    if item_url:
+                        by_url[item_url] = base_item
+                for extra_item in supplemental_items:
+                    item_url = str(extra_item.get("url", "")).strip()
+                    if item_url and item_url not in by_url:
+                        by_url[item_url] = extra_item
+                if by_url:
+                    items = list(by_url.values())
             except Exception:
                 pass
 
@@ -148,7 +144,7 @@ def _query_x(
     depth: str,
     mock: bool,
 ) -> tuple:
-    """Query X/Twitter via Bird search (primary) or xAI API (fallback). Returns (items, response, error)."""
+    """Query X/Twitter via xAI API. Returns (items, response, error)."""
     response = None
     error = None
 
@@ -165,54 +161,16 @@ def _query_x(
         _log(f"  Mock returned {len(items)} items")
         return items, response, error
 
-    use_bird = cfg.get("BIRD_X_AVAILABLE", False)
     has_xai = bool(cfg.get("XAI_API_KEY"))
     xai_key_preview = ""
     if has_xai:
         xai_key = cfg["XAI_API_KEY"]
         xai_key_preview = f"{xai_key[:8]}...{xai_key[-4:]} ({len(xai_key)} chars)"
 
-    _log(f"  DISABLE_BIRD: {DISABLE_BIRD}")
-    _log(f"  Bird available: {use_bird}")
     _log(f"  xAI key present: {has_xai} {xai_key_preview if has_xai else ''}")
     _log(f"  xAI model: {models_picked.get('xai')}")
 
-    if not DISABLE_BIRD and use_bird:
-        _log("  PATH: Bird search (primary, free)")
-        try:
-            response = bird.search_x(
-                topic,
-                start_date,
-                end_date,
-                depth=depth,
-            )
-            _log("  Bird API call succeeded")
-        except Exception as generic_err:
-            response = {"error": str(generic_err)}
-            error = f"Bird: {type(generic_err).__name__}: {generic_err}"
-            _log(f"  Bird API call FAILED: {error}")
-
-        items = bird.parse_bird_response(response or {})
-        _log(f"  Bird parsed {len(items)} items")
-
-        if not items and has_xai and error is None:
-            _log("  Bird returned 0 results, falling back to xAI API...")
-            try:
-                response = twitter.search(
-                    cfg["XAI_API_KEY"],
-                    models_picked["xai"],
-                    topic,
-                    start_date,
-                    end_date,
-                    depth=depth,
-                )
-                items = twitter.parse_x_response(response or {})
-                error = None
-                _log(f"  xAI fallback returned {len(items)} items")
-            except Exception as fallback_err:
-                _log(f"  xAI fallback FAILED: {type(fallback_err).__name__}: {fallback_err}")
-                error = f"xAI fallback: {type(fallback_err).__name__}: {fallback_err}"
-    elif has_xai:
+    if has_xai:
         _log("  PATH: xAI API (paid, direct)")
         _log(f"  Calling twitter.search(key={xai_key_preview}, model={models_picked.get('xai')}, topic='{topic[:50]}', dates={start_date}->{end_date}, depth={depth})")
         try:
@@ -237,9 +195,9 @@ def _query_x(
         items = twitter.parse_x_response(response or {})
         _log(f"  xAI parsed {len(items)} items")
     else:
-        _log("  PATH: NO X BACKEND AVAILABLE (no xAI key, Bird not authenticated)")
+        _log("  PATH: NO X BACKEND AVAILABLE (no xAI key)")
         response = {
-            "error": "No X search backend available (no xAI key, Bird not authenticated)"
+            "error": "No X search backend available (no xAI key configured)"
         }
         error = "No X search backend available"
         items = []
@@ -375,15 +333,13 @@ def run_research(
 
     openai_available = bool(cfg.get("OPENAI_API_KEY"))
     xai_available = bool(cfg.get("XAI_API_KEY"))
-    bird_available = bool(cfg.get("BIRD_X_AVAILABLE"))
-    x_available = xai_available or bird_available
+    x_available = xai_available
 
     _log("=== run_research ===")
     _log(f"  Platform: '{platform}'")
     _log(f"  OpenAI available: {openai_available}")
     _log(f"  xAI available: {xai_available}")
-    _log(f"  Bird available: {bird_available}")
-    _log(f"  X available (xAI or Bird): {x_available}")
+    _log(f"  X available (xAI): {x_available}")
     _log(f"  Depth: {depth}")
     _log(f"  Models picked: {models_picked}")
 
@@ -559,26 +515,45 @@ def main():
     parser.add_argument("topic", nargs="?", help="Topic to research")
     parser.add_argument("--mock", action="store_true", help="Use fixtures")
     parser.add_argument(
-        "--emit",
+        "--format",
+        dest="emit",
         choices=["compact", "json", "md", "context", "path"],
         default="compact",
         help="Output mode",
     )
     parser.add_argument(
-        "--sources",
+        "--emit",
+        dest="emit",
+        choices=["compact", "json", "md", "context", "path"],
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--channels",
+        dest="sources",
         choices=["auto", "reddit", "x", "youtube", "linkedin", "both", "all"],
         default="auto",
         help="Source selection (auto, reddit, x, youtube, linkedin, both=reddit+x, all=all sources)",
     )
     parser.add_argument(
+        "--sources",
+        dest="sources",
+        choices=["auto", "reddit", "x", "youtube", "linkedin", "both", "all"],
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--depth",
+        choices=["quick", "default", "deep"],
+        help="Sampling depth (quick/default/deep)",
+    )
+    parser.add_argument(
         "--quick",
         action="store_true",
-        help="Faster research with fewer sources (8-12 each)",
+        help="Use a light pass with smaller sample sizes",
     )
     parser.add_argument(
         "--deep",
         action="store_true",
-        help="Comprehensive research with more sources (50-70 Reddit, 40-60 X)",
+        help="Use exhaustive sampling for denser coverage",
     )
     parser.add_argument(
         "--debug",
@@ -586,15 +561,29 @@ def main():
         help="Enable verbose debug logging",
     )
     parser.add_argument(
-        "--days",
+        "--window",
+        dest="days",
         type=int,
         default=30,
         help="Number of days to search back (default: 30, e.g., 7 for a week, 1 for today)",
     )
     parser.add_argument(
-        "--include-web",
+        "--days",
+        dest="days",
+        type=int,
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--augment-web",
+        dest="include_web",
         action="store_true",
         help="Include general web search alongside Reddit/X (lower weighted)",
+    )
+    parser.add_argument(
+        "--include-web",
+        dest="include_web",
+        action="store_true",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--audio",
@@ -672,7 +661,9 @@ def main():
         sys.exit(1)
 
     depth = "default"
-    if args.quick:
+    if args.depth:
+        depth = args.depth
+    elif args.quick:
         depth = "quick"
     elif args.deep:
         depth = "deep"
@@ -684,9 +675,6 @@ def main():
 
     _log("=== main: Loading configuration ===")
     cfg = config.load_config()
-
-    cfg["BIRD_X_AVAILABLE"] = config.is_bird_x_available()
-    _log(f"BIRD_X_AVAILABLE: {cfg['BIRD_X_AVAILABLE']}")
 
     platforms = config.determine_available_platforms(cfg)
     _log(f"Available platforms: '{platforms}'")
@@ -800,10 +788,11 @@ def main():
     filtered_youtube = filter_by_date(normalized_youtube, start_date, end_date)
     filtered_linkedin = filter_by_date(normalized_linkedin, start_date, end_date)
 
-    # Combine all items, score them together, then deduplicate
+    # Combine all items then score -> dedupe -> rescore for final ranking
     all_items = filtered_reddit + filtered_x + filtered_youtube + filtered_linkedin
-    scored_items = ranking.rank_items(all_items)
-    deduped_items = ranking.deduplicate(scored_items)
+    initial_ranked = ranking.rank_items(all_items)
+    deduped_items = ranking.deduplicate(initial_ranked)
+    scored_items = ranking.rank_items(deduped_items)
 
     progress.end_processing()
 
@@ -1015,9 +1004,7 @@ def output_report(
 ):
     """Render and output the research report in the specified format."""
     format_handlers = {
-        "compact": lambda: print(
-            output.compact(report, missing_keys=missing_keys)
-        ),
+        "compact": lambda: print(output.compact(report, missing_keys=missing_keys)),
         "json": lambda: print(json.dumps(report.to_dict(), indent=2)),
         "md": lambda: print(output.full_report(report)),
         "context": lambda: print(report.context_snippet_md),
@@ -1038,13 +1025,13 @@ def output_report(
         print(f"Topic: {topic}")
         print(f"Date range: {start_date} to {end_date}")
         print()
-        print("Run WebSearch now and gather 7-14 non-social sources.")
-        print("Avoid reddit.com, x.com, and twitter.com (already handled above).")
-        print(f"Prioritize docs, blogs, changelogs, and news within the last {days} days.")
+        print("Run WebSearch and gather 8-15 non-social sources.")
+        print("Exclude reddit.com, x.com, and twitter.com (already covered above).")
+        print(f"Prioritize docs, blogs, changelogs, and news from the last {days} days.")
         print()
-        print("Merge web findings with platform findings in one synthesis.")
-        print("When confidence is similar, keep Reddit/X evidence above plain web links")
-        print("because web items usually lack direct engagement signals.")
+        print("Merge web findings with platform findings into a single synthesis.")
+        print("When confidence is close, prefer Reddit/X evidence above plain web links")
+        print("because social items include richer engagement signals.")
         print(separator_line)
 
 

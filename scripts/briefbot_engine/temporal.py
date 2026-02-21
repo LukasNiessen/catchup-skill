@@ -1,32 +1,42 @@
-"""Temporal helpers: range windows, parsing, freshness, and date detection."""
+"""Time-window and publication-date utilities."""
 
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional, Tuple
-from urllib.parse import urlparse
 
-PARSE_FORMATS = [
+_STRPTIME_PATTERNS = (
     "%Y-%m-%dT%H:%M:%S.%f%z",
     "%Y-%m-%dT%H:%M:%SZ",
     "%Y-%m-%dT%H:%M:%S",
     "%Y-%m-%d",
     "%B %d, %Y",
     "%d/%m/%Y",
-]
+)
 
-MONTHS = {
-    "jan": 1, "january": 1,
-    "feb": 2, "february": 2,
-    "mar": 3, "march": 3,
-    "apr": 4, "april": 4,
+_MONTH_TO_INT = {
+    "jan": 1,
+    "january": 1,
+    "feb": 2,
+    "february": 2,
+    "mar": 3,
+    "march": 3,
+    "apr": 4,
+    "april": 4,
     "may": 5,
-    "jun": 6, "june": 6,
-    "jul": 7, "july": 7,
-    "aug": 8, "august": 8,
-    "sep": 9, "september": 9,
-    "oct": 10, "october": 10,
-    "nov": 11, "november": 11,
-    "dec": 12, "december": 12,
+    "jun": 6,
+    "june": 6,
+    "jul": 7,
+    "july": 7,
+    "aug": 8,
+    "august": 8,
+    "sep": 9,
+    "september": 9,
+    "oct": 10,
+    "october": 10,
+    "nov": 11,
+    "november": 11,
+    "dec": 12,
+    "december": 12,
 }
 
 
@@ -34,49 +44,60 @@ MONTHS = {
 # Core date operations
 # ---------------------------------------------------------------------------
 
-def _utc_today():
+def _today_utc() -> date:
     return datetime.now(timezone.utc).date()
 
 
-def _as_iso_date(value) -> str:
+def _as_iso_date(value: date) -> str:
     return value.isoformat()
 
 
 def window(days: int = 30) -> Tuple[str, str]:
-    """Return (start, end) ISO date strings for a rolling window of N calendar days."""
-    end_date = _utc_today()
-    span_days = max(0, int(days or 0))
-    begin_date = end_date - timedelta(days=span_days)
-    return _as_iso_date(begin_date), _as_iso_date(end_date)
+    """Return `from,to` bounds for a rolling UTC calendar window."""
+    end_day = _today_utc()
+    back_days = max(0, int(days or 0))
+    start_day = end_day - timedelta(days=back_days)
+    return _as_iso_date(start_day), _as_iso_date(end_day)
 
 
 def interpret(date_input: Optional[str]) -> Optional[datetime]:
-    """Parse a date string or numeric timestamp into a UTC datetime."""
+    """Parse known date shapes into a UTC datetime."""
     if not date_input:
         return None
 
-    for fmt in PARSE_FORMATS:
+    text = str(date_input).strip()
+    if not text:
+        return None
+
+    # Fast path: Python ISO parser handles timezone offsets well.
+    iso_candidate = text.replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(iso_candidate)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+    except ValueError:
+        pass
+
+    for fmt in _STRPTIME_PATTERNS:
         try:
-            parsed = datetime.strptime(date_input, fmt)
+            parsed = datetime.strptime(text, fmt)
             return parsed.replace(tzinfo=timezone.utc)
         except ValueError:
             continue
 
     try:
-        return datetime.fromtimestamp(float(date_input), tz=timezone.utc)
+        return datetime.fromtimestamp(float(text), tz=timezone.utc)
     except (ValueError, TypeError):
-        pass
-
-    return None
+        return None
 
 
 def to_date_str(unix_timestamp: Optional[float]) -> Optional[str]:
-    """Convert a Unix timestamp to an ISO date string (YYYY-MM-DD)."""
+    """Convert unix seconds into `YYYY-MM-DD`."""
     if unix_timestamp is None:
         return None
     try:
-        dt = datetime.fromtimestamp(unix_timestamp, tz=timezone.utc)
-        return dt.date().isoformat()
+        return datetime.fromtimestamp(unix_timestamp, tz=timezone.utc).date().isoformat()
     except (ValueError, TypeError, OverflowError):
         return None
 
@@ -86,32 +107,31 @@ def trust_level(
     range_start: str,
     range_end: str,
 ) -> str:
-    """Return 'high' if date falls within [range_start, range_end], else 'low'."""
+    """Return confidence of date against the target range."""
     if not date_input:
         return "low"
     try:
         parsed = datetime.strptime(date_input, "%Y-%m-%d").date()
-        start = datetime.strptime(range_start, "%Y-%m-%d").date()
-        end = datetime.strptime(range_end, "%Y-%m-%d").date()
-        return "high" if start <= parsed <= end else "low"
+        start_day = datetime.strptime(range_start, "%Y-%m-%d").date()
+        end_day = datetime.strptime(range_end, "%Y-%m-%d").date()
+        return "high" if start_day <= parsed <= end_day else "low"
     except ValueError:
         return "low"
 
 
 def elapsed_days(date_input: Optional[str]) -> Optional[int]:
-    """Return number of days elapsed since the given YYYY-MM-DD date."""
+    """Return full days elapsed since date_input."""
     if not date_input:
         return None
     try:
         parsed = datetime.strptime(date_input, "%Y-%m-%d").date()
-        today = _utc_today()
-        return (today - parsed).days
+        return (_today_utc() - parsed).days
     except ValueError:
         return None
 
 
 def freshness_score(date_input: Optional[str], max_days: int = 30) -> int:
-    """Score from 0-100 based on freshness (100 = today, 0 = max_days old or unknown)."""
+    """Return curved freshness score in [0,100]."""
     age = elapsed_days(date_input)
     if age is None:
         return 0
@@ -120,9 +140,8 @@ def freshness_score(date_input: Optional[str], max_days: int = 30) -> int:
     cap = max(1, int(max_days))
     if age >= cap:
         return 0
-    ratio = (cap - age) / cap
-    curved = ratio ** 0.93
-    return int(100 * curved)
+    remaining = (cap - age) / cap
+    return int(100 * (remaining ** 0.93))
 
 
 # ---------------------------------------------------------------------------
@@ -130,99 +149,84 @@ def freshness_score(date_input: Optional[str], max_days: int = 30) -> int:
 # ---------------------------------------------------------------------------
 
 def extract_from_url(url: str) -> Optional[str]:
-    """Try to extract a YYYY-MM-DD date embedded in the URL path."""
-    # /YYYYMMDD/ (compact)
-    m = re.search(r'/(\d{4})(\d{2})(\d{2})/', url)
-    if m:
-        y, mo, d = m.groups()
-        if 2019 <= int(y) <= 2032 and 1 <= int(mo) <= 12 and 1 <= int(d) <= 31:
-            return f"{y}-{mo}-{d}"
-
-    # /YYYY/MM/DD/
-    m = re.search(r'/(\d{4})/(\d{2})/(\d{2})/', url)
-    if m:
-        y, mo, d = m.groups()
-        if 2019 <= int(y) <= 2032 and 1 <= int(mo) <= 12 and 1 <= int(d) <= 31:
-            return f"{y}-{mo}-{d}"
-
-    # /YYYY-MM-DD/ or /YYYY-MM-DD-
-    m = re.search(r'/(\d{4})-(\d{2})-(\d{2})[-/]', url)
-    if m:
-        y, mo, d = m.groups()
-        if 2019 <= int(y) <= 2032 and 1 <= int(mo) <= 12 and 1 <= int(d) <= 31:
-            return f"{y}-{mo}-{d}"
-
+    """Extract a plausible publish date from URL patterns."""
+    patterns = (
+        r"/(\d{4})(\d{2})(\d{2})/",
+        r"/(\d{4})/(\d{2})/(\d{2})/",
+        r"/(\d{4})-(\d{2})-(\d{2})[-/]",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, url)
+        if not match:
+            continue
+        year, month, day = match.groups()
+        if 2019 <= int(year) <= 2032 and 1 <= int(month) <= 12 and 1 <= int(day) <= 31:
+            return f"{year}-{month}-{day}"
     return None
 
 
 def extract_from_text(text: str) -> Optional[str]:
-    """Try to extract a date from free-form text content."""
+    """Extract a date-like value from natural language."""
     if not text:
         return None
 
-    lower = text.lower()
+    lowered = text.lower()
 
-    # Month DD, YYYY (e.g. "January 24, 2026")
-    m = re.search(
+    month_first = re.search(
         r'\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|'
         r'jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)'
         r'\s+(\d{1,2})(?:st|nd|rd|th)?,?\s*(\d{4})\b',
-        lower,
+        lowered,
     )
-    if m:
-        month_str, day_str, year_str = m.groups()
-        month_num = MONTHS.get(month_str[:3])
+    if month_first:
+        month_str, day_str, year_str = month_first.groups()
+        month_num = _MONTH_TO_INT.get(month_str[:3])
         if month_num and 2019 <= int(year_str) <= 2032 and 1 <= int(day_str) <= 31:
             return f"{year_str}-{month_num:02d}-{int(day_str):02d}"
 
-    # DD Month YYYY (e.g. "24 January 2026")
-    m = re.search(
+    day_first = re.search(
         r'\b(\d{1,2})(?:st|nd|rd|th)?\s+'
         r'(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|'
         r'jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)'
         r'\s+(\d{4})\b',
-        lower,
+        lowered,
     )
-    if m:
-        day_str, month_str, year_str = m.groups()
-        month_num = MONTHS.get(month_str[:3])
+    if day_first:
+        day_str, month_str, year_str = day_first.groups()
+        month_num = _MONTH_TO_INT.get(month_str[:3])
         if month_num and 2019 <= int(year_str) <= 2032 and 1 <= int(day_str) <= 31:
             return f"{year_str}-{month_num:02d}-{int(day_str):02d}"
 
-    # YYYY-MM-DD (ISO format)
-    m = re.search(r'\b(\d{4})-(\d{2})-(\d{2})\b', text)
-    if m:
-        y, mo, d = m.groups()
-        if 2019 <= int(y) <= 2032 and 1 <= int(mo) <= 12 and 1 <= int(d) <= 31:
-            return f"{y}-{mo}-{d}"
+    iso = re.search(r'\b(\d{4})-(\d{2})-(\d{2})\b', text)
+    if iso:
+        year, month, day = iso.groups()
+        if 2019 <= int(year) <= 2032 and 1 <= int(month) <= 12 and 1 <= int(day) <= 31:
+            return f"{year}-{month}-{day}"
 
-    # Relative dates
     now = datetime.now()
-
-    if "yesterday" in lower:
+    if "yesterday" in lowered:
         return (now - timedelta(days=1)).strftime("%Y-%m-%d")
-
-    if "today" in lower:
+    if "today" in lowered:
         return now.strftime("%Y-%m-%d")
 
-    m = re.search(r'\b(\d+)\s*days?\s*ago\b', lower)
-    if m:
-        n = int(m.group(1))
-        if n <= 90:
-            return (now - timedelta(days=n)).strftime("%Y-%m-%d")
+    ago_days = re.search(r"\b(\d+)\s*days?\s*ago\b", lowered)
+    if ago_days:
+        span = int(ago_days.group(1))
+        if span <= 90:
+            return (now - timedelta(days=span)).strftime("%Y-%m-%d")
 
-    m = re.search(r'\b(\d+)\s*hours?\s*ago\b', lower)
-    if m:
+    ago_hours = re.search(r"\b(\d+)\s*hours?\s*ago\b", lowered)
+    if ago_hours:
         return now.strftime("%Y-%m-%d")
 
-    if "last week" in lower:
-        return (now - timedelta(days=7)).strftime("%Y-%m-%d")
-
-    if "this week" in lower:
-        return (now - timedelta(days=4)).strftime("%Y-%m-%d")
-
-    if "last month" in lower:
-        return (now - timedelta(days=30)).strftime("%Y-%m-%d")
+    relative_map = {
+        "last week": 7,
+        "this week": 4,
+        "last month": 30,
+    }
+    for label, days_back in relative_map.items():
+        if label in lowered:
+            return (now - timedelta(days=days_back)).strftime("%Y-%m-%d")
 
     return None
 
@@ -232,7 +236,7 @@ def detect(
     snippet: str,
     title: str,
 ) -> Tuple[Optional[str], str]:
-    """Extract a date from any available signal, returning (date, confidence)."""
+    """Choose best available date signal from URL/title/snippet."""
     url_date = extract_from_url(url)
     if url_date:
         return url_date, "high"

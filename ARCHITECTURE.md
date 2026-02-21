@@ -36,7 +36,6 @@ briefbot-skill/
 │       │   ├── registry.py         # Response caching + model selection
 │       │   ├── reddit.py           # Reddit search via OpenAI web_search
 │       │   ├── twitter.py          # X search via xAI x_search
-│       │   ├── bird.py             # X search via vendored bird GraphQL client
 │       │   ├── youtube.py          # YouTube search via OpenAI web_search
 │       │   ├── linkedin.py         # LinkedIn search via OpenAI web_search
 │       │   ├── enrich.py           # Reddit thread enrichment (engagement + comments)
@@ -55,9 +54,6 @@ briefbot-skill/
 │       │   └── platform.py         # OS scheduler (crontab / schtasks)
 │       ├── extras/
 │       │   ├── __init__.py
-│       │   └── chrome_cookies.py   # Chrome cookie extraction
-│       ├── vendor/                 # Vendored bird-search (MIT)
-│       └── cookie-bridge/          # Chrome extension for X cookies
 ├── fixtures/                       # Sample API responses for testing
 └── tests/                          # Test suite (pure pytest)
 ```
@@ -202,9 +198,7 @@ Uses OpenAI's Responses API with `web_search` filtered to `reddit.com`.
 
 Uses xAI's Responses API with `x_search` for live Twitter data.
 
-### Bird X (`providers/bird.py`)
 
-Alternative X search using vendored bird-search GraphQL client (requires browser cookies).
 
 ### YouTube (`providers/youtube.py`)
 
@@ -299,3 +293,6 @@ TELEGRAM_BOT_TOKEN=...     # Telegram delivery (optional)
 
 5. Update `config.py` (if new API key needed):
    - Add to `load_config()` and `determine_available_platforms()`
+
+
+

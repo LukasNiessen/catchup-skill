@@ -19,6 +19,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from briefbot_engine import paths
+
 # Fix Windows console encoding
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -34,9 +36,9 @@ from briefbot_engine import config as bb_config
 # Constants
 # ---------------------------------------------------------------------------
 
-CONFIG_DIR = Path.home() / ".config" / "briefbot"
-ENV_FILE = CONFIG_DIR / ".env"
-PID_FILE = CONFIG_DIR / "telegram_bot.pid"
+CONFIG_DIR = paths.config_dir()
+ENV_FILE = paths.config_file()
+PID_FILE = paths.root_dir() / "telegram_bot.pid"
 BOT_SCRIPT = MODULE_ROOT / "telegram_bot.py"
 
 # Configuration sections — each is (section_title, list_of_fields)
@@ -84,15 +86,6 @@ CONFIG_SECTIONS = [
              "Create a bot via @BotFather on Telegram"),
             ("TELEGRAM_CHAT_ID", "Default Chat ID", False, None,
              "Comma-separated for multiple. Get yours via @userinfobot"),
-        ],
-    ),
-    (
-        "X/Twitter Browser Cookies (Optional)",
-        [
-            ("AUTH_TOKEN", "Auth Token (cookie)", True, None,
-             "For Bird X search — extract from browser DevTools"),
-            ("CT0", "CT0 (cookie)", True, None,
-             "For Bird X search — extract from browser DevTools"),
         ],
     ),
 ]
@@ -647,3 +640,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

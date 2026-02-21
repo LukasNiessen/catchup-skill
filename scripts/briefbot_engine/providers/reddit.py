@@ -1,4 +1,6 @@
-"""Reddit discovery via OpenAI Responses API with web search."""
+"""Reddit discovery via OpenAI Responses web tool."""
+
+from __future__ import annotations
 
 import json
 import re
@@ -7,83 +9,69 @@ from typing import Any, Dict, Iterable, List, Optional
 
 from .. import net
 
-# Fallback chain when the primary model is inaccessible
 FALLBACK_MODELS = ["gpt-4o-mini", "gpt-4o"]
 
 
-def _err(msg: str):
-    """Log an error to stderr."""
+def _err(msg: str) -> None:
     sys.stderr.write(f"[REDDIT ERROR] {msg}\n")
     sys.stderr.flush()
 
 
-def _info(msg: str):
-    """Log informational output to stderr."""
+def _info(msg: str) -> None:
     sys.stderr.write(f"[REDDIT] {msg}\n")
     sys.stderr.flush()
 
 
 def _is_access_err(err: net.HTTPError) -> bool:
-    """Check whether the failure likely means the model cannot be used by this key."""
     if err.status_code not in (400, 403) or not err.body:
         return False
     text = err.body.lower()
-    signals = (
+    tokens = (
         "organization must be verified",
         "does not have access",
         "model not found",
-        "not found",
         "not available for your account",
         "access denied",
     )
-    return any(token in text for token in signals)
+    return any(token in text for token in tokens)
 
 
 API_URL = "https://api.openai.com/v1/responses"
 
-# How many results to request per depth level (over-fetch for date filtering)
 DEPTH_SPECS = {
-    "quick": {"min": 11, "max": 19},
-    "default": {"min": 24, "max": 44},
-    "deep": {"min": 50, "max": 82},
+    "quick": {"min": 9, "max": 16},
+    "default": {"min": 20, "max": 36},
+    "deep": {"min": 42, "max": 74},
 }
 
-REDDIT_DISCOVERY_PROMPT = """Investigate Reddit community discussions related to: {topic}
+REDDIT_DISCOVERY_PROMPT = """You are scouting Reddit threads for research.
 
-First, distill the essential query. Simplify compound queries to their root subject
-(e.g., "best wireless headphones 2026" becomes "wireless headphones",
-"killer features of clawdbot" becomes "clawdbot").
+Topic: {topic}
+Window: {from_date} through {to_date}
+Goal: collect {min_items}-{max_items} substantive threads.
 
-Execute broad searches using site:reddit.com combined with the distilled subject.
-Over-fetch rather than under-fetch -- server-side filters will handle precision.
+Guidelines:
+- First distill the topic into a 2-3 word search phrase.
+- Run broad `site:reddit.com` searches and over-collect if needed.
+- Prefer community discussions with details or lessons learned.
+- Ignore developer/business subdomains.
 
-Content window: {from_date} through {to_date}
-
-For every matching thread, record:
-- Thread title
-- Full reddit.com URL -- URLs must include both /r/ and /comments/ path segments.
-  Discard developers.reddit.com and business.reddit.com domains.
-- Publication date in YYYY-MM-DD format, or null if not visible
-- A relevance score between 0.0 and 1.0
-- Brief explanation of why the thread is relevant
-
-Aim for {min_items} to {max_items} threads. More is better than fewer.
-
-Output strictly as JSON:
+Return JSON only in this structure:
 {{
-  "items": [
+  "threads": [
     {{
-      "title": "Example discussion title",
-      "url": "https://www.reddit.com/r/example/comments/abc123/example_thread/",
-      "subreddit": "example",
-      "date": "2026-01-15",
-      "why_relevant": "Directly discusses the topic with community input",
-      "relevance": 0.9
+      "headline": "Thread title",
+      "link": "https://www.reddit.com/r/example/comments/abc123/example_thread/",
+      "community": "example",
+      "posted": "2026-01-15",
+      "signal": 0.9,
+      "reason": "Explains why the thread matters for the topic"
     }}
   ]
-}}"""
+}}
+"""
 
-_FILLER_PATTERNS = (
+_FILLERS = (
     r"\bhow\s+to\b",
     r"\btips?\s+for\b",
     r"\bbest\b",
@@ -103,10 +91,10 @@ _STOPWORDS = {"using", "for", "with", "the", "of", "in", "on", "a", "an"}
 _ID_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
-def _core_subject(verbose_query: str) -> str:
-    """Extract a compact subject by dropping common modifier phrases and stopwords."""
+def compress_topic(verbose_query: str) -> str:
+    """Reduce verbose queries to a compact search phrase."""
     lowered = verbose_query.lower()
-    for pattern in _FILLER_PATTERNS:
+    for pattern in _FILLERS:
         lowered = re.sub(pattern, " ", lowered)
     tokens = [tok for tok in re.findall(r"[a-z0-9][a-z0-9.+_-]*", lowered) if tok not in _STOPWORDS]
     if len(tokens) <= 3:
@@ -115,7 +103,6 @@ def _core_subject(verbose_query: str) -> str:
 
 
 def _iter_text_chunks(output: Any) -> Iterable[str]:
-    """Yield possible text chunks from modern and legacy Responses API shapes."""
     if isinstance(output, str):
         yield output
         return
@@ -141,7 +128,6 @@ def _iter_text_chunks(output: Any) -> Iterable[str]:
 
 
 def _pick_output_text(api_response: Dict[str, Any]) -> str:
-    """Pick the first non-empty text payload from known response layouts."""
     for chunk in _iter_text_chunks(api_response.get("output")):
         text = chunk.strip()
         if text:
@@ -157,27 +143,26 @@ def _pick_output_text(api_response: Dict[str, Any]) -> str:
     return ""
 
 
-def _extract_items_blob(payload_text: str) -> List[Dict[str, Any]]:
-    """Decode the first JSON object containing an 'items' list from raw model text."""
+def _extract_threads_blob(payload_text: str) -> List[Dict[str, Any]]:
     if not payload_text:
         return []
     decoder = json.JSONDecoder()
-    start = 0
+    cursor = 0
     while True:
-        brace = payload_text.find("{", start)
+        brace = payload_text.find("{", cursor)
         if brace < 0:
             return []
         try:
             obj, end = decoder.raw_decode(payload_text[brace:])
         except json.JSONDecodeError:
-            start = brace + 1
+            cursor = brace + 1
             continue
-        if isinstance(obj, dict) and isinstance(obj.get("items"), list):
-            return obj["items"]
-        start = brace + max(end, 1)
+        if isinstance(obj, dict) and isinstance(obj.get("threads"), list):
+            return obj["threads"]
+        cursor = brace + max(end, 1)
 
 
-def _to_relevance(value: Any) -> float:
+def _to_signal(value: Any) -> float:
     try:
         return max(0.0, min(1.0, float(value)))
     except (TypeError, ValueError):
@@ -185,23 +170,23 @@ def _to_relevance(value: Any) -> float:
 
 
 def _normalize_item(raw: Dict[str, Any], ordinal: int) -> Optional[Dict[str, Any]]:
-    url = str(raw.get("url", "")).strip()
-    if "reddit.com" not in url:
+    link = str(raw.get("link", "")).strip()
+    if "reddit.com" not in link:
         return None
-    date_value = raw.get("date")
+    date_value = raw.get("posted")
     if date_value is not None and not _ID_DATE.match(str(date_value)):
         date_value = None
-    subreddit = str(raw.get("subreddit", "")).strip()
-    if subreddit.lower().startswith("r/"):
-        subreddit = subreddit[2:]
+    community = str(raw.get("community", "")).strip()
+    if community.lower().startswith("r/"):
+        community = community[2:]
     return {
-        "id": f"R{ordinal}",
-        "title": str(raw.get("title", "")).strip(),
-        "url": url,
-        "subreddit": subreddit,
-        "date": date_value,
-        "why_relevant": str(raw.get("why_relevant", "")).strip(),
-        "relevance": _to_relevance(raw.get("relevance")),
+        "uid": f"R{ordinal}",
+        "title": str(raw.get("headline", "")).strip(),
+        "link": link,
+        "community": community,
+        "posted": date_value,
+        "reason": str(raw.get("reason", "")).strip(),
+        "signal": _to_signal(raw.get("signal")),
     }
 
 
@@ -215,7 +200,6 @@ def search(
     mock_response: Optional[Dict] = None,
     _is_retry: bool = False,
 ) -> Dict[str, Any]:
-    """Query Reddit threads via OpenAI Responses API web search."""
     if mock_response is not None:
         return mock_response
 
@@ -223,7 +207,7 @@ def search(
     min_items = depth_spec["min"]
     max_items = depth_spec["max"]
     headers = {"Authorization": f"Bearer {key}"}
-    timeout = {"quick": 75, "default": 105, "deep": 160}.get(depth, 105)
+    timeout = {"quick": 65, "default": 95, "deep": 150}.get(depth, 95)
     model_candidates = [model] + [candidate for candidate in FALLBACK_MODELS if candidate != model]
     prompt = REDDIT_DISCOVERY_PROMPT.format(
         topic=topic,
@@ -237,7 +221,12 @@ def search(
     for candidate in model_candidates:
         request_payload = {
             "model": candidate,
-            "input": prompt,
+            "input": [
+                {
+                    "role": "user",
+                    "content": prompt,
+                }
+            ],
             "tools": [{"type": "web_search", "filters": {"allowed_domains": ["reddit.com"]}}],
             "include": ["web_search_call.action.sources"],
         }
@@ -263,7 +252,6 @@ def search(
 
 
 def parse_reddit_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Parse Reddit items from an OpenAI API response."""
     api_error = api_response.get("error")
     if api_error:
         message = api_error.get("message") if isinstance(api_error, dict) else str(api_error)
@@ -277,7 +265,7 @@ def parse_reddit_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]]:
         _err(f"No text output returned by model. Response keys: {sorted(api_response.keys())}")
         return []
 
-    raw_items = _extract_items_blob(raw_text)
+    raw_items = _extract_threads_blob(raw_text)
     parsed: List[Dict[str, Any]] = []
     for index, row in enumerate(raw_items, start=1):
         if not isinstance(row, dict):

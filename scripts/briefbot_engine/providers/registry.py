@@ -1,4 +1,4 @@
-"""ProviderRegistry: unified response caching and model selection."""
+"""Provider cache + model selection registry."""
 
 import hashlib
 import json
@@ -23,8 +23,8 @@ class ProviderRegistry:
     """Manages response caching (JSON files with TTL) and model selection."""
 
     CACHE_DIR = Path.home() / ".cache" / "briefbot"
-    DEFAULT_TTL = 18
-    MODEL_TTL_DAYS = 5
+    DEFAULT_TTL = 20
+    MODEL_TTL_DAYS = 4
 
     # OpenAI API configuration
     OPENAI_MODEL_LISTING_ENDPOINT = "https://api.openai.com/v1/models"
@@ -54,33 +54,32 @@ class ProviderRegistry:
         self.CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
     def cache_key(self, topic: str, start: str, end: str, platform: str) -> str:
-        raw = f"{topic}::{start}::{end}::{platform}"
-        return hashlib.sha256(raw.encode()).hexdigest()[:20]
+        raw = f"{topic}|{start}|{end}|{platform}"
+        digest = hashlib.blake2s(raw.encode("utf-8"), digest_size=16).hexdigest()
+        return digest[:20]
 
     def cache_path(self, key: str) -> Path:
         return self.CACHE_DIR / f"{key}.json"
 
     def is_valid(self, filepath: Path, ttl_hours: int = None) -> bool:
-        if ttl_hours is None:
-            ttl_hours = self.DEFAULT_TTL
+        ttl = self.DEFAULT_TTL if ttl_hours is None else ttl_hours
         if not filepath.exists():
             return False
         try:
             mtime = datetime.fromtimestamp(filepath.stat().st_mtime, tz=timezone.utc)
             elapsed = (datetime.now(timezone.utc) - mtime).total_seconds() / 3600
-            return elapsed < ttl_hours
+            return elapsed < ttl
         except OSError:
             return False
 
     def load(self, key: str, ttl_hours: int = None) -> Optional[dict]:
-        if ttl_hours is None:
-            ttl_hours = self.DEFAULT_TTL
+        ttl = self.DEFAULT_TTL if ttl_hours is None else ttl_hours
         fp = self.cache_path(key)
-        if not self.is_valid(fp, ttl_hours):
+        if not self.is_valid(fp, ttl):
             return None
         try:
-            with open(fp, 'r') as f:
-                return json.load(f)
+            with open(fp, "r", encoding="utf-8") as handle:
+                return json.load(handle)
         except (json.JSONDecodeError, OSError):
             return None
 
@@ -94,15 +93,14 @@ class ProviderRegistry:
             return None
 
     def load_with_age(self, key: str, ttl_hours: int = None) -> tuple:
-        if ttl_hours is None:
-            ttl_hours = self.DEFAULT_TTL
+        ttl = self.DEFAULT_TTL if ttl_hours is None else ttl_hours
         fp = self.cache_path(key)
-        if not self.is_valid(fp, ttl_hours):
+        if not self.is_valid(fp, ttl):
             return None, None
         hours = self.age_hours(fp)
         try:
-            with open(fp, 'r') as f:
-                return json.load(f), hours
+            with open(fp, "r", encoding="utf-8") as handle:
+                return json.load(handle), hours
         except (json.JSONDecodeError, OSError):
             return None, None
 
@@ -110,8 +108,8 @@ class ProviderRegistry:
         self._ensure_dir()
         fp = self.cache_path(key)
         try:
-            with open(fp, 'w') as f:
-                json.dump(data, f)
+            with open(fp, "w", encoding="utf-8") as handle:
+                json.dump(data, handle)
         except OSError:
             pass
 
@@ -148,16 +146,16 @@ class ProviderRegistry:
         if not self.is_valid(self._model_file, ttl_hours):
             return {}
         try:
-            with open(self._model_file, 'r') as f:
-                return json.load(f)
+            with open(self._model_file, "r", encoding="utf-8") as handle:
+                return json.load(handle)
         except (json.JSONDecodeError, OSError):
             return {}
 
     def _save_model_prefs(self, data: dict):
         self._ensure_dir()
         try:
-            with open(self._model_file, 'w') as f:
-                json.dump(data, f)
+            with open(self._model_file, "w", encoding="utf-8") as handle:
+                json.dump(data, handle)
         except OSError:
             pass
 
@@ -166,9 +164,10 @@ class ProviderRegistry:
 
     def set_cached_model(self, provider_name: str, model_identifier: str):
         prefs = self._load_model_prefs()
+        now = datetime.now(timezone.utc).isoformat()
         prefs[provider_name] = model_identifier
-        prefs['updated_at'] = datetime.now(timezone.utc).isoformat()
-        prefs['selected_at'] = datetime.now(timezone.utc).isoformat()
+        prefs["updated_at"] = now
+        prefs["selected_at"] = now
         self._save_model_prefs(prefs)
 
     # -----------------------------------------------------------------
@@ -177,20 +176,20 @@ class ProviderRegistry:
 
     @staticmethod
     def extract_version_tuple(model_identifier: str) -> Optional[Tuple[int, ...]]:
-        version_pattern = re.search(r'(\d+(?:[._]\d+)*)', model_identifier)
+        version_pattern = re.search(r"(\d+(?:[._]\d+)*)", model_identifier)
         if version_pattern is None:
             return None
         version_string = version_pattern.group(1)
-        version_components = re.split(r'[._]', version_string)
+        version_components = re.split(r"[._]", version_string)
         return tuple(int(component) for component in version_components)
 
     @staticmethod
     def is_standard_gpt_model(model_identifier: str) -> bool:
         normalized_id = model_identifier.lower()
-        pattern_match = re.match(r'^gpt-5(\.\d+)*$', normalized_id)
+        pattern_match = re.match(r"^gpt-5(\.\d+)*$", normalized_id)
         if not pattern_match:
             return False
-        excluded_variants = ['mini', 'nano', 'chat', 'codex', 'preview', 'turbo', 'experimental', 'snapshot']
+        excluded_variants = ["mini", "nano", "chat", "codex", "preview", "turbo", "experimental", "snapshot"]
         for variant in excluded_variants:
             if variant in normalized_id:
                 return False
@@ -215,14 +214,13 @@ class ProviderRegistry:
         else:
             try:
                 authorization_headers = {"Authorization": "Bearer {}".format(api_credential)}
-                available_models = net.get(self.OPENAI_MODEL_LISTING_ENDPOINT, headers=authorization_headers).get("data", [])
+                available_models = net.get(self.OPENAI_MODEL_LISTING_ENDPOINT, headers=authorization_headers).get(
+                    "data", []
+                )
             except net.HTTPError:
                 return self.OPENAI_DEFAULT_MODELS[0]
 
-        eligible_models = [
-            model for model in available_models
-            if self.is_standard_gpt_model(model.get("id", ""))
-        ]
+        eligible_models = [model for model in available_models if self.is_standard_gpt_model(model.get("id", ""))]
 
         if len(eligible_models) == 0:
             return self.OPENAI_DEFAULT_MODELS[0]

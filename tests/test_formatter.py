@@ -2,7 +2,7 @@
 
 import pytest
 
-from briefbot_engine.content import Report, ContentItem, Source, Signals
+from briefbot_engine.content import Report, ContentItem, Source, Engagement
 from briefbot_engine.output import compact, context_fragment, full_report, context_path
 
 
@@ -24,19 +24,19 @@ def _make_report(topic="AI agents", mode="both", items=None):
     )
 
 
-def _make_reddit_item(item_id="R1", headline="Big discussion", subreddit="machinelearning"):
+def _make_reddit_item(uid="R1", title="Big discussion", subreddit="machinelearning"):
     """Create a minimal Reddit ContentItem."""
     return ContentItem(
-        item_id=item_id,
+        uid=uid,
         source=Source.REDDIT,
-        headline=headline,
-        permalink="https://www.reddit.com/r/{}/comments/abc123/test/".format(subreddit),
+        title=title,
+        link="https://www.reddit.com/r/{}/comments/abc123/test/".format(subreddit),
         author=subreddit,
         published="2026-01-15",
-        date_trust="high",
-        signals=Signals(upvotes=42, comments=10),
-        relevance=0.9,
-        rationale="Highly relevant discussion",
+        date_quality="high",
+        engagement=Engagement(upvotes=42, comments=10),
+        signal=0.9,
+        reason="Highly relevant discussion",
         score=85,
         meta={"subreddit": subreddit},
     )

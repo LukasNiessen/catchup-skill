@@ -1,10 +1,14 @@
-"""Unified content model and factory functions for all platform sources."""
+"""Content domain models and normalization helpers."""
+
+from __future__ import annotations
 
 import math
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional, TypeVar
+from typing import Any, Callable, Dict, List, Optional
+
+from . import temporal
 
 
 class Source(Enum):
@@ -16,8 +20,8 @@ class Source(Enum):
 
 
 @dataclass
-class Signals:
-    """Platform-agnostic engagement metrics."""
+class Engagement:
+    """Platform-neutral engagement stats."""
 
     composite: Optional[float] = None
     upvotes: Optional[int] = None
@@ -32,26 +36,35 @@ class Signals:
     bookmarks: Optional[int] = None
 
     def to_dict(self) -> Optional[Dict[str, Any]]:
-        d = {}
-        for fld in (
-            "composite", "upvotes", "comments", "vote_ratio", "likes",
-            "reposts", "replies", "quotes", "views", "reactions", "bookmarks",
+        payload = {}
+        for key in (
+            "composite",
+            "upvotes",
+            "comments",
+            "vote_ratio",
+            "likes",
+            "reposts",
+            "replies",
+            "quotes",
+            "views",
+            "reactions",
+            "bookmarks",
         ):
-            val = getattr(self, fld)
-            if val is not None:
-                d[fld] = val
-        return d if d else None
+            value = getattr(self, key)
+            if value is not None:
+                payload[key] = value
+        return payload or None
 
 
 @dataclass
-class ThreadComment:
-    """Comment extracted from a discussion thread."""
+class CommentNote:
+    """A notable thread comment."""
 
     score: int
-    date: Optional[str]
+    posted: Optional[str]
     author: str
     excerpt: str
-    url: str
+    link: str
 
     def to_dict(self) -> Dict[str, Any]:
         payload = asdict(self)
@@ -60,11 +73,11 @@ class ThreadComment:
 
 
 @dataclass
-class ScoreBreakdown:
-    """Breakdown of scoring components."""
+class ScoreParts:
+    """Score breakdown per dimension."""
 
-    relevance: int = 0
-    recency: int = 0
+    signal: int = 0
+    freshness: int = 0
     engagement: int = 0
 
     def to_dict(self) -> Dict[str, int]:
@@ -73,45 +86,44 @@ class ScoreBreakdown:
 
 @dataclass
 class ContentItem:
-    """Unified content item spanning all platform sources."""
+    """Unified content item spanning all sources."""
 
-    item_id: str
+    uid: str
     source: Source
-    headline: str
-    permalink: str
+    title: str
+    link: str
     author: str = ""
-    body: str = ""
+    summary: str = ""
     published: Optional[str] = None
-    date_trust: str = "low"
-    signals: Optional[Signals] = None
-    relevance: float = 0.5
-    rationale: str = ""
+    date_quality: str = "low"
+    engagement: Optional[Engagement] = None
+    signal: float = 0.5
+    reason: str = ""
     score: int = 0
-    breakdown: ScoreBreakdown = field(default_factory=ScoreBreakdown)
-    thread_comments: List[ThreadComment] = field(default_factory=list)
-    thread_insights: List[str] = field(default_factory=list)
+    score_parts: ScoreParts = field(default_factory=ScoreParts)
+    comments: List[CommentNote] = field(default_factory=list)
+    comment_highlights: List[str] = field(default_factory=list)
     meta: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
-        d = {
-            "id": self.item_id,
+        return {
+            "uid": self.uid,
             "source": self.source.value,
-            "headline": self.headline,
-            "permalink": self.permalink,
+            "title": self.title,
+            "link": self.link,
             "author": self.author,
-            "body": self.body,
+            "summary": self.summary,
             "published": self.published,
-            "date_trust": self.date_trust,
-            "signals": self.signals.to_dict() if self.signals else None,
-            "relevance": self.relevance,
-            "rationale": self.rationale,
+            "date_quality": self.date_quality,
+            "engagement": self.engagement.to_dict() if self.engagement else None,
+            "signal": self.signal,
+            "reason": self.reason,
             "score": self.score,
-            "breakdown": self.breakdown.to_dict(),
-            "thread_comments": [c.to_dict() for c in self.thread_comments],
-            "thread_insights": self.thread_insights,
+            "score_parts": self.score_parts.to_dict(),
+            "comments": [c.to_dict() for c in self.comments],
+            "comment_highlights": self.comment_highlights,
             "meta": self.meta,
         }
-        return d
 
 
 @dataclass
@@ -200,22 +212,10 @@ class Report:
         if value is not None:
             self.errors["web"] = value
 
-    # Compat shims for render.py field access
-    @property
-    def range_from(self) -> str:
-        return self.range_start
-
-    @property
-    def range_to(self) -> str:
-        return self.range_end
-
     def to_dict(self) -> Dict[str, Any]:
-        d = {
+        payload = {
             "topic": self.topic,
-            "range": {
-                "from": self.range_start,
-                "to": self.range_end,
-            },
+            "range": {"from": self.range_start, "to": self.range_end},
             "generated_at": self.generated_at,
             "mode": self.mode,
             "openai_model_used": self.openai_model_used,
@@ -230,25 +230,24 @@ class Report:
             "context_snippet_md": self.context_snippet_md,
         }
         for platform, msg in self.errors.items():
-            d[f"{platform}_error"] = msg
+            payload[f"{platform}_error"] = msg
         if self.from_cache:
-            d["from_cache"] = self.from_cache
+            payload["from_cache"] = self.from_cache
         if self.cache_age_hours is not None:
-            d["cache_age_hours"] = self.cache_age_hours
+            payload["cache_age_hours"] = self.cache_age_hours
         if self.search_duration_seconds is not None:
-            d["search_duration_seconds"] = self.search_duration_seconds
+            payload["search_duration_seconds"] = self.search_duration_seconds
         if self.item_count:
-            d["item_count"] = self.item_count
-        return d
+            payload["item_count"] = self.item_count
+        return payload
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Report":
-        """Reconstruct a Report from its serialized dict."""
         range_section = data.get("range", {})
         start = range_section.get("from", data.get("range_start", ""))
         end = range_section.get("to", data.get("range_end", ""))
 
-        items = []
+        items: List[ContentItem] = []
         for platform, source_enum in [
             ("reddit", Source.REDDIT),
             ("x", Source.X),
@@ -293,34 +292,27 @@ class Report:
 
 
 def _item_from_dict(d: Dict[str, Any], source: Source) -> ContentItem:
-    """Reconstruct a ContentItem from a serialized dict."""
-    sig = None
-    if d.get("signals"):
-        sig = Signals(**d["signals"])
-
-    comments = []
-    for c in d.get("thread_comments", []):
-        comments.append(ThreadComment(**c))
-
-    bd = d.get("breakdown", {})
-    breakdown = ScoreBreakdown(**bd) if bd else ScoreBreakdown()
+    eng = Engagement(**d["engagement"]) if d.get("engagement") else None
+    comments = [CommentNote(**comment) for comment in d.get("comments", [])]
+    parts = d.get("score_parts", {})
+    score_parts = ScoreParts(**parts) if parts else ScoreParts()
 
     return ContentItem(
-        item_id=d.get("id", ""),
+        uid=d.get("uid", ""),
         source=source,
-        headline=d.get("headline", ""),
-        permalink=d.get("permalink", ""),
+        title=d.get("title", ""),
+        link=d.get("link", ""),
         author=d.get("author", ""),
-        body=d.get("body", ""),
+        summary=d.get("summary", ""),
         published=d.get("published"),
-        date_trust=d.get("date_trust", "low"),
-        signals=sig,
-        relevance=d.get("relevance", 0.5),
-        rationale=d.get("rationale", ""),
+        date_quality=d.get("date_quality", "low"),
+        engagement=eng,
+        signal=d.get("signal", 0.5),
+        reason=d.get("reason", ""),
         score=d.get("score", 0),
-        breakdown=breakdown,
-        thread_comments=comments,
-        thread_insights=d.get("thread_insights", []),
+        score_parts=score_parts,
+        comments=comments,
+        comment_highlights=d.get("comment_highlights", []),
         meta=d.get("meta", {}),
     )
 
@@ -334,7 +326,6 @@ def build_report(
     xai_model: Optional[str] = None,
     **kwargs,
 ) -> Report:
-    """Create a new report with metadata and optional extra fields."""
     return Report(
         topic=topic,
         range_start=start,
@@ -347,150 +338,124 @@ def build_report(
     )
 
 
-# ---------------------------------------------------------------------------
-# Factory functions: raw API dicts -> ContentItem
-# ---------------------------------------------------------------------------
-
-def _safe_log1p(val: Optional[int]) -> float:
-    """Safe log1p, returns 0.0 for None or negative inputs."""
-    if val is None:
+def _safe_log1p(value: Optional[int]) -> float:
+    if value is None:
         return 0.0
     try:
-        number = float(val)
+        numeric = float(value)
     except (TypeError, ValueError):
         return 0.0
-    if number < 0:
+    if numeric < 0:
         return 0.0
-    return math.log1p(number)
+    return math.log1p(numeric)
 
 
-def _compute_composite_reddit(sig: Signals) -> float:
-    """Compute composite engagement for Reddit: 0.48*score + 0.37*comments + 0.15*ratio."""
-    sc = _safe_log1p(sig.upvotes)
-    cm = _safe_log1p(sig.comments)
-    ra = (sig.vote_ratio or 0.5) * 12
-    return 0.48 * sc + 0.37 * cm + 0.15 * ra
+def _weighted_sum(components: List[tuple]) -> float:
+    return sum(weight * value for weight, value in components)
 
 
-def _compute_composite_x(sig: Signals) -> float:
-    """Compute composite engagement for X: 0.45*likes + 0.28*reposts + 0.17*replies + 0.10*quotes."""
-    lk = _safe_log1p(sig.likes)
-    rp = _safe_log1p(sig.reposts)
-    rl = _safe_log1p(sig.replies)
-    qu = _safe_log1p(sig.quotes)
-    return 0.45 * lk + 0.28 * rp + 0.17 * rl + 0.10 * qu
+def _reddit_composite(sig: Engagement) -> float:
+    return _weighted_sum(
+        [
+            (0.48, _safe_log1p(sig.upvotes)),
+            (0.37, _safe_log1p(sig.comments)),
+            (0.15, (sig.vote_ratio or 0.5) * 12),
+        ]
+    )
 
 
-def _compute_composite_youtube(sig: Signals) -> float:
-    """Compute composite engagement for YouTube: 0.62*views + 0.38*likes."""
-    vw = _safe_log1p(sig.views)
-    lk = _safe_log1p(sig.likes)
-    return 0.62 * vw + 0.38 * lk
+def _x_composite(sig: Engagement) -> float:
+    return _weighted_sum(
+        [
+            (0.45, _safe_log1p(sig.likes)),
+            (0.28, _safe_log1p(sig.reposts)),
+            (0.17, _safe_log1p(sig.replies)),
+            (0.10, _safe_log1p(sig.quotes)),
+        ]
+    )
 
 
-def _compute_composite_linkedin(sig: Signals) -> float:
-    """Compute composite engagement for LinkedIn: 0.55*reactions + 0.45*comments."""
-    rx = _safe_log1p(sig.reactions)
-    cm = _safe_log1p(sig.comments)
-    return 0.55 * rx + 0.45 * cm
+def _youtube_composite(sig: Engagement) -> float:
+    return _weighted_sum([(0.62, _safe_log1p(sig.views)), (0.38, _safe_log1p(sig.likes))])
 
 
-def _trust_level(date_input: Optional[str], range_start: str, range_end: str) -> str:
-    """Return 'high' if date falls within [range_start, range_end], else 'low'."""
-    if not date_input:
-        return "low"
-    try:
-        from datetime import datetime as _dt
-        parsed = _dt.strptime(date_input, "%Y-%m-%d").date()
-        s = _dt.strptime(range_start, "%Y-%m-%d").date()
-        e = _dt.strptime(range_end, "%Y-%m-%d").date()
-        return "high" if s <= parsed <= e else "low"
-    except ValueError:
-        return "low"
+def _linkedin_composite(sig: Engagement) -> float:
+    return _weighted_sum([(0.55, _safe_log1p(sig.reactions)), (0.45, _safe_log1p(sig.comments))])
 
 
-def from_reddit_raw(
-    entry: Dict[str, Any],
-    start: str,
-    end: str,
-) -> ContentItem:
-    """Transform a single raw Reddit API dict into a ContentItem."""
+def from_reddit_raw(entry: Dict[str, Any], start: str, end: str) -> ContentItem:
     sig = None
-    raw_eng = entry.get("engagement")
-    if isinstance(raw_eng, dict):
-        sig = Signals(
-            upvotes=raw_eng.get("score"),
-            comments=raw_eng.get("num_comments"),
-            vote_ratio=raw_eng.get("upvote_ratio"),
+    metrics = entry.get("metrics")
+    if isinstance(metrics, dict):
+        sig = Engagement(
+            upvotes=metrics.get("upvotes"),
+            comments=metrics.get("comments"),
+            vote_ratio=metrics.get("vote_ratio"),
         )
         if sig.upvotes is not None or sig.comments is not None:
-            sig.composite = _compute_composite_reddit(sig)
+            sig.composite = _reddit_composite(sig)
 
-    comments = []
-    for rc in entry.get("top_comments", []):
-        comments.append(ThreadComment(
-            score=rc.get("score", 0),
-            date=rc.get("date"),
-            author=rc.get("author", ""),
-            excerpt=rc.get("excerpt", ""),
-            url=rc.get("url", ""),
-        ))
+    comments = [
+        CommentNote(
+            score=comment.get("score", 0),
+            posted=comment.get("posted"),
+            author=comment.get("author", ""),
+            excerpt=comment.get("excerpt", ""),
+            link=comment.get("link", ""),
+        )
+        for comment in entry.get("comment_cards", [])
+    ]
 
-    item_date = entry.get("date")
-    trust = _trust_level(item_date, start, end)
+    item_date = entry.get("posted")
+    trust = temporal.trust_level(item_date, start, end)
 
     return ContentItem(
-        item_id=entry.get("id", ""),
+        uid=entry.get("uid", ""),
         source=Source.REDDIT,
-        headline=entry.get("title", ""),
-        permalink=entry.get("url", ""),
-        author=entry.get("subreddit", ""),
+        title=entry.get("title", ""),
+        link=entry.get("link", ""),
+        author=entry.get("community", ""),
         published=item_date,
-        date_trust=trust,
-        signals=sig,
-        thread_comments=comments,
-        thread_insights=entry.get("comment_insights", []),
-        relevance=entry.get("relevance", 0.5),
-        rationale=entry.get("why_relevant", ""),
+        date_quality=trust,
+        engagement=sig,
+        comments=comments,
+        comment_highlights=entry.get("comment_highlights", []),
+        signal=entry.get("signal", 0.5),
+        reason=entry.get("reason", ""),
         meta={
-            "subreddit": entry.get("subreddit", ""),
+            "subreddit": entry.get("community", ""),
             "flair": entry.get("flair", ""),
         },
     )
 
 
-def from_x_raw(
-    entry: Dict[str, Any],
-    start: str,
-    end: str,
-) -> ContentItem:
-    """Transform a single raw X/Twitter API dict into a ContentItem."""
+def from_x_raw(entry: Dict[str, Any], start: str, end: str) -> ContentItem:
     sig = None
-    raw_eng = entry.get("engagement")
-    if isinstance(raw_eng, dict):
-        sig = Signals(
-            likes=raw_eng.get("likes"),
-            reposts=raw_eng.get("reposts"),
-            replies=raw_eng.get("replies"),
-            quotes=raw_eng.get("quotes"),
+    metrics = entry.get("metrics")
+    if isinstance(metrics, dict):
+        sig = Engagement(
+            likes=metrics.get("likes"),
+            reposts=metrics.get("reposts"),
+            replies=metrics.get("replies"),
+            quotes=metrics.get("quotes"),
         )
         if sig.likes is not None or sig.reposts is not None:
-            sig.composite = _compute_composite_x(sig)
+            sig.composite = _x_composite(sig)
 
-    item_date = entry.get("date")
-    trust = _trust_level(item_date, start, end)
+    item_date = entry.get("posted")
+    trust = temporal.trust_level(item_date, start, end)
 
     return ContentItem(
-        item_id=entry.get("id", ""),
+        uid=entry.get("uid", ""),
         source=Source.X,
-        headline=entry.get("text", ""),
-        permalink=entry.get("url", ""),
-        author=entry.get("author_handle", ""),
+        title=entry.get("excerpt", ""),
+        link=entry.get("link", ""),
+        author=entry.get("handle", ""),
         published=item_date,
-        date_trust=trust,
-        signals=sig,
-        relevance=entry.get("relevance", 0.5),
-        rationale=entry.get("why_relevant", ""),
+        date_quality=trust,
+        engagement=sig,
+        signal=entry.get("signal", 0.5),
+        reason=entry.get("reason", ""),
         meta={
             "is_repost": bool(entry.get("is_repost", False)),
             "language": entry.get("language", "en"),
@@ -498,103 +463,82 @@ def from_x_raw(
     )
 
 
-def from_youtube_raw(
-    entry: Dict[str, Any],
-    start: str,
-    end: str,
-) -> ContentItem:
-    """Transform a single raw YouTube API dict into a ContentItem."""
+def from_youtube_raw(entry: Dict[str, Any], start: str, end: str) -> ContentItem:
     sig = None
-    view_count = entry.get("views")
-    like_count = entry.get("likes")
-    if view_count is not None or like_count is not None:
-        sig = Signals(views=view_count, likes=like_count)
-        sig.composite = _compute_composite_youtube(sig)
+    metrics = entry.get("metrics")
+    if isinstance(metrics, dict):
+        sig = Engagement(views=metrics.get("views"), likes=metrics.get("likes"))
+        sig.composite = _youtube_composite(sig)
 
-    item_date = entry.get("date")
-    trust = _trust_level(item_date, start, end)
+    item_date = entry.get("posted")
+    trust = temporal.trust_level(item_date, start, end)
 
     return ContentItem(
-        item_id=entry.get("id", ""),
+        uid=entry.get("uid", ""),
         source=Source.YOUTUBE,
-        headline=entry.get("title", ""),
-        permalink=entry.get("url", ""),
-        author=entry.get("channel_name", ""),
-        body=entry.get("description") or "",
+        title=entry.get("title", ""),
+        link=entry.get("link", ""),
+        author=entry.get("channel", ""),
+        summary=entry.get("summary") or "",
         published=item_date,
-        date_trust=trust,
-        signals=sig,
-        relevance=entry.get("relevance", 0.5),
-        rationale=entry.get("why_relevant", ""),
+        date_quality=trust,
+        engagement=sig,
+        signal=entry.get("signal", 0.5),
+        reason=entry.get("reason", ""),
         meta={
             "duration_seconds": entry.get("duration_seconds"),
         },
     )
 
 
-def from_linkedin_raw(
-    entry: Dict[str, Any],
-    start: str,
-    end: str,
-) -> ContentItem:
-    """Transform a single raw LinkedIn API dict into a ContentItem."""
+def from_linkedin_raw(entry: Dict[str, Any], start: str, end: str) -> ContentItem:
     sig = None
-    reaction_count = entry.get("reactions")
-    comment_count = entry.get("comments")
-    if reaction_count is not None or comment_count is not None:
-        sig = Signals(reactions=reaction_count, comments=comment_count)
-        sig.composite = _compute_composite_linkedin(sig)
+    metrics = entry.get("metrics")
+    if isinstance(metrics, dict):
+        sig = Engagement(reactions=metrics.get("reactions"), comments=metrics.get("comments"))
+        sig.composite = _linkedin_composite(sig)
 
-    item_date = entry.get("date")
-    trust = _trust_level(item_date, start, end)
+    item_date = entry.get("posted")
+    trust = temporal.trust_level(item_date, start, end)
 
     return ContentItem(
-        item_id=entry.get("id", ""),
+        uid=entry.get("uid", ""),
         source=Source.LINKEDIN,
-        headline=entry.get("text", ""),
-        permalink=entry.get("url", ""),
-        author=entry.get("author_name", ""),
+        title=entry.get("excerpt", ""),
+        link=entry.get("link", ""),
+        author=entry.get("author", ""),
         published=item_date,
-        date_trust=trust,
-        signals=sig,
-        relevance=entry.get("relevance", 0.5),
-        rationale=entry.get("why_relevant", ""),
+        date_quality=trust,
+        engagement=sig,
+        signal=entry.get("signal", 0.5),
+        reason=entry.get("reason", ""),
         meta={
-            "author_title": entry.get("author_title"),
+            "author_title": entry.get("role"),
         },
     )
 
 
-def from_web_raw(
-    entry: Dict[str, Any],
-    start: str,
-    end: str,
-) -> ContentItem:
-    """Transform a single raw web search dict into a ContentItem."""
-    item_date = entry.get("date")
-    trust = entry.get("date_confidence", "low")
+def from_web_raw(entry: Dict[str, Any], start: str, end: str) -> ContentItem:
+    item_date = entry.get("posted")
+    trust = entry.get("date_quality", "low")
 
     return ContentItem(
-        item_id=entry.get("id", ""),
+        uid=entry.get("uid", ""),
         source=Source.WEB,
-        headline=entry.get("title", ""),
-        permalink=entry.get("url", ""),
-        author=entry.get("source_domain", ""),
-        body=entry.get("snippet", ""),
+        title=entry.get("title", ""),
+        link=entry.get("link", ""),
+        author=entry.get("domain", ""),
+        summary=entry.get("snippet", ""),
         published=item_date,
-        date_trust=trust,
-        relevance=entry.get("relevance", 0.45),
-        rationale=entry.get("why_relevant", ""),
+        date_quality=trust,
+        signal=entry.get("signal", 0.45),
+        reason=entry.get("reason", ""),
         meta={
-            "source_domain": entry.get("source_domain", ""),
+            "source_domain": entry.get("domain", ""),
             "language": entry.get("language", "en"),
         },
     )
 
-
-# ---------------------------------------------------------------------------
-# Batch factory functions (list wrappers)
-# ---------------------------------------------------------------------------
 
 _FACTORY = {
     Source.REDDIT: from_reddit_raw,
@@ -605,15 +549,9 @@ _FACTORY = {
 }
 
 
-def items_from_raw(
-    raw_items: List[Dict[str, Any]],
-    source: Source,
-    start: str,
-    end: str,
-) -> List[ContentItem]:
-    """Convert a list of raw dicts into ContentItems for the given source."""
-    factory = _FACTORY[source]
-    return [factory(entry, start, end) for entry in raw_items]
+def items_from_raw(raw_items: List[Dict[str, Any]], source: Source, start: str, end: str) -> List[ContentItem]:
+    converter: Callable[[Dict[str, Any], str, str], ContentItem] = _FACTORY[source]
+    return [converter(entry, start, end) for entry in raw_items]
 
 
 def filter_by_date(
@@ -622,21 +560,19 @@ def filter_by_date(
     end: str,
     exclude_undated: bool = False,
 ) -> List[ContentItem]:
-    """Remove items with verified dates outside the acceptable range."""
-    filtered = []
+    selected: List[ContentItem] = []
     for item in items:
         if item.published is None:
             if not exclude_undated:
-                filtered.append(item)
+                selected.append(item)
             continue
         if item.published < start:
             continue
         if item.published > end:
             continue
-        filtered.append(item)
-    return filtered
+        selected.append(item)
+    return selected
 
 
 def as_dicts(items: List[ContentItem]) -> List[Dict[str, Any]]:
-    """Convert ContentItem objects to dicts for JSON serialization."""
     return [item.to_dict() for item in items]

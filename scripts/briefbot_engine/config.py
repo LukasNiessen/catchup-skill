@@ -1,9 +1,11 @@
-"""Configuration and credential management."""
+"""Configuration loading and source validation."""
 
 import os
 import sys
 from pathlib import Path
 from typing import Optional, Dict, Any, Tuple
+
+from . import paths
 
 
 def _log(message: str):
@@ -13,8 +15,10 @@ def _log(message: str):
         sys.stderr.flush()
 
 
-CONFIG_DIR = Path.home() / ".config" / "briefbot"
-CONFIG_FILE = CONFIG_DIR / ".env"
+CONFIG_DIR = paths.config_dir()
+CONFIG_FILE = paths.config_file()
+LEGACY_CONFIG_FILE = paths.legacy_config_file()
+_TRUTHY = {"1", "true", "yes", "on", "y", "t"}
 
 
 def _strip_inline_comment(value: str) -> str:
@@ -35,7 +39,7 @@ def _strip_inline_comment(value: str) -> str:
 
 
 def parse_dotenv(filepath: Path) -> Dict[str, str]:
-    """Parse a dotenv-like file into a dict."""
+    """Parse `.env` style file with inline-comment stripping."""
     parsed: Dict[str, str] = {}
 
     _log(f"Loading config from: {filepath}")
@@ -46,8 +50,8 @@ def parse_dotenv(filepath: Path) -> Dict[str, str]:
 
     _log("Config file exists, parsing...")
 
-    with open(filepath, "r") as fh:
-        for raw_line in fh:
+    with open(filepath, "r", encoding="utf-8") as handle:
+        for raw_line in handle:
             stripped = raw_line.strip()
 
             if not stripped or stripped.startswith("#"):
@@ -78,11 +82,22 @@ def parse_dotenv(filepath: Path) -> Dict[str, str]:
     return parsed
 
 
+def _pick_config_file() -> Path:
+    """Resolve the config file path, preferring the new location."""
+    if CONFIG_FILE.exists():
+        return CONFIG_FILE
+    if LEGACY_CONFIG_FILE.exists():
+        _log(f"Using legacy config file at {LEGACY_CONFIG_FILE}")
+        return LEGACY_CONFIG_FILE
+    return CONFIG_FILE
+
+
 def load_config() -> Dict[str, Any]:
-    """Build complete config from file + env vars (env vars take precedence)."""
+    """Load config from file and environment, with env taking precedence."""
     _log("=== Assembling configuration ===")
 
-    file_settings = parse_dotenv(CONFIG_FILE)
+    config_path = _pick_config_file()
+    file_settings = parse_dotenv(config_path)
 
     env_openai = os.environ.get("OPENAI_API_KEY")
     env_xai = os.environ.get("XAI_API_KEY")
@@ -91,39 +106,36 @@ def load_config() -> Dict[str, Any]:
     _log(f"OPENAI_API_KEY: env={f'SET ({len(env_openai)} chars)' if env_openai else 'NOT SET'}, file={f'SET ({len(file_openai)} chars)' if file_openai else 'NOT SET'}")
     _log(f"XAI_API_KEY: env={f'SET ({len(env_xai)} chars)' if env_xai else 'NOT SET'}, file={f'SET ({len(file_xai)} chars)' if file_xai else 'NOT SET'}")
 
-    cfg = {
-        "OPENAI_API_KEY": os.environ.get("OPENAI_API_KEY")
-        or file_settings.get("OPENAI_API_KEY"),
-        "XAI_API_KEY": os.environ.get("XAI_API_KEY")
-        or file_settings.get("XAI_API_KEY"),
-        "OPENAI_MODEL_POLICY": os.environ.get("OPENAI_MODEL_POLICY")
-        or file_settings.get("OPENAI_MODEL_POLICY", "auto"),
-        "OPENAI_MODEL_PIN": os.environ.get("OPENAI_MODEL_PIN")
-        or file_settings.get("OPENAI_MODEL_PIN"),
-        "XAI_MODEL_POLICY": os.environ.get("XAI_MODEL_POLICY")
-        or file_settings.get("XAI_MODEL_POLICY", "latest"),
-        "XAI_MODEL_PIN": os.environ.get("XAI_MODEL_PIN")
-        or file_settings.get("XAI_MODEL_PIN"),
-        "ELEVENLABS_API_KEY": os.environ.get("ELEVENLABS_API_KEY")
-        or file_settings.get("ELEVENLABS_API_KEY"),
-        "ELEVENLABS_VOICE_ID": os.environ.get("ELEVENLABS_VOICE_ID")
-        or file_settings.get("ELEVENLABS_VOICE_ID"),
-        "SMTP_HOST": os.environ.get("SMTP_HOST") or file_settings.get("SMTP_HOST"),
-        "SMTP_PORT": os.environ.get("SMTP_PORT")
-        or file_settings.get("SMTP_PORT", "587"),
-        "SMTP_USER": os.environ.get("SMTP_USER") or file_settings.get("SMTP_USER"),
-        "SMTP_PASSWORD": os.environ.get("SMTP_PASSWORD")
-        or file_settings.get("SMTP_PASSWORD"),
-        "SMTP_FROM": os.environ.get("SMTP_FROM") or file_settings.get("SMTP_FROM"),
-        "SMTP_USE_TLS": os.environ.get("SMTP_USE_TLS")
-        or file_settings.get("SMTP_USE_TLS", "true"),
-        "TELEGRAM_BOT_TOKEN": os.environ.get("TELEGRAM_BOT_TOKEN")
-        or file_settings.get("TELEGRAM_BOT_TOKEN"),
-        "TELEGRAM_CHAT_ID": os.environ.get("TELEGRAM_CHAT_ID")
-        or file_settings.get("TELEGRAM_CHAT_ID"),
-        "AUTH_TOKEN": os.environ.get("AUTH_TOKEN") or file_settings.get("AUTH_TOKEN"),
-        "CT0": os.environ.get("CT0") or file_settings.get("CT0"),
+    key_defaults = {
+        "OPENAI_MODEL_POLICY": "auto",
+        "XAI_MODEL_POLICY": "latest",
+        "SMTP_PORT": "587",
+        "SMTP_USE_TLS": "true",
     }
+    keys = [
+        "OPENAI_API_KEY",
+        "XAI_API_KEY",
+        "OPENAI_MODEL_POLICY",
+        "OPENAI_MODEL_PIN",
+        "XAI_MODEL_POLICY",
+        "XAI_MODEL_PIN",
+        "ELEVENLABS_API_KEY",
+        "ELEVENLABS_VOICE_ID",
+        "SMTP_HOST",
+        "SMTP_PORT",
+        "SMTP_USER",
+        "SMTP_PASSWORD",
+        "SMTP_FROM",
+        "SMTP_USE_TLS",
+        "TELEGRAM_BOT_TOKEN",
+        "TELEGRAM_CHAT_ID",
+    ]
+    cfg = {}
+    for key in keys:
+        env_value = os.environ.get(key)
+        file_value = file_settings.get(key)
+        fallback = key_defaults.get(key)
+        cfg[key] = env_value or file_value or fallback
 
     eff_openai = cfg.get("OPENAI_API_KEY")
     eff_xai = cfg.get("XAI_API_KEY")
@@ -137,25 +149,22 @@ def load_config() -> Dict[str, Any]:
 
 def settings_file_exists() -> bool:
     """Check whether the config file exists."""
-    return CONFIG_FILE.exists()
+    return CONFIG_FILE.exists() or LEGACY_CONFIG_FILE.exists()
 
 
 def determine_available_platforms(configuration: Dict[str, Any]) -> str:
-    """Identify accessible platforms based on configured keys and Bird cookies.
+    """Identify accessible platforms based on configured keys.
 
     Returns one of: "both", "reddit", "x", "web", or "all".
     """
     _log("=== Determining available platforms ===")
     openai_ok = bool(configuration.get("OPENAI_API_KEY"))
     xai_ok = bool(configuration.get("XAI_API_KEY"))
-    bird_ok = is_bird_x_available()
-
-    x_ok = xai_ok or bird_ok
+    x_ok = xai_ok
 
     _log(f"  OpenAI configured: {openai_ok}")
     _log(f"  xAI configured:    {xai_ok}")
-    _log(f"  Bird available:     {bird_ok}")
-    _log(f"  X available (xAI or Bird): {x_ok}")
+    _log(f"  X available (xAI): {x_ok}")
 
     if openai_ok and x_ok:
         _log("  Result: 'both' (OpenAI + X)")
@@ -175,9 +184,7 @@ def identify_missing_credentials(configuration: Dict[str, Any]) -> str:
     """Return which API keys are absent: 'none', 'x', 'reddit', or 'both'."""
     openai_ok = bool(configuration.get("OPENAI_API_KEY"))
     xai_ok = bool(configuration.get("XAI_API_KEY"))
-    bird_ok = is_bird_x_available()
-
-    has_x = xai_ok or bird_ok
+    has_x = xai_ok
 
     if openai_ok and has_x:
         return "none"
@@ -189,19 +196,6 @@ def identify_missing_credentials(configuration: Dict[str, Any]) -> str:
         return "both"
 
 
-def is_bird_x_available() -> bool:
-    """Check if Bird X search is installed and authenticated."""
-    try:
-        from briefbot_engine.providers import bird
-
-        installed = bird.is_bird_installed()
-        authenticated = bool(bird.is_bird_authenticated()) if installed else False
-        result = installed and authenticated
-        _log(f"Bird X check: installed={installed}, authenticated={authenticated}, available={result}")
-        return result
-    except Exception as exc:
-        _log(f"Bird X check failed with exception: {exc}")
-        return False
 
 
 def validate_sources(
@@ -219,17 +213,15 @@ def validate_sources(
             return "web", None
         return (
             "web",
-            "No API keys found. Falling back to WebSearch only. Configure ~/.config/briefbot/.env to enable Reddit, X, YouTube, and LinkedIn.",
+            "No API keys found. Falling back to WebSearch only. Configure ~/.config/briefbot/.env (or legacy ~/.config/briefbot/.env) to enable Reddit, X, YouTube, and LinkedIn.",
         )
 
     mode_map = {
-        ("auto", False): {"both": "both", "reddit": "reddit", "x": "x"},
-        ("auto", True): {"both": "all", "reddit": "reddit-web", "x": "x-web"},
+        False: {"both": "both", "reddit": "reddit", "x": "x"},
+        True: {"both": "all", "reddit": "reddit-web", "x": "x-web"},
     }
     if requested_sources == "auto":
-        resolved = mode_map[("auto", bool(include_web_search))].get(
-            available_platforms, available_platforms
-        )
+        resolved = mode_map[bool(include_web_search)].get(available_platforms, available_platforms)
         return resolved, None
 
     if requested_sources == "web":
@@ -239,7 +231,7 @@ def validate_sources(
         if available_platforms == "both":
             return "all", None
         if available_platforms == "reddit":
-            return "all", "Note: X source unavailable (missing xAI key and Bird authentication). X/Twitter will be skipped."
+            return "all", "Note: X source unavailable (missing xAI key). X/Twitter will be skipped."
         if available_platforms == "x":
             return "all", "Note: OpenAI key missing; Reddit/YouTube/LinkedIn will be skipped."
         return "web", "No API keys configured."
@@ -247,7 +239,7 @@ def validate_sources(
     if requested_sources == "both":
         if available_platforms == "both":
             return ("all", None) if include_web_search else ("both", None)
-        missing = "xAI/Bird" if available_platforms == "reddit" else "OpenAI"
+        missing = "xAI" if available_platforms == "reddit" else "OpenAI"
         return "none", f"Cannot use both sources: missing {missing} credentials. Try --sources=auto for automatic fallback."
 
     source_requirements = {
@@ -259,10 +251,11 @@ def validate_sources(
     requirement = source_requirements.get(requested_sources)
     if requirement == "openai" and available_platforms == "x":
         label = requested_sources.capitalize()
-        return "none", f"{label} was requested but only xAI/Bird credentials are configured."
+        return "none", f"{label} was requested but only xAI credentials are configured."
     if requirement == "x" and available_platforms == "reddit":
-        return "none", "X source requires xAI or Bird credentials, but only an OpenAI key was found."
+        return "none", "X source requires an xAI credential, but only an OpenAI key was found."
 
     if requested_sources == "reddit":
         return ("reddit-web", None) if include_web_search else ("reddit", None)
     return requested_sources, None
+

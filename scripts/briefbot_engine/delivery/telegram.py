@@ -262,3 +262,5 @@ def send_telegram_message(
             {"chat_id": chat_id, "caption": "PDF briefing"},
             {"document": Path(pdf_path)},
         )
+
+

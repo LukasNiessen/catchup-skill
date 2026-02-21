@@ -1,5 +1,7 @@
 """YouTube discovery via OpenAI Responses API with web search."""
 
+from __future__ import annotations
+
 import json
 import re
 import sys
@@ -7,27 +9,22 @@ from typing import Any, Dict, List, Optional
 
 from .. import net
 
-# Fallback chain when the primary model is inaccessible
 FALLBACK_MODELS = ["gpt-4o", "gpt-4o-mini"]
 
 
-def _err(msg: str):
-    """Log an error to stderr."""
+def _err(msg: str) -> None:
     sys.stderr.write(f"[YOUTUBE ERROR] {msg}\n")
     sys.stderr.flush()
 
 
-def _info(msg: str):
-    """Log informational output to stderr."""
+def _info(msg: str) -> None:
     sys.stderr.write(f"[YOUTUBE] {msg}\n")
     sys.stderr.flush()
 
 
 def _is_access_err(err: net.HTTPError) -> bool:
-    """Check whether the error signals a model-access or verification problem."""
     if err.status_code not in (400, 403) or not err.body:
         return False
-
     lowered = err.body.lower()
     indicators = (
         "organization must be verified",
@@ -41,53 +38,57 @@ def _is_access_err(err: net.HTTPError) -> bool:
 
 API_URL = "https://api.openai.com/v1/responses"
 
-# How many results to request per depth level
 DEPTH_SPECS = {
-    "quick": {"min": 7, "max": 13},
-    "default": {"min": 14, "max": 24},
-    "deep": {"min": 28, "max": 52},
+    "quick": {"min": 6, "max": 12},
+    "default": {"min": 12, "max": 22},
+    "deep": {"min": 26, "max": 48},
 }
 
-YOUTUBE_DISCOVERY_PROMPT = """Locate YouTube videos related to: {topic}
+YOUTUBE_DISCOVERY_PROMPT = """Find YouTube videos about: {topic}
 
-Identify the main subject, ignoring filler words like "best", "top", "tutorial".
-Search YouTube using the core subject via site:youtube.com queries.
+Distill the topic into a short search phrase, then search YouTube via site:youtube.com.
+Return only actual video URLs (youtube.com/watch?v= or youtu.be).
 
-We filter dates server-side, so include everything relevant you find.
+Target {min_items}-{max_items} videos.
 
-Only return actual video URLs (youtube.com/watch?v= or youtu.be/).
-Skip playlists, channel pages, and non-video links.
-
-Target {min_items}-{max_items} videos. More is better.
-
-JSON format:
+Return JSON only:
 {{
-  "items": [
+  "videos": [
     {{
       "title": "Video title",
-      "url": "https://www.youtube.com/watch?v=...",
-      "channel_name": "Channel Name",
-      "date": "YYYY-MM-DD or null",
-      "views": 12345,
-      "likes": 500,
-      "description": "Short description or null",
-      "why_relevant": "Relevance explanation",
-      "relevance": 0.85
+      "link": "https://www.youtube.com/watch?v=...",
+      "channel": "Channel Name",
+      "posted": "YYYY-MM-DD or null",
+      "metrics": {{
+        "views": 12345,
+        "likes": 500
+      }},
+      "summary": "Short description or null",
+      "signal": 0.85,
+      "reason": "Why this video is relevant"
     }}
   ]
-}}"""
+}}
+"""
 
 
-def _core_subject(verbose_query: str) -> str:
-    """Strip filler words from a query, returning the essential subject."""
-    compact = re.sub(
-        r"\b(how\s+to|tips?\s+for|best|top|tutorials?|recommendations?|guide|advice|walkthrough)\b",
-        " ",
-        verbose_query.lower(),
-    )
-    stop = {"using", "for", "with", "the", "of", "in", "on", "videos", "video"}
-    tokens = [tok for tok in re.findall(r"[a-z0-9][a-z0-9.+_-]*", compact) if tok not in stop]
-    return " ".join(tokens[:3]) or verbose_query
+def _extract_items(output_text: str) -> List[Dict[str, Any]]:
+    if not output_text:
+        return []
+    decoder = json.JSONDecoder()
+    cursor = 0
+    while True:
+        start = output_text.find("{", cursor)
+        if start < 0:
+            return []
+        try:
+            candidate, consumed = decoder.raw_decode(output_text[start:])
+        except json.JSONDecodeError:
+            cursor = start + 1
+            continue
+        if isinstance(candidate, dict) and isinstance(candidate.get("videos"), list):
+            return candidate["videos"]
+        cursor = start + max(consumed, 1)
 
 
 def search(
@@ -100,7 +101,6 @@ def search(
     mock_response: Optional[Dict] = None,
     _is_retry: bool = False,
 ) -> Dict[str, Any]:
-    """Query YouTube videos via OpenAI Responses API web search."""
     if mock_response is not None:
         return mock_response
 
@@ -131,13 +131,11 @@ def search(
     for current_model in models_chain:
         payload = {
             "model": current_model,
-            "input": prompt,
+            "input": [{"role": "user", "content": prompt}],
             "tools": [
                 {
                     "type": "web_search",
-                    "filters": {
-                        "allowed_domains": ["youtube.com", "youtu.be"],
-                    },
+                    "filters": {"allowed_domains": ["youtube.com", "youtu.be"]},
                 }
             ],
             "include": ["web_search_call.action.sources"],
@@ -160,10 +158,8 @@ def search(
 
 
 def parse_youtube_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Parse YouTube items from an OpenAI API response."""
-    extracted = []
+    extracted: List[Dict[str, Any]] = []
 
-    # API-level error check
     if api_response.get("error"):
         err_data = api_response["error"]
         err_msg = err_data.get("message", str(err_data)) if isinstance(err_data, dict) else str(err_data)
@@ -172,31 +168,25 @@ def parse_youtube_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]]
             _err(f"Full error response: {json.dumps(api_response, indent=2)[:1000]}")
         return extracted
 
-    # Find output text in the response
     output_text = ""
+    output_data = api_response.get("output")
+    if isinstance(output_data, str):
+        output_text = output_data
+    elif isinstance(output_data, list):
+        for elem in output_data:
+            if isinstance(elem, dict):
+                if elem.get("type") == "message":
+                    for block in elem.get("content", []):
+                        if isinstance(block, dict) and block.get("type") == "output_text":
+                            output_text = block.get("text", "")
+                            break
+                elif "text" in elem:
+                    output_text = elem["text"]
+            elif isinstance(elem, str):
+                output_text = elem
+            if output_text:
+                break
 
-    if "output" in api_response:
-        output_data = api_response["output"]
-
-        if isinstance(output_data, str):
-            output_text = output_data
-        elif isinstance(output_data, list):
-            for elem in output_data:
-                if isinstance(elem, dict):
-                    if elem.get("type") == "message":
-                        for block in elem.get("content", []):
-                            if isinstance(block, dict) and block.get("type") == "output_text":
-                                output_text = block.get("text", "")
-                                break
-                    elif "text" in elem:
-                        output_text = elem["text"]
-                elif isinstance(elem, str):
-                    output_text = elem
-
-                if output_text:
-                    break
-
-    # Legacy format fallback
     if not output_text and "choices" in api_response:
         for choice in api_response["choices"]:
             if "message" in choice:
@@ -207,55 +197,43 @@ def parse_youtube_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]]
         print(f"[YOUTUBE WARNING] No output text found in response. Keys: {list(api_response.keys())}", flush=True)
         return extracted
 
-    # Pull JSON from the text
-    match = re.search(r'\{[\s\S]*"items"[\s\S]*\}', output_text)
+    raw_items = _extract_items(output_text)
 
-    if match:
-        try:
-            parsed = json.loads(match.group())
-            extracted = parsed.get("items", [])
-        except json.JSONDecodeError:
-            pass
-
-    # Validate and normalise each item
-    validated = []
-
-    for idx, raw in enumerate(extracted):
+    validated: List[Dict[str, Any]] = []
+    for idx, raw in enumerate(raw_items):
         if not isinstance(raw, dict):
             continue
 
-        url = raw.get("url", "")
-        if not url:
+        link = raw.get("link", "")
+        if not link:
+            continue
+        if "youtube.com" not in link and "youtu.be" not in link:
+            continue
+        if "/playlist" in link or "/channel/" in link or "/@" in link:
             continue
 
-        # Must be a YouTube video URL
-        if "youtube.com" not in url and "youtu.be" not in url:
-            continue
-
-        # Reject playlists and channel pages
-        if "/playlist" in url or "/channel/" in url or "/@" in url:
-            continue
-
-        desc = raw.get("description")
-        if desc:
-            desc = str(desc).strip()[:300]
+        summary = raw.get("summary")
+        if summary:
+            summary = str(summary).strip()[:300]
 
         item = {
-            "id": f"YT{idx + 1}",
+            "uid": f"YT{idx + 1}",
             "title": str(raw.get("title", "")).strip(),
-            "url": url,
-            "channel_name": str(raw.get("channel_name", "")).strip(),
-            "date": raw.get("date"),
-            "views": int(raw.get("views", 0)) if raw.get("views") else None,
-            "likes": int(raw.get("likes", 0)) if raw.get("likes") else None,
-            "description": desc,
-            "why_relevant": str(raw.get("why_relevant", "")).strip(),
-            "relevance": min(1.0, max(0.0, float(raw.get("relevance", 0.5)))),
+            "link": link,
+            "channel": str(raw.get("channel", "")).strip(),
+            "posted": raw.get("posted"),
+            "metrics": {
+                "views": int(raw.get("metrics", {}).get("views", 0)) if raw.get("metrics", {}).get("views") else None,
+                "likes": int(raw.get("metrics", {}).get("likes", 0)) if raw.get("metrics", {}).get("likes") else None,
+            },
+            "summary": summary,
+            "reason": str(raw.get("reason", "")).strip(),
+            "signal": min(1.0, max(0.0, float(raw.get("signal", 0.5)))),
         }
 
-        if item["date"]:
-            if not re.match(r'^\d{4}-\d{2}-\d{2}$', str(item["date"])):
-                item["date"] = None
+        if item["posted"]:
+            if not re.match(r'^\d{4}-\d{2}-\d{2}$', str(item["posted"])):
+                item["posted"] = None
 
         validated.append(item)
 
