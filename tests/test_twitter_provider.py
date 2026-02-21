@@ -2,8 +2,8 @@
 
 import pytest
 
-from briefbot_engine.net import HTTPError
-from briefbot_engine.providers import twitter
+from briefbot_engine.http_client import HTTPError
+from briefbot_engine.sources import x_posts
 
 
 def test_is_model_access_error_detects_400_access_message():
@@ -12,7 +12,7 @@ def test_is_model_access_error_detects_400_access_message():
         status_code=400,
         response_body="This API key does not have access to model grok-4-fast.",
     )
-    assert twitter._is_model_access_error(err) is True
+    assert x_posts._is_model_access_error(err) is True
 
 
 def test_is_model_access_error_detects_422_with_model_not_found():
@@ -21,7 +21,7 @@ def test_is_model_access_error_detects_422_with_model_not_found():
         status_code=422,
         response_body="Model not found for this account",
     )
-    assert twitter._is_model_access_error(err) is True
+    assert x_posts._is_model_access_error(err) is True
 
 
 def test_is_model_access_error_ignores_unrelated_400():
@@ -30,7 +30,7 @@ def test_is_model_access_error_ignores_unrelated_400():
         status_code=400,
         response_body="Malformed request body",
     )
-    assert twitter._is_model_access_error(err) is False
+    assert x_posts._is_model_access_error(err) is False
 
 
 def test_search_retries_with_fallback_on_400_access_error(monkeypatch):
@@ -47,12 +47,16 @@ def test_search_retries_with_fallback_on_400_access_error(monkeypatch):
             )
         return {"ok": True, "model": model, "output": []}
 
-    monkeypatch.setattr(twitter, "_make_request", fake_make_request)
-    monkeypatch.setattr(twitter, "MODEL_FALLBACKS", ["grok-4-1-fast-non-reasoning"])
-    monkeypatch.setattr(twitter.registry, "set_cached_model", lambda provider, model: cache_updates.append((provider, model)))
-    monkeypatch.setattr(twitter.registry, "discover_xai_models", lambda _key: [])
+    monkeypatch.setattr(x_posts, "_make_request", fake_make_request)
+    monkeypatch.setattr(x_posts, "MODEL_FALLBACKS", ["grok-4-1-fast-non-reasoning"])
+    monkeypatch.setattr(
+        x_posts.catalog,
+        "set_cached_model",
+        lambda provider, model: cache_updates.append((provider, model)),
+    )
+    monkeypatch.setattr(x_posts.catalog, "discover_xai_models", lambda _key: [])
 
-    response = twitter.search(
+    response = x_posts.search(
         key="xai-test-key",
         model="grok-4-fast",
         topic="test",
@@ -74,11 +78,11 @@ def test_search_does_not_fallback_for_unrelated_400(monkeypatch):
             response_body="Malformed request body",
         )
 
-    monkeypatch.setattr(twitter, "_make_request", fake_make_request)
-    monkeypatch.setattr(twitter.registry, "discover_xai_models", lambda _key: [])
+    monkeypatch.setattr(x_posts, "_make_request", fake_make_request)
+    monkeypatch.setattr(x_posts.catalog, "discover_xai_models", lambda _key: [])
 
     with pytest.raises(HTTPError) as exc:
-        twitter.search(
+        x_posts.search(
             key="xai-test-key",
             model="grok-4-fast",
             topic="test",
@@ -99,13 +103,13 @@ def test_search_uses_discovered_models_after_hardcoded_failures(monkeypatch):
             response_body="access denied",
         )
 
-    monkeypatch.setattr(twitter, "_make_request", fake_make_request)
-    monkeypatch.setattr(twitter, "MODEL_FALLBACKS", ["grok-hardcoded-a"])
-    monkeypatch.setattr(twitter.registry, "set_cached_model", lambda *_args: None)
-    monkeypatch.setattr(twitter.registry, "discover_xai_models", lambda _key: ["grok-discovered-b"])
+    monkeypatch.setattr(x_posts, "_make_request", fake_make_request)
+    monkeypatch.setattr(x_posts, "MODEL_FALLBACKS", ["grok-hardcoded-a"])
+    monkeypatch.setattr(x_posts.catalog, "set_cached_model", lambda *_args: None)
+    monkeypatch.setattr(x_posts.catalog, "discover_xai_models", lambda _key: ["grok-discovered-b"])
 
     with pytest.raises(HTTPError) as exc:
-        twitter.search(
+        x_posts.search(
             key="xai-test-key",
             model="grok-primary",
             topic="test",
@@ -131,13 +135,13 @@ Here is the data:
   "meta": {"model": "grok-4-1-fast"},
   "posts": [
     {
-      "excerpt": "hello world",
-      "link": "https://x.com/u/status/1",
+      "snippet": "hello world",
+      "url": "https://x.com/u/status/1",
       "handle": "u",
-      "posted": "2026-02-20",
-      "metrics": {"likes": 1, "reposts": 2, "replies": 3, "quotes": 4},
-      "reason": "test",
-      "signal": 0.9
+      "dated": "2026-02-20",
+      "signals": {"likes": 1, "reposts": 2, "replies": 3, "quotes": 4},
+      "rationale": "test",
+      "topicality": 0.9
     }
   ]
 }
@@ -147,7 +151,7 @@ Here is the data:
             }
         ]
     }
-    items = twitter.parse_x_response(response)
+    items = x_posts.parse_x_response(response)
     assert len(items) == 1
-    assert items[0]["uid"] == "X1"
+    assert items[0]["key"] == "X-01"
     assert items[0]["handle"] == "u"

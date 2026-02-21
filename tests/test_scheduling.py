@@ -172,7 +172,7 @@ def test_create_job_has_required_fields(tmp_path):
         topic="AI news",
         schedule="0 6 * * *",
         email="test@example.com",
-        args_dict={"quick": True},
+        args_dict={"sampling": "lite"},
         filepath=jobs_file,
     )
     assert "id" in job

@@ -15,29 +15,31 @@ briefbot-skill/
 - SKILL.md
 - ARCHITECTURE.md
 - README.md
-- SPEC.md
 - scripts/
   - briefbot.py
   - deliver.py
+  - run.sh
   - run_job.py
   - setup.py
   - telegram_bot.py
   - briefbot_engine/
-    - content.py
-    - ranking.py
-    - temporal.py
-    - config.py
-    - net.py
-    - output.py
-    - terminal.py
-    - providers/
-      - registry.py
-      - reddit.py
-      - twitter.py
-      - youtube.py
-      - linkedin.py
-      - enrich.py
-      - web.py
+    - analysis.py
+    - console.py
+    - http_client.py
+    - locations.py
+    - presenter.py
+    - records.py
+    - scoring.py
+    - settings.py
+    - timeframe.py
+    - sources/
+      - catalog.py
+      - reddit_source.py
+      - x_posts.py
+      - youtube_feed.py
+      - linkedin_feed.py
+      - hydrate.py
+      - webscan.py
       - claude_web.py
     - delivery/
     - scheduling/
@@ -66,17 +68,17 @@ allowed-tools: Bash, Read, Write, AskUserQuestion, WebSearch
 User: /briefbot [topic] for [tool]
   -> SKILL.md parsed by Claude Code
   -> Agent dispatches via Bash:
-     python scripts/briefbot.py "$ARGUMENTS" --emit=compact
+     python scripts/briefbot.py "$ARGUMENTS" --view=snapshot
   -> Script runs parallel searches -> processes -> outputs results
   -> Claude synthesizes findings and waits for user direction
 ```
 
-## Unified Content Model (`content.py`)
+## Unified Content Model (`records.py`)
 
-All platform results share a single `ContentItem` dataclass:
+All platform results share a single `Signal` object with shared metadata:
 
 ```python
-class Source(Enum):
+class Channel(Enum):
     REDDIT = "reddit"
     X = "x"
     YOUTUBE = "youtube"
@@ -84,132 +86,122 @@ class Source(Enum):
     WEB = "web"
 
 @dataclass
-class Engagement:
-    composite: Optional[float] = None
-    upvotes: Optional[int] = None
-    comments: Optional[int] = None
-    vote_ratio: Optional[float] = None
-    likes: Optional[int] = None
-    reposts: Optional[int] = None
-    replies: Optional[int] = None
-    quotes: Optional[int] = None
-    views: Optional[int] = None
-    reactions: Optional[int] = None
-    bookmarks: Optional[int] = None
+class Interaction:
+    pulse: Optional[float]
+    upvotes: Optional[int]
+    comments: Optional[int]
+    ratio: Optional[float]
+    likes: Optional[int]
+    reposts: Optional[int]
+    replies: Optional[int]
+    quotes: Optional[int]
+    views: Optional[int]
+    reactions: Optional[int]
+    bookmarks: Optional[int]
 
 @dataclass
-class ScoreBreakdown:
-    relevance: int = 0
-    timeliness: int = 0
-    traction: int = 0
-    credibility: int = 0
+class Scorecard:
+    topicality: int
+    freshness: int
+    traction: int
+    trust: int
 
 @dataclass
-class ContentItem:
-    uid: str
-    source: Source
-    title: str
-    link: str
-    author: str = ""
-    summary: str = ""
-    published: Optional[str] = None
-    date_confidence: str = "weak"
-    engagement: Optional[Engagement] = None
-    relevance: float = 0.5
-    reason: str = ""
-    score: int = 0
-    breakdown: ScoreBreakdown = field(default_factory=ScoreBreakdown)
-    comments: List[CommentNote] = field(default_factory=list)
-    comment_highlights: List[str] = field(default_factory=list)
-    meta: Dict[str, Any] = field(default_factory=dict)
+class Signal:
+    key: str
+    channel: Channel
+    headline: str
+    url: str
+    byline: str = ""
+    blurb: str = ""
+    dated: Optional[str] = None
+    time_confidence: str = "low"
+    interaction: Optional[Interaction] = None
+    topicality: float = 0.5
+    rationale: str = ""
+    rank: int = 0
+    scorecard: Scorecard = field(default_factory=Scorecard)
+    thread_notes: List[ThreadNote] = field(default_factory=list)
+    notables: List[str] = field(default_factory=list)
+    extras: Dict[str, Any] = field(default_factory=dict)
 ```
 
-Report stores items with property-based filtering:
+Reports store items on a `Brief` object with channel helpers:
 
 ```python
 @dataclass
-class Report:
+class Brief:
     topic: str
-    window: Window
+    span: Span
     generated_at: str
     mode: str
-    models: ModelUsage
-    items: List[ContentItem] = field(default_factory=list)
-    errors: ErrorBag = field(default_factory=ErrorBag)
+    items: List[Signal] = field(default_factory=list)
 
     @property
-    def reddit(self) -> List[ContentItem]:
-        return [i for i in self.items if i.source == Source.REDDIT]
+    def reddit(self) -> List[Signal]:
+        return [i for i in self.items if i.channel == Channel.REDDIT]
 ```
 
-Factory functions convert raw API responses to ContentItem:
-- `from_reddit_raw(entry, start, end) -> ContentItem`
-- `from_x_raw(entry, start, end) -> ContentItem`
-- `from_youtube_raw(entry, start, end) -> ContentItem`
-- `from_linkedin_raw(entry, start, end) -> ContentItem`
-- `from_web_raw(entry, start, end) -> ContentItem`
+Normalization helpers live in `records.items_from_raw()` and `records.filter_by_date()`.
 
-## Scoring System (`ranking.py`)
+## Scoring System (`scoring.py`)
 
-### Percentile + Power-Mean Scoring
+### Percentile + Geometric Blend
 
-Instead of linear weighted sums, scoring uses percentile ranks combined via a weighted power mean:
+Scores are derived by percentile-normalizing topicality, freshness, traction, and trust, then blending via a weighted geometric mean. This emphasizes consistent strength across dimensions instead of allowing a single dominant metric to overwhelm the rank.
 
-1. Convert raw values (relevance, timeliness, traction) to percentile ranks (0-100)
-2. Add credibility as a source-weighted adjustment
-3. Combine dimensions via weighted power mean, then apply confidence penalties/bonuses
+Platform weights:
+- Topicality: 0.38
+- Freshness: 0.27
+- Traction: 0.23
+- Trust: 0.12
 
-Dimension weights (platform items):
-- Relevance: 0.40
-- Timeliness: 0.28
-- Traction: 0.22
-- Credibility: 0.10
+Web weights:
+- Topicality: 0.52
+- Freshness: 0.33
+- Trust: 0.15
 
-Dimension weights (web items):
-- Relevance: 0.58
-- Timeliness: 0.30
-- Credibility: 0.12
+### Jaccard Shingle Deduplication
 
-### SimHash Deduplication
-
-Near-duplicate detection uses SimHash with a 64-bit fingerprint and Hamming distance threshold <= 10 bits.
+Near-duplicates are detected using word-shingle Jaccard similarity and suppressed before the final ranking pass.
 
 ## Search Providers
 
-- Reddit (`providers/reddit.py`): OpenAI Responses API with `web_search` filtered to `reddit.com`
-- X/Twitter (`providers/twitter.py`): xAI Responses API with `x_search`
-- YouTube (`providers/youtube.py`): OpenAI Responses API with `web_search` filtered to `youtube.com`
-- LinkedIn (`providers/linkedin.py`): OpenAI Responses API with `web_search` filtered to `linkedin.com`
-- Web (`providers/web.py`): WebSearch fallback with domain exclusions
+- Reddit (`sources/reddit_source.py`): OpenAI Responses API with `web_search` filtered to `reddit.com`
+- X/Twitter (`sources/x_posts.py`): xAI Responses API with `x_search`
+- YouTube (`sources/youtube_feed.py`): OpenAI Responses API with `web_search` filtered to `youtube.com`
+- LinkedIn (`sources/linkedin_feed.py`): OpenAI Responses API with `web_search` filtered to `linkedin.com`
+- Web (`sources/webscan.py`): WebSearch fallback with domain exclusions
 
 ## Parallel Execution
 
-All searches run concurrently using `ThreadPoolExecutor`:
+All searches run concurrently using `ThreadPoolExecutor` with a task registry:
 
 ```python
+work = [
+    ("reddit", _query_reddit),
+    ("x", _query_x),
+    ("youtube", _query_youtube),
+    ("linkedin", _query_linkedin),
+]
 with ThreadPoolExecutor(max_workers=5) as executor:
-    futures = {
-        executor.submit(_search_reddit, ...): "reddit",
-        executor.submit(_search_x, ...): "x",
-        executor.submit(_search_youtube, ...): "youtube",
-        executor.submit(_search_linkedin, ...): "linkedin",
-    }
+    futures = {executor.submit(fn, ...): name for name, fn in work}
 ```
 
 ## Processing Pipeline
 
 ```
 Raw API Responses
-  -> content.items_from_raw()
-  -> content.filter_by_date()
-  -> ranking.rank_items()
-  -> ranking.deduplicate()
-  -> output.compact()
+  -> records.items_from_raw()
+  -> records.filter_by_date()
+  -> scoring.rank_items()
+  -> scoring.deduplicate()
+  -> presenter.render_snapshot()
 ```
 
-## Configuration (`config.py`)
+## Configuration (`settings.py`)
 
-Config file: `~/.config/briefbot/briefbot.env` (legacy `.env` still supported)
+Config file: `~/.config/briefbot/briefbot.env` (legacy `~/.config/briefbot/.env` still supported)
 
 ```env
 OPENAI_API_KEY=sk-...      # Reddit, YouTube, LinkedIn
@@ -224,11 +216,11 @@ Source modes (based on available keys):
 - xAI only -> `x`
 - Neither -> `web`
 
-## Output Modes (`--emit`)
+## Output Modes (`--view`)
 
 | Mode | Description |
 |------|-------------|
-| `compact` | Markdown for Claude synthesis (default) |
+| `snapshot` | Markdown for Claude synthesis (default) |
 | `json` | Full normalized report as JSON |
 | `md` | Full human-readable markdown |
 | `context` | Compact snippet for embedding |
@@ -238,8 +230,8 @@ Source modes (based on available keys):
 ## Extension Points
 
 Adding a new source:
-1. Create `briefbot_engine/providers/newplatform.py`
-2. Add `Source.NEWPLATFORM` and `from_newplatform_raw()` in `content.py`
-3. Wire it into `briefbot.py` parallel execution and normalization
-4. Add rendering in `output.py`
-5. Add config keys and source resolution in `config.py` if needed
+1. Create `briefbot_engine/sources/new_platform.py`
+2. Add `Channel.NEW_PLATFORM` and a normalizer in `records.items_from_raw()`
+3. Wire it into `briefbot.py` query orchestration
+4. Add rendering in `presenter.py`
+5. Update `settings.resolve_sources()` if new keys or modes are needed

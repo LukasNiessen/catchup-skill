@@ -219,20 +219,20 @@ class Progress:
         )
         sys.stderr.flush()
 
-    def start_reddit(self):
+    def begin_reddit(self):
         msg = random.choice(REDDIT_MSGS)
         self.indicator = Spinner(
             f"{Style.AMBER}Reddit{Style.NORMAL} {msg}", Style.AMBER
         )
         self.indicator.start()
 
-    def end_reddit(self, item_count: int):
+    def finish_reddit(self, item_count: int):
         if self.indicator:
             self.indicator.stop(
                 f"{Style.AMBER}Reddit{Style.NORMAL} Found {item_count} threads"
             )
 
-    def start_reddit_enrich(self, current_position: int, total_count: int):
+    def begin_thread_hydration(self, current_position: int, total_count: int):
         if self.indicator:
             self.indicator.stop()
         msg = random.choice(ENRICH_MSGS)
@@ -242,42 +242,42 @@ class Progress:
         )
         self.indicator.start()
 
-    def update_reddit_enrich(self, current_position: int, total_count: int):
+    def update_thread_hydration(self, current_position: int, total_count: int):
         if self.indicator:
             msg = random.choice(ENRICH_MSGS)
             self.indicator.update(
                 f"{Style.AMBER}Reddit{Style.NORMAL} [{current_position}/{total_count}] {msg}"
             )
 
-    def end_reddit_enrich(self):
+    def finish_thread_hydration(self):
         if self.indicator:
             self.indicator.stop(
                 f"{Style.AMBER}Reddit{Style.NORMAL} Enriched with engagement data"
             )
 
-    def start_x(self):
+    def begin_x(self):
         msg = random.choice(X_MSGS)
         self.indicator = Spinner(f"{Style.AZURE}X{Style.NORMAL} {msg}", Style.AZURE)
         self.indicator.start()
 
-    def end_x(self, item_count: int):
+    def finish_x(self, item_count: int):
         if self.indicator:
             self.indicator.stop(
                 f"{Style.AZURE}X{Style.NORMAL} Found {item_count} posts"
             )
 
-    def start_processing(self):
+    def begin_scoring(self):
         msg = random.choice(PROCESS_MSGS)
         self.indicator = Spinner(
             f"{Style.MAGENTA}Processing{Style.NORMAL} {msg}", Style.MAGENTA
         )
         self.indicator.start()
 
-    def end_processing(self):
+    def finish_scoring(self):
         if self.indicator:
             self.indicator.stop()
 
-    def show_complete(
+    def show_summary(
         self,
         reddit_count: int,
         x_count: int,
@@ -292,47 +292,47 @@ class Progress:
         )
         sys.stderr.write(f"{Style.SUBDUED}({elapsed:.1f}s){Style.NORMAL}\n")
         sys.stderr.write(
-            f"  {Style.AMBER}Reddit:{Style.NORMAL} {reddit_count} threads  "
+            f"  {Style.TEAL}Reddit:{Style.NORMAL} {reddit_count} threads  "
         )
-        sys.stderr.write(f"{Style.AZURE}X:{Style.NORMAL} {x_count} posts")
+        sys.stderr.write(f"{Style.AMBER}X:{Style.NORMAL} {x_count} posts")
         if youtube_count > 0:
             sys.stderr.write(
-                f"  {Style.CRIMSON}YouTube:{Style.NORMAL} {youtube_count} videos"
+                f"  {Style.AZURE}YouTube:{Style.NORMAL} {youtube_count} videos"
             )
         if linkedin_count > 0:
             sys.stderr.write(
-                f"  {Style.AZURE}LinkedIn:{Style.NORMAL} {linkedin_count} posts"
+                f"  {Style.MAGENTA}LinkedIn:{Style.NORMAL} {linkedin_count} posts"
             )
         sys.stderr.write(f"\n{sep}\n\n")
         sys.stderr.flush()
 
-    def show_cached(self, cache_age_hours: float = None):
+    def show_cache_notice(self, cache_age_hours: float = None):
         age_display = (
             f" ({cache_age_hours:.1f}h old)" if cache_age_hours is not None else ""
         )
         sys.stderr.write(
-            f"{Style.LIME}\u26a1{Style.NORMAL} {Style.SUBDUED}Hint: Using cached results {age_display}. You can use --refresh to circumvent the cache{Style.NORMAL}\n\n"
+            f"{Style.LIME}\u26a1{Style.NORMAL} {Style.SUBDUED}Cache hit{age_display}. Add --refresh to force a live pull.{Style.NORMAL}\n\n"
         )
         sys.stderr.flush()
 
-    def show_error(self, error_description: str):
+    def report_error(self, error_description: str):
         sys.stderr.write(
             f"{Style.CRIMSON}\u2717 Error:{Style.NORMAL} {error_description}\n"
         )
         sys.stderr.flush()
 
-    def start_web_only(self):
+    def begin_web_only(self):
         msg = random.choice(WEB_MSGS)
         self.indicator = Spinner(f"{Style.LIME}Web{Style.NORMAL} {msg}", Style.LIME)
         self.indicator.start()
 
-    def end_web_only(self):
+    def finish_web_only(self):
         if self.indicator:
             self.indicator.stop(
-                f"{Style.LIME}Web{Style.NORMAL} Claude will search the web"
+                f"{Style.LIME}Web{Style.NORMAL} Ready for web-only synthesis"
             )
 
-    def show_web_only_complete(self):
+    def show_web_only_summary(self):
         elapsed = time.time() - self.start_timestamp
         sep = f"{Style.SUBDUED}{Style.EMPHASIZED}\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500{Style.NORMAL}"
         sys.stderr.write(f"\n{sep}\n")
@@ -341,25 +341,25 @@ class Progress:
         )
         sys.stderr.write(f"{Style.SUBDUED}({elapsed:.1f}s){Style.NORMAL}\n")
         sys.stderr.write(
-            f"  {Style.LIME}Web:{Style.NORMAL} Claude will search blogs, docs & news\n"
+            f"  {Style.LIME}Web:{Style.NORMAL} Ready to gather blogs, docs & news\n"
         )
         sys.stderr.write(f"{sep}\n\n")
         sys.stderr.flush()
 
-    def start_tts(self):
+    def begin_audio(self):
         msg = random.choice(TTS_MSGS)
         self.indicator = Spinner(
             f"{Style.MAGENTA}Audio{Style.NORMAL} {msg}", Style.MAGENTA
         )
         self.indicator.start()
 
-    def end_tts(self, output_file: str):
+    def finish_audio(self, output_file: str):
         if self.indicator:
             self.indicator.stop(
                 f"{Style.MAGENTA}Audio{Style.NORMAL} Saved to {output_file}"
             )
 
-    def show_promo(self, missing_keys: str = "both"):
+    def show_upgrade_notice(self, missing_keys: str = "both"):
         if missing_keys == "both":
             sys.stderr.write(UPGRADE_NOTICE)
         elif missing_keys in SINGLE_KEY_HINTS:
@@ -370,12 +370,12 @@ class Progress:
 def phase_status(phase_name: str, status_text: str):
     """Print a single phase-status line to stderr."""
     phase_styles = {
-        "reddit": Style.AMBER,
-        "x": Style.AZURE,
-        "process": Style.MAGENTA,
+        "reddit": Style.TEAL,
+        "x": Style.AMBER,
+        "process": Style.AZURE,
         "done": Style.LIME,
         "error": Style.CRIMSON,
-        "youtube": Style.TEAL,
+        "youtube": Style.MAGENTA,
         "linkedin": Style.AZURE,
     }
     color = phase_styles.get(phase_name, Style.NORMAL)

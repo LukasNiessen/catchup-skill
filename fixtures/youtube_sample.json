@@ -1,0 +1,13 @@
+{
+  "output": [
+    {
+      "type": "message",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "{\"videos\": [{\"headline\": \"Perovskite Tandems Explained\", \"url\": \"https://www.youtube.com/watch?v=yt123\", \"channel\": \"Solar Deep Dive\", \"dated\": \"2026-02-06\", \"signals\": {\"views\": 88000, \"likes\": 2100}, \"blurb\": \"A walkthrough of the latest tandem cell results.\", \"topicality\": 0.83, \"rationale\": \"High-quality explainer with solid engagement\"}]}"
+        }
+      ]
+    }
+  ]
+}

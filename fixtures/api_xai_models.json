@@ -2,28 +2,16 @@
   "object": "list",
   "data": [
     {
-      "id": "grok-4-latest",
-      "object": "model",
-      "created": 1704499200,
-      "owned_by": "xai"
+      "id": "grok-4-fast"
     },
     {
-      "id": "grok-4",
-      "object": "model",
-      "created": 1701043200,
-      "owned_by": "xai"
+      "id": "grok-4-1-fast"
     },
     {
-      "id": "grok-4-fast",
-      "object": "model",
-      "created": 1703001600,
-      "owned_by": "xai"
+      "id": "grok-4-1"
     },
     {
-      "id": "grok-3",
-      "object": "model",
-      "created": 1698969600,
-      "owned_by": "xai"
+      "id": "grok-3-fast"
     }
   ]
 }

@@ -1,0 +1,13 @@
+{
+  "output": [
+    {
+      "type": "message",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "{\"posts\": [{\"snippet\": \"Our lab hit a new stability milestone for perovskites.\", \"url\": \"https://www.linkedin.com/posts/example\", \"author\": \"Dr. Elena Vasquez\", \"role\": \"Director of PV Research\", \"dated\": \"2026-02-07\", \"signals\": {\"reactions\": 210, \"comments\": 19}, \"topicality\": 0.78, \"rationale\": \"First-hand lab update with useful context\"}]}"
+        }
+      ]
+    }
+  ]
+}

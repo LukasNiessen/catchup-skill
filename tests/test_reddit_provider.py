@@ -1,9 +1,9 @@
-"""Tests for the Reddit provider module (briefbot_engine.providers.reddit)."""
+"""Tests for the Reddit provider module (briefbot_engine.sources.reddit_source)."""
 
 import pytest
 
-from briefbot_engine.providers.reddit import _is_access_err, FALLBACK_MODELS
-from briefbot_engine.net import HTTPError
+from briefbot_engine.sources.reddit_source import _is_access_err, FALLBACK_MODELS
+from briefbot_engine.http_client import HTTPError
 
 
 # ---------------------------------------------------------------------------
@@ -51,7 +51,7 @@ def test_is_access_err_returns_false_for_unrelated_400():
     err = HTTPError(
         "Bad request",
         status_code=400,
-        response_body="Invalid JSON in request body",
+        response_body="Malformed request payload",
     )
     assert _is_access_err(err) is False
 
@@ -60,9 +60,9 @@ def test_is_access_err_returns_false_for_unrelated_400():
 # FALLBACK_MODELS
 # ---------------------------------------------------------------------------
 
-def test_fallback_models_contains_gpt4o():
-    assert "gpt-4o" in FALLBACK_MODELS
+def test_fallback_models_contains_gpt41():
+    assert "gpt-4.1" in FALLBACK_MODELS
 
 
-def test_fallback_models_first_item_is_gpt4o_mini():
-    assert FALLBACK_MODELS[0] == "gpt-4o-mini"
+def test_fallback_models_first_item_is_gpt41_mini():
+    assert FALLBACK_MODELS[0] == "gpt-4.1-mini"

@@ -7,22 +7,22 @@ import re
 import sys
 from typing import Any, Dict, Iterable, List, Optional
 
-from .. import net
+from .. import http_client
 
-FALLBACK_MODELS = ["gpt-4o", "gpt-4o-mini"]
+FALLBACK_MODELS = ["gpt-4.1-mini", "gpt-4.1"]
 
 
 def _err(msg: str) -> None:
-    sys.stderr.write(f"Error (Reddit): {msg}\n")
+    sys.stderr.write(f"[Reddit] {msg}\n")
     sys.stderr.flush()
 
 
 def _info(msg: str) -> None:
-    sys.stderr.write(f"(Reddit): {msg}\n")
+    sys.stderr.write(f"[Reddit] {msg}\n")
     sys.stderr.flush()
 
 
-def _is_access_err(err: net.HTTPError) -> bool:
+def _is_access_err(err: http_client.HTTPError) -> bool:
     if err.status_code not in (400, 401, 403) or not err.body:
         return False
     text = err.body.lower()
@@ -39,10 +39,10 @@ def _is_access_err(err: net.HTTPError) -> bool:
 
 API_URL = "https://api.openai.com/v1/responses"
 
-DEPTH_SPECS = {
-    "quick": {"min": 7, "max": 14},
-    "default": {"min": 18, "max": 32},
-    "deep": {"min": 45, "max": 72},
+SAMPLING_SPECS = {
+    "lite": {"min": 7, "max": 14},
+    "standard": {"min": 18, "max": 32},
+    "dense": {"min": 45, "max": 72},
 }
 
 REDDIT_DISCOVERY_PROMPT = """You are assembling Reddit threads for a research brief.
@@ -61,12 +61,12 @@ Return JSON only in this structure:
 {{
   "threads": [
     {{
-      "title": "Thread title",
+      "headline": "Thread title",
       "url": "https://www.reddit.com/r/example/comments/abc123/example_thread/",
-      "subreddit": "example",
-      "date": "2026-01-15",
-      "signal": 0.9,
-      "why": "Explains why the thread matters for the topic"
+      "forum": "example",
+      "dated": "2026-01-15",
+      "topicality": 0.9,
+      "rationale": "Explains why the thread matters for the topic"
     }}
   ]
 }}
@@ -167,7 +167,7 @@ def _extract_threads_blob(payload_text: str) -> List[Dict[str, Any]]:
         cursor = brace + max(end, 1)
 
 
-def _to_signal(value: Any) -> float:
+def _to_match(value: Any) -> float:
     try:
         return max(0.0, min(1.0, float(value)))
     except (TypeError, ValueError):
@@ -178,22 +178,22 @@ def _normalize_item(raw: Dict[str, Any], ordinal: int) -> Optional[Dict[str, Any
     link = str(raw.get("url", raw.get("link", ""))).strip()
     if "reddit.com" not in link:
         return None
-    date_value = raw.get("date", raw.get("posted"))
+    date_value = raw.get("dated", raw.get("date", raw.get("posted")))
     if date_value is not None and not _ID_DATE.match(str(date_value)):
         date_value = None
-    community = str(raw.get("subreddit", raw.get("community", ""))).strip()
+    community = str(raw.get("forum", raw.get("subreddit", raw.get("community", "")))).strip()
     if community.lower().startswith("r/"):
         community = community[2:]
-    title = str(raw.get("title", raw.get("headline", ""))).strip()
-    why = str(raw.get("why", raw.get("reason", ""))).strip()
+    title = str(raw.get("headline", raw.get("title", ""))).strip()
+    why = str(raw.get("rationale", raw.get("why", raw.get("reason", "")))).strip()
     return {
-        "uid": f"RD{ordinal}",
-        "title": title,
-        "link": link,
-        "community": community,
-        "posted": date_value,
-        "reason": why,
-        "signal": _to_signal(raw.get("signal")),
+        "key": f"RDT-{ordinal:02d}",
+        "headline": title,
+        "url": link,
+        "forum": community,
+        "dated": date_value,
+        "rationale": why,
+        "topicality": _to_match(raw.get("topicality", raw.get("signal"))),
     }
 
 
@@ -203,21 +203,22 @@ def search(
     topic: str,
     start: str,
     end: str,
-    depth: str = "default",
+    sampling: str = "standard",
     mock_response: Optional[Dict] = None,
     _is_retry: bool = False,
 ) -> Dict[str, Any]:
     if mock_response is not None:
         return mock_response
 
-    depth_spec = DEPTH_SPECS.get(depth, DEPTH_SPECS["default"])
-    min_items = depth_spec["min"]
-    max_items = depth_spec["max"]
+    sampling_spec = SAMPLING_SPECS.get(sampling, SAMPLING_SPECS["standard"])
+    min_items = sampling_spec["min"]
+    max_items = sampling_spec["max"]
     headers = {"Authorization": f"Bearer {key}"}
-    timeout = {"quick": 60, "default": 90, "deep": 150}.get(depth, 90)
-    model_candidates = [model] + [
-        candidate for candidate in FALLBACK_MODELS if candidate != model
-    ]
+    timeout = {"lite": 60, "standard": 90, "dense": 150}.get(sampling, 90)
+    model_candidates = [model]
+    for candidate in FALLBACK_MODELS:
+        if candidate not in model_candidates:
+            model_candidates.append(candidate)
     prompt = REDDIT_DISCOVERY_PROMPT.format(
         topic=topic,
         from_date=start,
@@ -241,14 +242,14 @@ def search(
             "max_output_tokens": 1200,
         }
         try:
-            return net.request(
+            return http_client.request(
                 "POST",
                 API_URL,
                 headers=headers,
                 json_body=request_payload,
                 timeout=timeout,
             )
-        except net.HTTPError as exc:
+        except http_client.HTTPError as exc:
             final_error = exc
             if _is_access_err(exc):
                 _info(f"Model {candidate} unavailable for this key, trying fallback...")
@@ -258,7 +259,7 @@ def search(
     if final_error:
         _err(f"All model attempts failed: {final_error}")
         raise final_error
-    raise net.HTTPError("No compatible model could be selected")
+    raise http_client.HTTPError("No compatible model could be selected")
 
 
 def parse_reddit_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -267,9 +268,9 @@ def parse_reddit_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]]:
         message = (
             api_error.get("message") if isinstance(api_error, dict) else str(api_error)
         )
-        _err(f"OpenAI API error: {message}")
-        if net.DEBUG:
-            _err(f"Error payload snapshot: {json.dumps(api_response, indent=2)[:700]}")
+        _err(f"OpenAI API reported an error: {message}")
+        if http_client.DEBUG:
+            _err(f"Error payload snapshot: {json.dumps(api_response, indent=2)[:650]}")
         return []
 
     raw_text = _pick_output_text(api_response)

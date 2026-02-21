@@ -3,19 +3,18 @@
 import hashlib
 import json
 import os
-import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from .. import net
+from .. import http_client
 
 
 def _log(message: str):
     """Emit a debug log line to stderr, gated by BRIEFBOT_DEBUG."""
     if os.environ.get("BRIEFBOT_DEBUG", "").lower() in ("1", "true", "yes"):
-        sys.stderr.write("[REGISTRY] {}\n".format(message))
+        sys.stderr.write("[CATALOG] {}\n".format(message))
         sys.stderr.flush()
 
 
@@ -54,9 +53,15 @@ class ProviderRegistry:
         self.CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
     def cache_key(self, topic: str, start: str, end: str, platform: str) -> str:
-        raw = f"{topic}|{start}|{end}|{platform}"
-        digest = hashlib.blake2s(raw.encode("utf-8"), digest_size=16).hexdigest()
-        return digest[:20]
+        payload = {
+            "topic": (topic or "").strip().lower(),
+            "start": start,
+            "end": end,
+            "channel": platform,
+        }
+        raw = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+        return digest[:18]
 
     def cache_path(self, key: str) -> Path:
         return self.CACHE_DIR / f"{key}.json"
@@ -176,22 +181,46 @@ class ProviderRegistry:
 
     @staticmethod
     def extract_version_tuple(model_identifier: str) -> Optional[Tuple[int, ...]]:
-        version_pattern = re.search(r"(\d+(?:[._]\d+)*)", model_identifier)
-        if version_pattern is None:
+        text = model_identifier or ""
+        digits = []
+        current = ""
+        for ch in text:
+            if ch.isdigit():
+                current += ch
+            elif current:
+                digits.append(current)
+                current = ""
+        if current:
+            digits.append(current)
+        if not digits:
             return None
-        version_string = version_pattern.group(1)
-        version_components = re.split(r"[._]", version_string)
-        return tuple(int(component) for component in version_components)
+        return tuple(int(part) for part in digits)
 
     @staticmethod
     def is_standard_gpt_model(model_identifier: str) -> bool:
-        normalized_id = model_identifier.lower()
-        pattern_match = re.match(r"^gpt-5(\.\d+)*$", normalized_id)
-        if not pattern_match:
+        normalized_id = (model_identifier or "").lower().strip()
+        if not normalized_id.startswith("gpt-5"):
             return False
-        excluded_variants = ["mini", "nano", "chat", "codex", "preview", "turbo", "experimental", "snapshot"]
+        excluded_variants = {
+            "mini",
+            "nano",
+            "chat",
+            "codex",
+            "preview",
+            "turbo",
+            "experimental",
+            "snapshot",
+        }
         for variant in excluded_variants:
             if variant in normalized_id:
+                return False
+        tail = normalized_id[len("gpt-5") :]
+        if not tail:
+            return True
+        if not tail.startswith("."):
+            return False
+        for segment in tail[1:].split("."):
+            if not segment.isdigit():
                 return False
         return True
 
@@ -214,10 +243,12 @@ class ProviderRegistry:
         else:
             try:
                 authorization_headers = {"Authorization": "Bearer {}".format(api_credential)}
-                available_models = net.get(self.OPENAI_MODEL_LISTING_ENDPOINT, headers=authorization_headers).get(
+                available_models = http_client.get(
+                    self.OPENAI_MODEL_LISTING_ENDPOINT, headers=authorization_headers
+                ).get(
                     "data", []
                 )
-            except net.HTTPError:
+            except http_client.HTTPError:
                 return self.OPENAI_DEFAULT_MODELS[0]
 
         eligible_models = [model for model in available_models if self.is_standard_gpt_model(model.get("id", ""))]
@@ -239,9 +270,9 @@ class ProviderRegistry:
     def discover_xai_models(self, api_credential: str) -> List[str]:
         try:
             authorization_headers = {"Authorization": "Bearer {}".format(api_credential)}
-            api_response = net.get(self.XAI_MODEL_LISTING_ENDPOINT, headers=authorization_headers)
+            api_response = http_client.get(self.XAI_MODEL_LISTING_ENDPOINT, headers=authorization_headers)
             return [m.get("id", "") for m in api_response.get("data", []) if m.get("id")]
-        except net.HTTPError as err:
+        except http_client.HTTPError as err:
             _log("discover_xai_models failed: {}".format(err))
             return []
 

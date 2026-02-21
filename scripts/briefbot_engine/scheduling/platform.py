@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 from . import cron
-from .. import paths
+from .. import locations
 
 
 # Tag format used to identify briefbot entries in crontab
@@ -71,7 +71,7 @@ def _register_crontab(job: Dict[str, Any], runner_path: Path) -> str:
     tag = "{}{}".format(CRONTAB_TAG_PREFIX, job_id)
 
     # Build the cron line
-    log_dir = paths.logs_dir()
+    log_dir = locations.logs_dir()
     cron_command = '{} "{}" {} >> "{}/{}.log" 2>&1'.format(
         python_exe, runner_path, job_id, str(log_dir).replace('"', ""), job_id
     )

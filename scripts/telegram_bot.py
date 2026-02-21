@@ -14,8 +14,8 @@
 #
 # Then text the bot on Telegram:
 #     @BotName ai news
-#     @BotName best python libs --deep
-#     @BotName crypto --audio --days=7
+#     @BotName best python libs --sampling=dense
+#     @BotName crypto --audio --span=7
 #
 
 import json
@@ -44,7 +44,7 @@ if sys.platform == "win32":
 MODULE_ROOT = Path(__file__).parent.resolve()
 sys.path.insert(0, str(MODULE_ROOT))
 
-from briefbot_engine import config
+from briefbot_engine import settings
 from briefbot_engine.delivery import telegram
 
 # ---------------------------------------------------------------------------
@@ -69,8 +69,8 @@ log = logging.getLogger("briefbot.telegram_bot")
 # ---------------------------------------------------------------------------
 
 POLL_TIMEOUT = 30  # seconds (Telegram long-polling)
-RECOGNIZED_FLAGS = {"--audio", "--deep", "--quick", "--include-web"}
-RECOGNIZED_KV_FLAGS = {"--days", "--sources"}  # flags that take =VALUE
+RECOGNIZED_FLAGS = {"--audio", "--web-plus"}
+RECOGNIZED_KV_FLAGS = {"--span", "--feeds", "--sampling"}  # flags that take =VALUE
 
 # Additional @usernames the bot responds to (lowercase, without @)
 EXTRA_USERNAMES = ["ALPHAGORILLADRAGONBOT", "BRIEFBOT", "briefbot"]
@@ -86,15 +86,14 @@ HELP_TEXT = (
     "Follow-up messages continue the conversation.\n\n"
     "Examples:\n"
     "  @{bot} ai news\n"
-    "  @{bot} best python frameworks --deep\n"
-    "  @{bot} crypto trends --audio --days=7\n\n"
+    "  @{bot} best python frameworks --sampling=dense\n"
+    "  @{bot} crypto trends --audio --span=7\n\n"
     "Flags:\n"
     "  --audio       Generate audio briefing\n"
-    "  --deep        Comprehensive research\n"
-    "  --quick       Faster, fewer sources\n"
-    "  --days=N      Search last N days (default 30)\n"
-    "  --sources=X   Source filter (auto/reddit/x/all)\n"
-    "  --include-web Include general web search\n\n"
+    "  --sampling=X  Sampling intensity (lite/standard/dense)\n"
+    "  --span=N      Search last N days (default 30)\n"
+    "  --feeds=X     Source filter (auto/social/reddit/x/all)\n"
+    "  --web-plus    Include general web search\n\n"
     "Commands:\n"
     "  /new   Start fresh research (clears current conversation)\n"
     "  /help  Show this help message\n"
@@ -260,7 +259,7 @@ def _remove_chat_id_from_env(chat_id: str) -> None:
 
 def _load_allowed_chat_ids() -> set:
     """Reads the current whitelist from .env (live reload)."""
-    config = config.load_config()
+    config = settings.load_config()
     raw = config.get("TELEGRAM_CHAT_ID", "")
     return {cid.strip() for cid in raw.split(",") if cid.strip()}
 
@@ -385,7 +384,7 @@ def cli_pair_approve(code: str) -> None:
     print("\nThe bot will pick up the new whitelist automatically.")
 
     # Try to notify the user on Telegram
-    config = config.load_config()
+    config = settings.load_config()
     token = config.get("TELEGRAM_BOT_TOKEN")
     if token:
         try:
@@ -522,7 +521,7 @@ def parse_message(text: str) -> tuple:
     Recognized flags are passed through verbatim.
 
     Returns:
-        (topic, flags_string) — e.g. ("ai news", "--audio --days=7")
+        (topic, flags_string) — e.g. ("ai news", "--audio --span=7")
     """
     words = text.strip().split()
     topic_parts = []
@@ -721,7 +720,7 @@ def run_research_lite(topic: str, flags: str, chat_id: str, config: dict) -> Non
     """
     # Build briefbot.py arguments
     briefbot_script = MODULE_ROOT / "briefbot.py"
-    cmd = [sys.executable, str(briefbot_script), topic, "--emit=md"]
+    cmd = [sys.executable, str(briefbot_script), topic, "--view=md"]
 
     # Parse flags into individual args
     for flag in flags.split():
@@ -898,7 +897,7 @@ def main() -> None:
     log.info("Wrote PID file: %s (pid=%d)", PID_FILE, _os.getpid())
 
     # Load config
-    config = config.load_config()
+    config = settings.load_config()
     token = config.get("TELEGRAM_BOT_TOKEN")
 
     if not token:
@@ -1052,7 +1051,7 @@ def main() -> None:
                     _send_message(
                         token,
                         chat_id,
-                        "Please provide a topic. Example: ai news --deep",
+                        "Please provide a topic. Example: ai news --sampling=dense",
                     )
                     continue
 

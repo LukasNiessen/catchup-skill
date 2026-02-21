@@ -19,7 +19,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from briefbot_engine import paths
+from briefbot_engine import locations
 
 # Fix Windows console encoding
 if sys.platform == "win32":
@@ -30,7 +30,7 @@ if sys.platform == "win32":
 MODULE_ROOT = Path(__file__).parent.resolve()
 sys.path.insert(0, str(MODULE_ROOT))
 
-from briefbot_engine import config as bb_config
+from briefbot_engine import settings as bb_config
 
 # ---------------------------------------------------------------------------
 # Constants

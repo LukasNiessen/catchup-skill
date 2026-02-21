@@ -15,7 +15,7 @@ from typing import Any, Dict, Mapping, Optional
 
 DEFAULT_TIMEOUT_SECONDS = 26
 DEFAULT_ATTEMPTS = 3
-USER_AGENT = "briefbot-net/2026.2"
+USER_AGENT = "briefbot-http/2026.2"
 DEBUG = False
 
 
@@ -25,11 +25,11 @@ def _debug_enabled() -> bool:
 
 def _debug(msg: str) -> None:
     if _debug_enabled():
-        sys.stderr.write(f"[NET] {msg}\n")
+        sys.stderr.write(f"[HTTP] {msg}\n")
         sys.stderr.flush()
 
 
-class ApiError(Exception):
+class HttpFailure(Exception):
     """Raised on HTTP or transport failures."""
 
     def __init__(self, message: str, status_code: Optional[int] = None, response_body: Optional[str] = None):
@@ -38,7 +38,7 @@ class ApiError(Exception):
         self.body = response_body
 
 
-HTTPError = ApiError
+HTTPError = HttpFailure
 
 
 @dataclass
@@ -54,7 +54,7 @@ class RetryPolicy:
 
 
 def _retryable(code: int) -> bool:
-    return code in (408, 425, 429, 500, 502, 503, 504) or code >= 520
+    return code in (408, 425, 429, 500, 502, 503, 504, 522, 524) or code >= 520
 
 
 def _decode_json(payload: str) -> Dict[str, Any]:
@@ -63,7 +63,7 @@ def _decode_json(payload: str) -> Dict[str, Any]:
     try:
         parsed = json.loads(payload)
     except json.JSONDecodeError as exc:
-        raise ApiError(f"Invalid JSON payload: {exc}") from exc
+        raise HttpFailure(f"Malformed JSON payload: {exc}") from exc
     if isinstance(parsed, dict):
         return parsed
     return {"data": parsed}
@@ -95,7 +95,7 @@ class HttpClient:
         if json_body is not None:
             combined.setdefault("Content-Type", "application/json")
 
-        last_error: Optional[ApiError] = None
+        last_error: Optional[HttpFailure] = None
         attempts = max(1, int(self.retry.attempts))
         for attempt in range(attempts):
             req = urllib.request.Request(
@@ -115,16 +115,16 @@ class HttpClient:
                     body = exc.read().decode("utf-8")
                 except Exception:
                     body = ""
-                last_error = ApiError(f"HTTP {exc.code}: {exc.reason}", exc.code, body or None)
+                last_error = HttpFailure(f"Status {exc.code} {exc.reason}", exc.code, body or None)
                 _debug(f"{method.upper()} {url} -> HTTP {exc.code}")
                 if not _retryable(exc.code):
                     raise last_error
             except urllib.error.URLError as exc:
                 reason = getattr(exc, "reason", exc)
-                last_error = ApiError(f"Transport error: {reason}")
+                last_error = HttpFailure(f"Transport error: {reason}")
                 _debug(f"Transport error for {url}: {reason}")
             except (ConnectionError, TimeoutError, OSError) as exc:
-                last_error = ApiError(f"{type(exc).__name__}: {exc}")
+                last_error = HttpFailure(f"{type(exc).__name__}: {exc}")
                 _debug(f"Connection failure for {url}: {exc}")
 
             if attempt + 1 < attempts:
@@ -132,7 +132,7 @@ class HttpClient:
 
         if last_error is not None:
             raise last_error
-        raise ApiError("Request failed without a captured error")
+        raise HttpFailure("Request failed after retries")
 
 
 def request(
@@ -173,6 +173,6 @@ def _reddit_endpoint(path: str) -> str:
 
 def reddit_json(path: str) -> Dict[str, Any]:
     endpoint = _reddit_endpoint(path)
-    query = urllib.parse.urlencode({"raw_json": "1"})
+    query = urllib.parse.urlencode({"raw_json": "1", "context": "0"})
     url = f"https://www.reddit.com{endpoint}?{query}"
     return get(url, headers={"Accept": "application/json"})

@@ -13,11 +13,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .. import paths
+from .. import locations
 
 
-JOBS_DIRECTORY = paths.root_dir()
-JOBS_FILEPATH = paths.jobs_file()
+JOBS_DIRECTORY = locations.root_dir()
+JOBS_FILEPATH = locations.jobs_file()
 
 
 def _generate_job_id() -> str:
@@ -81,7 +81,7 @@ def create_job(
         topic: The research topic.
         schedule: Cron expression string (e.g., "0 6 * * *").
         email: Recipient email address.
-        args_dict: Captured CLI arguments (quick, deep, audio, days, sources, etc.).
+        args_dict: Captured CLI arguments (sampling, audio, days, sources, etc.).
         python_executable: Path to python interpreter. Defaults to current sys.executable.
         filepath: Override jobs file path (for testing).
 

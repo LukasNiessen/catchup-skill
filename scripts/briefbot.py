@@ -6,6 +6,7 @@ import json
 import os
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass, field
 from pathlib import Path
 
 
@@ -33,23 +34,23 @@ ROOT = Path(__file__).parent.resolve()
 sys.path.insert(0, str(ROOT))
 
 from briefbot_engine import (
-    config,
-    content,
-    intent,
-    net,
-    output,
-    ranking,
-    temporal,
-    terminal,
+    settings,
+    records,
+    analysis,
+    http_client,
+    presenter,
+    scoring,
+    timeframe,
+    console,
 )
-from briefbot_engine.providers import (
-    enrich,
-    linkedin,
-    reddit,
-    registry,
-    twitter,
-    web,
-    youtube,
+from briefbot_engine.sources import (
+    hydrate,
+    linkedin_feed,
+    reddit_source,
+    catalog,
+    x_posts,
+    webscan,
+    youtube_feed,
 )
 from briefbot_engine.scheduling import cron, jobs, platform as sched_platform
 from briefbot_engine.delivery import email, telegram
@@ -66,13 +67,21 @@ def load_fixture(name: str) -> dict:
         return json.load(handle)
 
 
+@dataclass
+class ResearchBundle:
+    items: dict = field(default_factory=dict)
+    raw: dict = field(default_factory=dict)
+    errors: dict = field(default_factory=dict)
+    needs_web: bool = False
+
+
 def _query_reddit(
     topic: str,
     cfg: dict,
     models_picked: dict,
     start_date: str,
     end_date: str,
-    depth: str,
+    sampling: str,
     mock: bool,
 ) -> tuple:
     """Query Reddit via OpenAI web search API. Returns (items, response, error)."""
@@ -83,52 +92,52 @@ def _query_reddit(
         response = load_fixture("provider_reddit_response.json")
     else:
         try:
-            response = reddit.search(
+            response = reddit_source.search(
                 cfg["OPENAI_API_KEY"],
                 models_picked["openai"],
                 topic,
                 start_date,
                 end_date,
-                depth=depth,
+                sampling=sampling,
             )
-        except net.HTTPError as network_err:
+        except http_client.HTTPError as network_err:
             response = {"error": str(network_err)}
-            error = f"API error: {network_err}"
+            error = f"Request failed: {network_err}"
         except Exception as generic_err:
             response = {"error": str(generic_err)}
-            error = f"{type(generic_err).__name__}: {generic_err}"
+            error = f"Unhandled exception ({type(generic_err).__name__}) - {generic_err}"
 
-    items = reddit.parse_reddit_response(response or {})
+    items = reddit_source.parse_reddit_response(response or {})
 
     has_few_results = len(items) < 4
     should_retry = has_few_results and not mock and error is None
 
     if should_retry:
-        simplified_topic = reddit.compress_topic(topic)
+        simplified_topic = reddit_source.compress_topic(topic)
         topics_differ = simplified_topic.strip().lower() != topic.strip().lower()
 
         if topics_differ:
             try:
-                supplemental_response = reddit.search(
+                supplemental_response = reddit_source.search(
                     cfg["OPENAI_API_KEY"],
                     models_picked["openai"],
                     simplified_topic,
                     start_date,
                     end_date,
-                    depth=depth,
+                    sampling=sampling,
                 )
-                supplemental_items = reddit.parse_reddit_response(supplemental_response)
+                supplemental_items = reddit_source.parse_reddit_response(supplemental_response)
 
                 by_url = {}
                 for base_item in items:
                     item_url = str(
-                        base_item.get("link", base_item.get("url", ""))
+                        base_item.get("url", base_item.get("link", ""))
                     ).strip()
                     if item_url:
                         by_url[item_url] = base_item
                 for extra_item in supplemental_items:
                     item_url = str(
-                        extra_item.get("link", extra_item.get("url", ""))
+                        extra_item.get("url", extra_item.get("link", ""))
                     ).strip()
                     if item_url and item_url not in by_url:
                         by_url[item_url] = extra_item
@@ -146,7 +155,7 @@ def _query_x(
     models_picked: dict,
     start_date: str,
     end_date: str,
-    depth: str,
+    sampling: str,
     mock: bool,
 ) -> tuple:
     """Query X/Twitter via xAI API. Returns (items, response, error)."""
@@ -156,13 +165,13 @@ def _query_x(
     _log("=== _query_x START ===")
     _log(f"  Subject: '{topic}'")
     _log(f"  Date range: {start_date} to {end_date}")
-    _log(f"  Depth: {depth}")
+    _log(f"  Sampling: {sampling}")
     _log(f"  Mock data: {mock}")
 
     if mock:
         _log("  Using MOCK data for X search")
         response = load_fixture("provider_x_response.json")
-        items = twitter.parse_x_response(response or {})
+        items = x_posts.parse_x_response(response or {})
         _log(f"  Mock returned {len(items)} items")
         return items, response, error
 
@@ -178,32 +187,32 @@ def _query_x(
     if has_xai:
         _log("  PATH: xAI API (paid, direct)")
         _log(
-            f"  Calling twitter.search(key={xai_key_preview}, model={models_picked.get('xai')}, topic='{topic[:50]}', dates={start_date}->{end_date}, depth={depth})"
+            f"  Calling twitter.search(key={xai_key_preview}, model={models_picked.get('xai')}, topic='{topic[:50]}', dates={start_date}->{end_date}, sampling={sampling})"
         )
         try:
-            response = twitter.search(
+            response = x_posts.search(
                 cfg["XAI_API_KEY"],
                 models_picked["xai"],
                 topic,
                 start_date,
                 end_date,
-                depth=depth,
+                sampling=sampling,
             )
             _log(
                 f"  xAI API call succeeded, response keys: {list(response.keys()) if isinstance(response, dict) else type(response).__name__}"
             )
-        except net.HTTPError as network_err:
+        except http_client.HTTPError as network_err:
             response = {"error": str(network_err)}
-            error = f"API error: {network_err}"
+            error = f"Request failed: {network_err}"
             _log(
                 f"  xAI API HTTP ERROR: {network_err} (status={getattr(network_err, 'status_code', '?')}, body={(getattr(network_err, 'body', '') or '')[:300]})"
             )
         except Exception as generic_err:
             response = {"error": str(generic_err)}
-            error = f"{type(generic_err).__name__}: {generic_err}"
+            error = f"Unhandled exception ({type(generic_err).__name__}) - {generic_err}"
             _log(f"  xAI API EXCEPTION: {error}")
 
-        items = twitter.parse_x_response(response or {})
+        items = x_posts.parse_x_response(response or {})
         _log(f"  xAI parsed {len(items)} items")
     else:
         _log("  PATH: NO X BACKEND AVAILABLE (no xAI key)")
@@ -221,7 +230,7 @@ def _query_youtube(
     models_picked: dict,
     start_date: str,
     end_date: str,
-    depth: str,
+    sampling: str,
     mock: bool,
 ) -> tuple:
     """Query YouTube via OpenAI web search API. Returns (items, response, error)."""
@@ -232,22 +241,22 @@ def _query_youtube(
         response = load_fixture("youtube_sample.json")
     else:
         try:
-            response = youtube.search(
+            response = youtube_feed.search(
                 cfg["OPENAI_API_KEY"],
                 models_picked["openai"],
                 topic,
                 start_date,
                 end_date,
-                depth=depth,
+                sampling=sampling,
             )
-        except net.HTTPError as network_err:
+        except http_client.HTTPError as network_err:
             response = {"error": str(network_err)}
-            error = f"API error: {network_err}"
+            error = f"Request failed: {network_err}"
         except Exception as generic_err:
             response = {"error": str(generic_err)}
-            error = f"{type(generic_err).__name__}: {generic_err}"
+            error = f"Unhandled exception ({type(generic_err).__name__}) - {generic_err}"
 
-    items = youtube.parse_youtube_response(response or {})
+    items = youtube_feed.parse_youtube_response(response or {})
 
     return items, response, error
 
@@ -258,7 +267,7 @@ def _query_linkedin(
     models_picked: dict,
     start_date: str,
     end_date: str,
-    depth: str,
+    sampling: str,
     mock: bool,
 ) -> tuple:
     """Query LinkedIn via OpenAI web search API. Returns (items, response, error)."""
@@ -269,22 +278,22 @@ def _query_linkedin(
         response = load_fixture("linkedin_sample.json")
     else:
         try:
-            response = linkedin.search(
+            response = linkedin_feed.search(
                 cfg["OPENAI_API_KEY"],
                 models_picked["openai"],
                 topic,
                 start_date,
                 end_date,
-                depth=depth,
+                sampling=sampling,
             )
-        except net.HTTPError as network_err:
+        except http_client.HTTPError as network_err:
             response = {"error": str(network_err)}
-            error = f"API error: {network_err}"
+            error = f"Request failed: {network_err}"
         except Exception as generic_err:
             response = {"error": str(generic_err)}
-            error = f"{type(generic_err).__name__}: {generic_err}"
+            error = f"Unhandled exception ({type(generic_err).__name__}) - {generic_err}"
 
-    items = linkedin.parse_linkedin_response(response or {})
+    items = linkedin_feed.parse_linkedin_response(response or {})
 
     return items, response, error
 
@@ -296,60 +305,41 @@ def run_research(
     models_picked: dict,
     start_date: str,
     end_date: str,
-    depth: str = "default",
+    sampling: str = "standard",
     mock: bool = False,
-    progress: terminal.Progress = None,
-) -> tuple:
-    """Orchestrate the full research pipeline across all platforms. Returns a 14-element tuple."""
-    reddit_items = []
-    x_items = []
-    youtube_items = []
-    linkedin_items = []
-    raw_openai = None
-    raw_xai = None
-    raw_youtube = None
-    raw_linkedin = None
-    raw_reddit_enriched = []
-    reddit_error = None
-    x_error = None
-    youtube_error = None
-    linkedin_error = None
+    progress: console.Progress = None,
+) -> ResearchBundle:
+    """Orchestrate the full research pipeline across all platforms."""
+    bundle = ResearchBundle(
+        items={"reddit": [], "x": [], "youtube": [], "linkedin": []},
+        raw={
+            "openai": None,
+            "xai": None,
+            "youtube": None,
+            "linkedin": None,
+            "reddit_enriched": [],
+        },
+        errors={},
+        needs_web=False,
+    )
 
     web_search_modes = ("all", "web", "reddit-web", "x-web")
-    requires_web_search = platform in web_search_modes
+    bundle.needs_web = platform in web_search_modes
 
     if platform == "web":
         if progress is not None:
-            progress.start_web_only()
-            progress.end_web_only()
-
-        return (
-            reddit_items,
-            x_items,
-            youtube_items,
-            linkedin_items,
-            True,
-            raw_openai,
-            raw_xai,
-            raw_youtube,
-            raw_linkedin,
-            raw_reddit_enriched,
-            reddit_error,
-            x_error,
-            youtube_error,
-            linkedin_error,
-        )
+            progress.begin_web_only()
+            progress.finish_web_only()
+        return bundle
 
     openai_available = bool(cfg.get("OPENAI_API_KEY"))
     xai_available = bool(cfg.get("XAI_API_KEY"))
-    x_available = xai_available
 
     _log("=== run_research ===")
     _log(f"  Platform: '{platform}'")
     _log(f"  OpenAI available: {openai_available}")
     _log(f"  xAI available: {xai_available}")
-    _log(f"  X available (xAI): {x_available}")
-    _log(f"  Depth: {depth}")
+    _log(f"  Sampling: {sampling}")
     _log(f"  Models picked: {models_picked}")
 
     reddit_platforms = ("both", "reddit", "all", "reddit-web")
@@ -358,7 +348,7 @@ def run_research(
     linkedin_platforms = ("all", "linkedin")
 
     should_query_reddit = platform in reddit_platforms and openai_available
-    should_query_x = platform in x_platforms and x_available
+    should_query_x = platform in x_platforms and xai_available
     should_query_youtube = platform in youtube_platforms and openai_available
     should_query_linkedin = platform in linkedin_platforms and openai_available
 
@@ -371,61 +361,55 @@ def run_research(
         futures = {}
         if should_query_reddit:
             if progress is not None:
-                progress.start_reddit()
-
-            future = thread_pool.submit(
+                progress.begin_reddit()
+            futures[thread_pool.submit(
                 _query_reddit,
                 topic,
                 cfg,
                 models_picked,
                 start_date,
                 end_date,
-                depth,
+                sampling,
                 mock,
-            )
-            futures[future] = "reddit"
+            )] = "reddit"
 
         if should_query_x:
             if progress is not None:
-                progress.start_x()
-
-            future = thread_pool.submit(
+                progress.begin_x()
+            futures[thread_pool.submit(
                 _query_x,
                 topic,
                 cfg,
                 models_picked,
                 start_date,
                 end_date,
-                depth,
+                sampling,
                 mock,
-            )
-            futures[future] = "x"
+            )] = "x"
 
         if should_query_youtube:
-            future = thread_pool.submit(
+            futures[thread_pool.submit(
                 _query_youtube,
                 topic,
                 cfg,
                 models_picked,
                 start_date,
                 end_date,
-                depth,
+                sampling,
                 mock,
-            )
-            futures[future] = "youtube"
+            )] = "youtube"
 
         if should_query_linkedin:
-            future = thread_pool.submit(
+            futures[thread_pool.submit(
                 _query_linkedin,
                 topic,
                 cfg,
                 models_picked,
                 start_date,
                 end_date,
-                depth,
+                sampling,
                 mock,
-            )
-            futures[future] = "linkedin"
+            )] = "linkedin"
 
         for future in as_completed(futures):
             source = futures[future]
@@ -437,80 +421,70 @@ def run_research(
                 source_error = f"{type(exc).__name__}: {exc}"
 
             if source == "reddit":
-                reddit_items = items
-                raw_openai = raw_response
-                reddit_error = source_error
+                bundle.items["reddit"] = items
+                bundle.raw["openai"] = raw_response
+                if source_error:
+                    bundle.errors["reddit"] = source_error
                 if progress is not None:
-                    if reddit_error:
-                        progress.show_error(f"Error (Reddit): {reddit_error}")
-                    progress.end_reddit(len(reddit_items))
+                    if source_error:
+                        progress.report_error(f"Reddit error: {source_error}")
+                    progress.finish_reddit(len(items))
             elif source == "x":
-                x_items = items
-                raw_xai = raw_response
-                x_error = source_error
+                bundle.items["x"] = items
+                bundle.raw["xai"] = raw_response
+                if source_error:
+                    bundle.errors["x"] = source_error
                 if progress is not None:
-                    if x_error:
-                        progress.show_error(f"Error (X): {x_error}")
-                    progress.end_x(len(x_items))
+                    if source_error:
+                        progress.report_error(f"X error: {source_error}")
+                    progress.finish_x(len(items))
             elif source == "youtube":
-                youtube_items = items
-                raw_youtube = raw_response
-                youtube_error = source_error
-                if progress is not None and youtube_error:
-                    progress.show_error(f"YouTube error: {youtube_error}")
+                bundle.items["youtube"] = items
+                bundle.raw["youtube"] = raw_response
+                if source_error:
+                    bundle.errors["youtube"] = source_error
+                if progress is not None and source_error:
+                    progress.report_error(f"YouTube error: {source_error}")
             elif source == "linkedin":
-                linkedin_items = items
-                raw_linkedin = raw_response
-                linkedin_error = source_error
-                if progress is not None and linkedin_error:
-                    progress.show_error(f"LinkedIn error: {linkedin_error}")
+                bundle.items["linkedin"] = items
+                bundle.raw["linkedin"] = raw_response
+                if source_error:
+                    bundle.errors["linkedin"] = source_error
+                if progress is not None and source_error:
+                    progress.report_error(f"LinkedIn error: {source_error}")
 
     _log("=== Query results summary ===")
-    _log(f"  Reddit: {len(reddit_items)} items, error={reddit_error}")
-    _log(f"  X:      {len(x_items)} items, error={x_error}")
-    _log(f"  YouTube: {len(youtube_items)} items, error={youtube_error}")
-    _log(f"  LinkedIn: {len(linkedin_items)} items, error={linkedin_error}")
+    _log(f"  Reddit: {len(bundle.items['reddit'])} items, error={bundle.errors.get('reddit')}")
+    _log(f"  X:      {len(bundle.items['x'])} items, error={bundle.errors.get('x')}")
+    _log(f"  YouTube: {len(bundle.items['youtube'])} items, error={bundle.errors.get('youtube')}")
+    _log(f"  LinkedIn: {len(bundle.items['linkedin'])} items, error={bundle.errors.get('linkedin')}")
 
-    if len(reddit_items) > 0:
+    reddit_items = bundle.items["reddit"]
+    if reddit_items:
         if progress is not None:
-            progress.start_reddit_enrich(1, len(reddit_items))
+            progress.begin_thread_hydration(1, len(reddit_items))
 
         for i, item in enumerate(reddit_items):
             if progress is not None and i > 0:
-                progress.update_reddit_enrich(i + 1, len(reddit_items))
+                progress.update_thread_hydration(i + 1, len(reddit_items))
 
             try:
                 if mock:
                     thread_data = load_fixture("provider_reddit_thread.json")
-                    reddit_items[i] = enrich.enrich(item, thread_data)
+                    reddit_items[i] = hydrate.hydrate(item, thread_data)
                 else:
-                    reddit_items[i] = enrich.enrich(item)
+                    reddit_items[i] = hydrate.hydrate(item)
             except Exception as err:
                 if progress is not None:
                     url = item.get("url", "unknown")
-                    progress.show_error(f"Enrich failed for {url}: {err}")
+                    progress.report_error(f"Hydration failed for {url}: {err}")
 
-            raw_reddit_enriched.append(reddit_items[i])
+            bundle.raw["reddit_enriched"].append(reddit_items[i])
 
         if progress is not None:
-            progress.end_reddit_enrich()
+            progress.finish_thread_hydration()
 
-    return (
-        reddit_items,
-        x_items,
-        youtube_items,
-        linkedin_items,
-        requires_web_search,
-        raw_openai,
-        raw_xai,
-        raw_youtube,
-        raw_linkedin,
-        raw_reddit_enriched,
-        reddit_error,
-        x_error,
-        youtube_error,
-        linkedin_error,
-    )
+    return bundle
 
 
 def main():
@@ -519,48 +493,32 @@ def main():
         description="Research a topic from the last N days on Reddit + X + YouTube + LinkedIn"
     )
 
-    parser.add_argument("topic", nargs="?", help="Topic to research")
-    parser.add_argument("--mock", action="store_true", help="Use fixtures")
+    parser.add_argument("topic", nargs="?", help="Topic or query to research")
     parser.add_argument(
-        "--format",
-        dest="emit",
-        choices=["compact", "json", "md", "context", "path", "cards"],
-        default="compact",
-        help="Output mode",
+        "--fixtures",
+        dest="mock",
+        action="store_true",
+        help="Use local fixtures instead of live APIs",
     )
     parser.add_argument(
-        "--emit",
+        "--view",
         dest="emit",
-        choices=["compact", "json", "md", "context", "path", "cards"],
-        help=argparse.SUPPRESS,
+        choices=["snapshot", "json", "md", "context", "path", "cards"],
+        default="snapshot",
+        help="Output view",
     )
     parser.add_argument(
-        "--channels",
+        "--feeds",
         dest="sources",
-        choices=["auto", "reddit", "x", "youtube", "linkedin", "both", "all"],
+        choices=["auto", "social", "reddit", "x", "youtube", "linkedin", "all", "web"],
         default="auto",
-        help="Source selection (auto, reddit, x, youtube, linkedin, both=reddit+x, all=all sources)",
+        help="Source selection (auto, social=reddit+x, all=all sources)",
     )
     parser.add_argument(
-        "--sources",
-        dest="sources",
-        choices=["auto", "reddit", "x", "youtube", "linkedin", "both", "all"],
-        help=argparse.SUPPRESS,
-    )
-    parser.add_argument(
-        "--depth",
-        choices=["quick", "default", "deep"],
-        help="Sampling depth (quick/default/deep)",
-    )
-    parser.add_argument(
-        "--quick",
-        action="store_true",
-        help="Use a light pass with smaller sample sizes",
-    )
-    parser.add_argument(
-        "--deep",
-        action="store_true",
-        help="Use exhaustive sampling for denser coverage",
+        "--sampling",
+        choices=["lite", "standard", "dense"],
+        default="standard",
+        help="Sampling intensity (lite/standard/dense)",
     )
     parser.add_argument(
         "--debug",
@@ -568,23 +526,17 @@ def main():
         help="Enable verbose debug logging",
     )
     parser.add_argument(
-        "--window",
+        "--span",
         dest="days",
         type=int,
         default=30,
-        help="Number of days to search back (default: 30, e.g., 7 for a week, 1 for today)",
+        help="Number of days to search back (default: 30)",
     )
     parser.add_argument(
-        "--days",
-        dest="days",
-        type=int,
-        help=argparse.SUPPRESS,
-    )
-    parser.add_argument(
-        "--augment-web",
+        "--web-plus",
         dest="include_web",
         action="store_true",
-        help="Include general web search alongside Reddit/X (lower weighted)",
+        help="Include general web search alongside social sources",
     )
     parser.add_argument(
         "--include-web",
@@ -661,19 +613,9 @@ def main():
 
     if args.debug:
         os.environ["BRIEFBOT_DEBUG"] = "1"
-        net.DEBUG = True
+        http_client.DEBUG = True
 
-    if args.quick and args.deep:
-        print("Error: Cannot use both --quick and --deep", file=sys.stderr)
-        sys.exit(1)
-
-    depth = "default"
-    if args.depth:
-        depth = args.depth
-    elif args.quick:
-        depth = "quick"
-    elif args.deep:
-        depth = "deep"
+    sampling = args.sampling or "standard"
 
     if args.topic is None:
         print("Error: Please provide a topic to research.", file=sys.stderr)
@@ -681,15 +623,17 @@ def main():
         sys.exit(1)
 
     _log("=== main: Loading configuration ===")
-    cfg = config.load_config()
+    cfg = settings.load_config()
 
-    platforms = config.determine_available_platforms(cfg)
+    platforms = settings.determine_available_platforms(cfg)
     _log(f"Available platforms: '{platforms}'")
 
     if args.mock:
-        platform = "both" if args.sources == "auto" else args.sources
+        raw_sources = "both" if args.sources in ("auto", "social") else args.sources
+        platform = raw_sources
     else:
-        resolution = config.resolve_sources(args.sources, platforms, args.include_web)
+        requested_sources = "both" if args.sources == "social" else args.sources
+        resolution = settings.resolve_sources(requested_sources, platforms, args.include_web)
         platform = resolution.mode
 
         _log(
@@ -704,41 +648,39 @@ def main():
                 sys.exit(1)
 
     days = args.days
-    start_date, end_date = temporal.window(days)
+    start_date, end_date = timeframe.span(days)
 
-    missing_keys = config.identify_missing_credentials(cfg)
+    missing_keys = settings.identify_missing_credentials(cfg)
 
-    progress = terminal.Progress(args.topic, display_header=True)
+    progress = console.Progress(args.topic, display_header=True)
 
     if missing_keys != "none":
-        progress.show_promo(missing_keys)
+        progress.show_upgrade_notice(missing_keys)
 
     if args.mock:
         mock_openai_models = load_fixture("api_openai_models.json").get("data", [])
         mock_xai_models = load_fixture("api_xai_models.json").get("data", [])
 
-        models_picked = registry.get_models(
-            {
-                "OPENAI_API_KEY": "mock",
-                "XAI_API_KEY": "mock",
-                **cfg,
-            },
+        config_copy = dict(cfg)
+        config_copy.update({"OPENAI_API_KEY": "mock", "XAI_API_KEY": "mock"})
+        models_picked = catalog.get_models(
+            config_copy,
             mock_openai_models,
             mock_xai_models,
         )
     else:
-        models_picked = registry.get_models(cfg)
+        models_picked = catalog.get_models(cfg)
 
     _log(
         f"Models picked: openai={models_picked.get('openai')}, xai={models_picked.get('xai')}"
     )
 
-    complexity_class, complexity_reason = intent.classify_complexity(args.topic)
-    epistemic_stance, epistemic_reason = intent.classify_epistemic_stance(args.topic)
+    complexity_class, complexity_reason = analysis.classify_complexity(args.topic)
+    epistemic_stance, epistemic_reason = analysis.classify_epistemic_stance(args.topic)
     decomposition = []
     decomposition_source = "skipped"
-    if complexity_class == intent.COMPLEX_ANALYTICAL:
-        decomposition, decomposition_source = intent.decompose_query(
+    if complexity_class == analysis.COMPLEX_ANALYTICAL:
+        decomposition, decomposition_source = analysis.decompose_query(
             args.topic,
             cfg.get("OPENAI_API_KEY"),
             models_picked.get("openai"),
@@ -761,48 +703,33 @@ def main():
             display_mode = friendly
             break
 
-    (
-        reddit_items,
-        x_items,
-        youtube_items,
-        linkedin_items,
-        requires_web_search,
-        raw_openai,
-        raw_xai,
-        raw_youtube,
-        raw_linkedin,
-        raw_reddit_enriched,
-        reddit_error,
-        x_error,
-        youtube_error,
-        linkedin_error,
-    ) = run_research(
+    bundle = run_research(
         args.topic,
         platform,
         cfg,
         models_picked,
         start_date,
         end_date,
-        depth,
+        sampling,
         args.mock,
         progress,
     )
 
     # Begin post-processing phase
-    progress.start_processing()
+    progress.begin_scoring()
 
-    # Convert raw dicts to unified ContentItems
-    from briefbot_engine.content import Source, items_from_raw, filter_by_date
+    # Convert raw dicts to unified Signals
+    from briefbot_engine.records import Channel, items_from_raw, filter_by_date
 
     normalized_reddit = items_from_raw(
-        reddit_items, Source.REDDIT, start_date, end_date
+        bundle.items["reddit"], Channel.REDDIT, start_date, end_date
     )
-    normalized_x = items_from_raw(x_items, Source.X, start_date, end_date)
+    normalized_x = items_from_raw(bundle.items["x"], Channel.X, start_date, end_date)
     normalized_youtube = items_from_raw(
-        youtube_items, Source.YOUTUBE, start_date, end_date
+        bundle.items["youtube"], Channel.YOUTUBE, start_date, end_date
     )
     normalized_linkedin = items_from_raw(
-        linkedin_items, Source.LINKEDIN, start_date, end_date
+        bundle.items["linkedin"], Channel.LINKEDIN, start_date, end_date
     )
 
     # Apply strict date filtering
@@ -813,15 +740,15 @@ def main():
 
     # Combine all items then score -> dedupe -> rescore for final ranking
     all_items = filtered_reddit + filtered_x + filtered_youtube + filtered_linkedin
-    source_weights = intent.stance_weights(epistemic_stance)
-    initial_ranked = ranking.rank_items(all_items, source_weights=source_weights)
-    deduped_items = ranking.deduplicate(initial_ranked)
-    scored_items = ranking.rank_items(deduped_items, source_weights=source_weights)
+    source_weights = analysis.stance_weights(epistemic_stance)
+    initial_ranked = scoring.rank_items(all_items, source_weights=source_weights)
+    deduped_items = scoring.deduplicate(initial_ranked)
+    scored_items = scoring.rank_items(deduped_items, source_weights=source_weights)
 
-    progress.end_processing()
+    progress.finish_scoring()
 
     # Assemble the final report
-    report = content.build_report(
+    report = records.build_brief(
         args.topic,
         start_date,
         end_date,
@@ -836,22 +763,27 @@ def main():
         decomposition_source=decomposition_source,
     )
     report.items = deduped_items
-    report.reddit_error = reddit_error
-    report.x_error = x_error
-    report.youtube_error = youtube_error
-    report.linkedin_error = linkedin_error
+    report.reddit_error = bundle.errors.get("reddit")
+    report.x_error = bundle.errors.get("x")
+    report.youtube_error = bundle.errors.get("youtube")
+    report.linkedin_error = bundle.errors.get("linkedin")
     report.metrics.item_count = len(report.items)
 
-    report.context_snippet_md = output.context_fragment(report)
+    report.context_snippet_md = presenter.context_fragment(report)
 
-    output.save_artifacts(
-        report, raw_openai, raw_xai, raw_reddit_enriched, raw_youtube, raw_linkedin
+    presenter.save_artifacts(
+        report,
+        bundle.raw.get("openai"),
+        bundle.raw.get("xai"),
+        bundle.raw.get("reddit_enriched"),
+        bundle.raw.get("youtube"),
+        bundle.raw.get("linkedin"),
     )
 
     if platform == "web":
-        progress.show_web_only_complete()
+        progress.show_web_only_summary()
     else:
-        progress.show_complete(
+        progress.show_summary(
             len(report.reddit),
             len(report.x),
             len(report.youtube),
@@ -861,7 +793,7 @@ def main():
     output_report(
         report,
         args.emit,
-        requires_web_search,
+        bundle.needs_web,
         args.topic,
         start_date,
         end_date,
@@ -961,7 +893,7 @@ def _create_schedule(args):
         sys.exit(1)
 
     if args.email:
-        cfg = config.load_config()
+        cfg = settings.load_config()
         smtp_error = email.validate_smtp_config(cfg)
         if smtp_error:
             print(f"Error: {smtp_error}", file=sys.stderr)
@@ -975,8 +907,7 @@ def _create_schedule(args):
         print("Consider adding --audio, --email, and/or --telegram.", file=sys.stderr)
 
     args_dict = {
-        "quick": args.quick,
-        "deep": args.deep,
+        "sampling": args.sampling or "standard",
         "audio": args.audio,
         "days": args.days,
         "sources": args.sources,
@@ -1037,12 +968,12 @@ def output_report(
 ):
     """Render and output the research report in the specified format."""
     format_handlers = {
-        "compact": lambda: print(output.compact(report, missing_keys=missing_keys)),
+        "snapshot": lambda: print(presenter.compact(report, missing_keys=missing_keys)),
         "json": lambda: print(json.dumps(report.to_dict(), indent=2)),
-        "md": lambda: print(output.full_report(report)),
+        "md": lambda: print(presenter.full_report(report)),
         "context": lambda: print(report.context_snippet_md),
-        "path": lambda: print(output.context_path()),
-        "cards": lambda: print(output.signal_cards(report)),
+        "path": lambda: print(presenter.context_path()),
+        "cards": lambda: print(presenter.signal_cards(report)),
     }
 
     handler = format_handlers.get(output_format)
@@ -1054,13 +985,13 @@ def output_report(
 
         print()
         print(separator_line)
-        print("### WEB AUGMENTATION REQUIRED ###")
+        print("### WEB SWEEP RECOMMENDED ###")
         print(separator_line)
         print(f"Topic: {topic}")
         print(f"Date range: {start_date} to {end_date}")
         print()
         print("Run WebSearch and gather 8-15 non-social sources.")
-        print("Exclude reddit.com, x.com, and twitter.com (already covered above).")
+        print("Skip reddit.com and X/Twitter domains (already covered above).")
         print(
             f"Prioritize docs, blogs, changelogs, and news from the last {days} days."
         )
@@ -1068,19 +999,13 @@ def output_report(
         print("Merge web findings with platform findings into a single synthesis.")
         stance = (report.epistemic_stance or "").upper()
         if stance == "FACTUAL_TEMPORAL":
-            print(
-                "When confidence is close, prefer authoritative web sources for factual claims."
-            )
+            print("When confidence is close, prefer authoritative web sources for factual claims.")
         elif stance == "TRENDING_BREAKING":
             print("When confidence is close, prefer X for real-time momentum signals.")
         elif stance == "HOW_TO_TUTORIAL":
-            print(
-                "When confidence is close, prefer YouTube + docs for procedural guidance."
-            )
+            print("When confidence is close, prefer YouTube + docs for procedural guidance.")
         elif stance == "EXPERIENTIAL_OPINION":
-            print(
-                "When confidence is close, prefer Reddit/X for lived experience and sentiment."
-            )
+            print("When confidence is close, prefer Reddit/X for lived experience and sentiment.")
         else:
             print(
                 "When confidence is close, prefer sources with the strongest engagement signals."

@@ -7,22 +7,22 @@ import re
 import sys
 from typing import Any, Dict, List, Optional
 
-from .. import net
+from .. import http_client
 
 FALLBACK_MODELS = ["gpt-4o", "gpt-4o-mini"]
 
 
 def _err(msg: str) -> None:
-    sys.stderr.write(f"[YOUTUBE ERROR] {msg}\n")
+    sys.stderr.write(f"[YouTube] {msg}\n")
     sys.stderr.flush()
 
 
 def _info(msg: str) -> None:
-    sys.stderr.write(f"[YOUTUBE] {msg}\n")
+    sys.stderr.write(f"[YouTube] {msg}\n")
     sys.stderr.flush()
 
 
-def _is_access_err(err: net.HTTPError) -> bool:
+def _is_access_err(err: http_client.HTTPError) -> bool:
     if err.status_code not in (400, 403) or not err.body:
         return False
     lowered = err.body.lower()
@@ -38,10 +38,10 @@ def _is_access_err(err: net.HTTPError) -> bool:
 
 API_URL = "https://api.openai.com/v1/responses"
 
-DEPTH_SPECS = {
-    "quick": {"min": 6, "max": 12},
-    "default": {"min": 12, "max": 22},
-    "deep": {"min": 26, "max": 48},
+SAMPLING_SPECS = {
+    "lite": {"min": 6, "max": 12},
+    "standard": {"min": 12, "max": 22},
+    "dense": {"min": 26, "max": 48},
 }
 
 YOUTUBE_DISCOVERY_PROMPT = """Find YouTube videos about: {topic}
@@ -55,17 +55,17 @@ Return JSON only:
 {{
   "videos": [
     {{
-      "title": "Video title",
-      "link": "https://www.youtube.com/watch?v=...",
+      "headline": "Video title",
+      "url": "https://www.youtube.com/watch?v=...",
       "channel": "Channel Name",
-      "posted": "YYYY-MM-DD or null",
-      "metrics": {{
+      "dated": "YYYY-MM-DD or null",
+      "signals": {{
         "views": 12345,
         "likes": 500
       }},
-      "summary": "Short description or null",
-      "signal": 0.85,
-      "reason": "Why this video is relevant"
+      "blurb": "Short description or null",
+      "topicality": 0.85,
+      "rationale": "Why this video is relevant"
     }}
   ]
 }}
@@ -97,14 +97,14 @@ def search(
     topic: str,
     start: str,
     end: str,
-    depth: str = "default",
+    sampling: str = "standard",
     mock_response: Optional[Dict] = None,
     _is_retry: bool = False,
 ) -> Dict[str, Any]:
     if mock_response is not None:
         return mock_response
 
-    depth_spec = DEPTH_SPECS.get(depth, DEPTH_SPECS["default"])
+    depth_spec = SAMPLING_SPECS.get(sampling, SAMPLING_SPECS["standard"])
     min_items = depth_spec["min"]
     max_items = depth_spec["max"]
 
@@ -113,10 +113,13 @@ def search(
         "Content-Type": "application/json",
     }
 
-    timeout_map = {"quick": 90, "default": 120, "deep": 180}
-    timeout = timeout_map.get(depth, 120)
+    timeout_map = {"lite": 90, "standard": 120, "dense": 180}
+    timeout = timeout_map.get(sampling, 120)
 
-    models_chain = [model] + [m for m in FALLBACK_MODELS if m != model]
+    models_chain = [model]
+    for candidate in FALLBACK_MODELS:
+        if candidate not in models_chain:
+            models_chain.append(candidate)
 
     prompt = YOUTUBE_DISCOVERY_PROMPT.format(
         topic=topic,
@@ -142,8 +145,8 @@ def search(
         }
 
         try:
-            return net.post(API_URL, payload, headers=headers, timeout=timeout)
-        except net.HTTPError as api_err:
+            return http_client.post(API_URL, payload, headers=headers, timeout=timeout)
+        except http_client.HTTPError as api_err:
             last_err = api_err
             if _is_access_err(api_err):
                 _info(f"Model {current_model} not accessible, trying fallback...")
@@ -154,7 +157,7 @@ def search(
         _err(f"All models failed. Last error: {last_err}")
         raise last_err
 
-    raise net.HTTPError("No models available")
+    raise http_client.HTTPError("No models available")
 
 
 def parse_youtube_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -167,9 +170,9 @@ def parse_youtube_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]]
             if isinstance(err_data, dict)
             else str(err_data)
         )
-        _err(f"OpenAI API error: {err_msg}")
-        if net.DEBUG:
-            _err(f"Full error response: {json.dumps(api_response, indent=2)[:700]}")
+        _err(f"OpenAI response error: {err_msg}")
+        if http_client.DEBUG:
+            _err(f"Response snapshot: {json.dumps(api_response, indent=2)[:600]}")
         return extracted
 
     output_text = ""
@@ -202,7 +205,7 @@ def parse_youtube_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]]
 
     if not output_text:
         print(
-            f"[YOUTUBE WARNING] No output text found in response. Keys: {list(api_response.keys())}",
+            f"[YouTube] No output text found in response. Keys: {list(api_response.keys())}",
             flush=True,
         )
         return extracted
@@ -214,7 +217,7 @@ def parse_youtube_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]]
         if not isinstance(raw, dict):
             continue
 
-        link = raw.get("link", "")
+        link = raw.get("url", raw.get("link", ""))
         if not link:
             continue
         if "youtube.com" not in link and "youtu.be" not in link:
@@ -222,36 +225,36 @@ def parse_youtube_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]]
         if "/playlist" in link or "/channel/" in link or "/@" in link:
             continue
 
-        summary = raw.get("summary")
+        summary = raw.get("blurb", raw.get("summary"))
         if summary:
             summary = str(summary).strip()[:300]
 
         item = {
-            "uid": f"YT{idx + 1}",
-            "title": str(raw.get("title", "")).strip(),
-            "link": link,
+            "key": f"YT-{idx + 1:02d}",
+            "headline": str(raw.get("headline", raw.get("title", ""))).strip(),
+            "url": link,
             "channel": str(raw.get("channel", "")).strip(),
-            "posted": raw.get("posted"),
-            "metrics": {
+            "dated": raw.get("dated", raw.get("posted")),
+            "signals": {
                 "views": (
-                    int(raw.get("metrics", {}).get("views", 0))
-                    if raw.get("metrics", {}).get("views")
+                    int(raw.get("signals", raw.get("metrics", {})).get("views", 0))
+                    if raw.get("signals", raw.get("metrics", {})).get("views")
                     else None
                 ),
                 "likes": (
-                    int(raw.get("metrics", {}).get("likes", 0))
-                    if raw.get("metrics", {}).get("likes")
+                    int(raw.get("signals", raw.get("metrics", {})).get("likes", 0))
+                    if raw.get("signals", raw.get("metrics", {})).get("likes")
                     else None
                 ),
             },
-            "summary": summary,
-            "reason": str(raw.get("reason", "")).strip(),
-            "signal": min(1.0, max(0.0, float(raw.get("signal", 0.5)))),
+            "blurb": summary,
+            "rationale": str(raw.get("rationale", raw.get("reason", ""))).strip(),
+            "topicality": min(1.0, max(0.0, float(raw.get("topicality", raw.get("signal", 0.5))))),
         }
 
-        if item["posted"]:
-            if not re.match(r"^\d{4}-\d{2}-\d{2}$", str(item["posted"])):
-                item["posted"] = None
+        if item["dated"]:
+            if not re.match(r"^\d{4}-\d{2}-\d{2}$", str(item["dated"])):
+                item["dated"] = None
 
         validated.append(item)
 

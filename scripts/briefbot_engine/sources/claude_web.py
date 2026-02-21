@@ -80,10 +80,10 @@ def _build_prompt(
         "Date range: {} to {}".format(start_date, end_date),
         "",
         "Instructions:",
-        "1. Run a LIGHT WebSearch (3-5 results) to discover key terms and sources",
-        "2. Use what you found to run TARGETED WebSearch queries",
+        "1. Run a light WebSearch (3-5 results) to discover key terms and sources",
+        "2. Use what you found to run targeted WebSearch queries",
         "3. From the targeted searches, collect 8-15 relevant web pages",
-        "4. Exclude reddit.com, x.com, twitter.com (already covered by APIs)",
+        "4. Skip social domains already covered (Reddit/X/Twitter)",
         "5. Focus on: blogs, news articles, tutorials, documentation, GitHub repos",
         "6. Prefer recent content within the date range",
     ]
@@ -115,7 +115,7 @@ def _build_prompt(
         "- Insight 2",
         "- Insight 3",
         "",
-        "No preamble, no sign-off, no Sources: list. Just the structured results above.",
+        "No preamble or sign-off. Do not add a separate Sources list.",
     ])
 
     return "\n".join(lines)

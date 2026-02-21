@@ -8,27 +8,27 @@ import re
 import sys
 from typing import Any, Dict, List, Optional
 
-from .. import net
-from . import registry
+from .. import http_client
+from . import catalog
 
 
 def _err(msg: str) -> None:
-    sys.stderr.write(f"Error (X): {msg}\n")
+    sys.stderr.write(f"[X] {msg}\n")
     sys.stderr.flush()
 
 
 def _log(message: str) -> None:
     if os.environ.get("BRIEFBOT_DEBUG", "").lower() in ("1", "true", "yes"):
-        sys.stderr.write(f"[XAI_X] {message}\n")
+        sys.stderr.write(f"[X-POSTS] {message}\n")
         sys.stderr.flush()
 
 
 API_URL = "https://api.x.ai/v1/responses"
 
-DEPTH_TARGETS = {
-    "quick": {"min": 7, "max": 14},
-    "default": {"min": 14, "max": 30},
-    "deep": {"min": 28, "max": 58},
+SAMPLING_TARGETS = {
+    "lite": {"min": 7, "max": 14},
+    "standard": {"min": 14, "max": 30},
+    "dense": {"min": 28, "max": 58},
 }
 
 X_DISCOVERY_PROMPT = """Search X (Twitter) for posts about: {topic}
@@ -39,18 +39,18 @@ Return JSON only:
 {{
   "posts": [
     {{
-      "excerpt": "Short post text",
-      "link": "https://x.com/user/status/1234567890",
+      "snippet": "Short post text",
+      "url": "https://x.com/user/status/1234567890",
       "handle": "example_user",
-      "posted": "2026-01-20",
-      "metrics": {{
+      "dated": "2026-01-20",
+      "signals": {{
         "likes": 250,
         "reposts": 40,
         "replies": 30,
         "quotes": 8
       }},
-      "signal": 0.92,
-      "reason": "Explains why this post matters"
+      "topicality": 0.92,
+      "rationale": "Explains why this post matters"
     }}
   ]
 }}
@@ -80,7 +80,7 @@ def _make_request(
     _log(
         f"  Payload model: {payload['model']}, tools: {[t['type'] for t in payload['tools']]}, input_length: {len(payload['input'][0]['content'])} chars"
     )
-    response = net.post(API_URL, payload, headers=headers, timeout=timeout)
+    response = http_client.post(API_URL, payload, headers=headers, timeout=timeout)
     return response
 
 
@@ -98,7 +98,7 @@ MODEL_FALLBACKS = [
 ]
 
 
-def _is_model_access_error(err: net.HTTPError) -> bool:
+def _is_model_access_error(err: http_client.HTTPError) -> bool:
     if err.status_code is None:
         return False
     if err.status_code not in (400, 401, 403, 404, 409, 422):
@@ -202,7 +202,7 @@ def search(
     topic: str,
     start: str,
     end: str,
-    depth: str = "default",
+    sampling: str = "standard",
     mock_response: Optional[Dict] = None,
 ) -> Dict[str, Any]:
     _log("=== search START ===")
@@ -211,7 +211,7 @@ def search(
         _log("  Using MOCK response")
         return mock_response
 
-    depth_bucket = DEPTH_TARGETS.get(depth, DEPTH_TARGETS["default"])
+    depth_bucket = SAMPLING_TARGETS.get(sampling, SAMPLING_TARGETS["standard"])
     min_items = depth_bucket["min"]
     max_items = depth_bucket["max"]
 
@@ -220,8 +220,8 @@ def search(
         "Content-Type": "application/json",
     }
 
-    timeout_map = {"quick": 70, "default": 100, "deep": 145}
-    timeout = timeout_map.get(depth, 100)
+    timeout_map = {"lite": 70, "standard": 100, "dense": 145}
+    timeout = timeout_map.get(sampling, 100)
 
     prompt_content = X_DISCOVERY_PROMPT.format(
         topic=topic,
@@ -236,17 +236,20 @@ def search(
         response = _make_request(key, model, prompt_content, headers, timeout)
         _log("=== search END ===")
         return response
-    except net.HTTPError as e:
+    except http_client.HTTPError as e:
         if not _is_model_access_error(e):
             raise
         _err(
             f"Model '{model}' appears unavailable for this key "
             f"(status {e.status_code}); trying fallbacks..."
         )
-        registry.set_cached_model("xai", "")
+        catalog.set_cached_model("xai", "")
         last_err = e
 
-    fallbacks = [m for m in MODEL_FALLBACKS if m not in tried]
+    fallbacks = []
+    for m in MODEL_FALLBACKS:
+        if m not in tried:
+            fallbacks.append(m)
     for fallback_model in fallbacks:
         tried.add(fallback_model)
         try:
@@ -254,19 +257,20 @@ def search(
                 key, fallback_model, prompt_content, headers, timeout
             )
             _err(f"Fallback succeeded with model '{fallback_model}'")
-            registry.set_cached_model("xai", fallback_model)
+            catalog.set_cached_model("xai", fallback_model)
             _log("=== search END (via fallback) ===")
             return response
-        except net.HTTPError as e:
+        except http_client.HTTPError as e:
             if _is_model_access_error(e):
                 last_err = e
                 continue
             raise
 
-    discovered = registry.discover_xai_models(key)
-    dynamic_candidates = [
-        m for m in discovered if m.startswith("grok-") and m not in tried
-    ]
+    discovered = catalog.discover_xai_models(key)
+    dynamic_candidates = []
+    for m in discovered:
+        if m.startswith("grok-") and m not in tried:
+            dynamic_candidates.append(m)
 
     for fallback_model in dynamic_candidates:
         tried.add(fallback_model)
@@ -275,10 +279,10 @@ def search(
                 key, fallback_model, prompt_content, headers, timeout
             )
             _err(f"Dynamic fallback succeeded with model '{fallback_model}'")
-            registry.set_cached_model("xai", fallback_model)
+            catalog.set_cached_model("xai", fallback_model)
             _log("=== search END (via dynamic discovery) ===")
             return response
-        except net.HTTPError as e:
+        except http_client.HTTPError as e:
             if _is_model_access_error(e):
                 last_err = e
                 continue
@@ -290,7 +294,7 @@ def search(
     _log("=== search END (all fallbacks exhausted) ===")
     if last_err:
         raise last_err
-    raise net.HTTPError("All models were rejected by access constraints", 403)
+    raise http_client.HTTPError("All models were rejected by access constraints", 403)
 
 
 def parse_x_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -302,9 +306,9 @@ def parse_x_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]]:
         message = (
             api_error.get("message") if isinstance(api_error, dict) else str(api_error)
         )
-        _err(f"xAI API error: {message}")
-        if net.DEBUG:
-            _err(f"Full error response: {json.dumps(api_response, indent=2)[:700]}")
+        _err(f"xAI response error: {message}")
+        if http_client.DEBUG:
+            _err(f"Response snapshot: {json.dumps(api_response, indent=2)[:600]}")
         _log("=== parse_x_response END (api error) ===")
         return items
 
@@ -320,24 +324,24 @@ def parse_x_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]]:
     for row in candidates:
         if not isinstance(row, dict):
             continue
-        link = str(row.get("link", "")).strip()
+        link = str(row.get("url", row.get("link", ""))).strip()
         if not link:
             continue
 
-        date_value = row.get("posted")
+        date_value = row.get("dated", row.get("posted"))
         if date_value and not re.match(r"^\d{4}-\d{2}-\d{2}$", str(date_value)):
             date_value = None
 
         items.append(
             {
-                "uid": f"X{len(items) + 1}",
-                "excerpt": str(row.get("excerpt", "")).strip()[:500],
-                "link": link,
+                "key": f"X-{len(items) + 1:02d}",
+                "snippet": str(row.get("snippet", row.get("excerpt", ""))).strip()[:500],
+                "url": link,
                 "handle": str(row.get("handle", "")).strip().lstrip("@"),
-                "posted": date_value,
-                "metrics": _normalize_metrics(row.get("metrics")),
-                "reason": str(row.get("reason", "")).strip(),
-                "signal": _safe_signal(row.get("signal")),
+                "dated": date_value,
+                "signals": _normalize_metrics(row.get("signals", row.get("metrics"))),
+                "rationale": str(row.get("rationale", row.get("reason", ""))).strip(),
+                "topicality": _safe_signal(row.get("topicality", row.get("signal"))),
             }
         )
 

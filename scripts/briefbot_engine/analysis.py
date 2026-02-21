@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
-from . import net
+from . import http_client
 
 
 @dataclass
@@ -169,7 +169,7 @@ def decompose_query(
     )
 
     try:
-        response = net.post(
+        response = http_client.post(
             "https://api.openai.com/v1/responses",
             json_body={
                 "model": model,
@@ -180,7 +180,7 @@ def decompose_query(
             timeout=timeout,
             retries=2,
         )
-    except net.HTTPError:
+    except http_client.HTTPError:
         return [], "skipped"
 
     content = _extract_text(response)

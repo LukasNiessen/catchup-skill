@@ -36,10 +36,10 @@ MODULE_ROOT = Path(__file__).parent.resolve()
 sys.path.insert(0, str(MODULE_ROOT))
 
 from briefbot_engine.scheduling import cron, jobs
-from briefbot_engine import paths
+from briefbot_engine import locations
 
 
-LOG_DIRECTORY = paths.logs_dir()
+LOG_DIRECTORY = locations.logs_dir()
 
 BANNER_PAUSE_SECONDS = 15
 
@@ -100,21 +100,20 @@ def _build_briefbot_args(job: dict) -> list:
     args = ['"{}"'.format(job["topic"].replace('"', '\\"'))]
     job_args = job.get("args", {})
 
-    if job_args.get("quick"):
-        args.append("--quick")
-    elif job_args.get("deep"):
-        args.append("--deep")
+    sampling = job_args.get("sampling")
+    if sampling and sampling != "standard":
+        args.append("--sampling={}".format(sampling))
 
     days = job_args.get("days", 30)
     if days != 30:
-        args.append("--days={}".format(days))
+        args.append("--span={}".format(days))
 
     sources = job_args.get("sources", "auto")
     if sources != "auto":
-        args.append("--sources={}".format(sources))
+        args.append("--feeds={}".format(sources))
 
     if job_args.get("include_web"):
-        args.append("--include-web")
+        args.append("--web-plus")
 
     if job_args.get("audio"):
         args.append("--audio")

@@ -20,7 +20,7 @@ if sys.platform == "win32":
 MODULE_ROOT = Path(__file__).parent.resolve()
 sys.path.insert(0, str(MODULE_ROOT))
 
-from briefbot_engine import config as bb_config
+from briefbot_engine import settings as bb_config
 from briefbot_engine.delivery import email as email_delivery, telegram, audio, document
 
 

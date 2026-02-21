@@ -1,17 +1,20 @@
-"""Reddit thread hydration and comment-signal extraction."""
+"""Reddit thread hydration and comment signal extraction."""
 
+import math
 import re
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
-from .. import net, temporal
+from .. import http_client, timeframe
 
-_TRIVIAL_REPLIES = (
-    r"^(yep|nope|same|agreed|this|exactly|yes|no|ok|okay|got it|\+1)\.?!?$",
-    r"^(lol|lmao|rofl|haha|heh|lmfao|based)+$",
+_LOW_VALUE_PATTERNS = (
+    r"^(thanks|thx|ty|appreciate it|helpful)\.?$",
+    r"^(following|subscribed|bookmarking|saving this)\.?$",
+    r"^(same here|me too|ditto|this is the way)\.?$",
+    r"^(lol|lmao|rofl|haha|heh)+$",
     r"^\[(deleted|removed)\]$",
 )
-_SKIP_AUTHORS = {"[deleted]", "[removed]"}
+_SKIP_AUTHORS = {"[deleted]", "[removed]", "AutoModerator"}
 
 
 def _thread_path_from_url(url: str) -> Optional[str]:
@@ -36,8 +39,8 @@ def _load_thread_json(
     if not thread_path:
         return None
     try:
-        return net.reddit_json(thread_path)
-    except net.HTTPError:
+        return http_client.reddit_json(thread_path)
+    except http_client.HTTPError:
         return None
 
 
@@ -89,7 +92,7 @@ def _read_comments(raw_data: Any) -> List[Dict[str, Any]]:
                 "score": payload.get("score", 0),
                 "created_utc": payload.get("created_utc"),
                 "author": payload.get("author", "[deleted]"),
-                "body": body[:360],
+                "body": body[:420],
                 "permalink": payload.get("permalink"),
             }
         )
@@ -97,16 +100,26 @@ def _read_comments(raw_data: Any) -> List[Dict[str, Any]]:
 
 
 def _decode_thread_payload(raw_data: Any) -> Tuple[Optional[Dict[str, Any]], List[Dict[str, Any]]]:
-    """Decode Reddit listing JSON into submission + comments."""
     submission = _read_submission(raw_data)
     comments = _read_comments(raw_data)
     return submission, comments
 
 
-def _top_comments(comments: List[Dict], limit: int = 10) -> List[Dict[str, Any]]:
-    """Return highest-scoring comments from non-removed authors."""
-    ranked = [row for row in comments if row.get("author") not in _SKIP_AUTHORS]
-    ranked.sort(key=lambda row: int(row.get("score") or 0), reverse=True)
+def _comment_weight(row: Dict[str, Any]) -> float:
+    score = float(row.get("score") or 0)
+    body = str(row.get("body") or "")
+    score_weight = math.log1p(max(0.0, score))
+    length_weight = math.log1p(len(body))
+    return (score_weight * 1.4) + (length_weight * 0.8)
+
+
+def _top_comments(comments: List[Dict], limit: int = 8) -> List[Dict[str, Any]]:
+    ranked = [
+        row
+        for row in comments
+        if row.get("author") not in _SKIP_AUTHORS and (row.get("score") or 0) >= 0
+    ]
+    ranked.sort(key=_comment_weight, reverse=True)
     return ranked[: max(limit, 0)]
 
 
@@ -114,60 +127,64 @@ def _excerpt(text: str, hard_limit: int = 180, min_boundary_index: int = 60) -> 
     snippet = text[:hard_limit]
     if len(text) <= hard_limit:
         return snippet
-    boundary = max(snippet.rfind("."), snippet.rfind("!"), snippet.rfind("?"), snippet.rfind(";"))
+    boundary = max(
+        snippet.rfind("."),
+        snippet.rfind("!"),
+        snippet.rfind("?"),
+        snippet.rfind(";"),
+    )
     if boundary >= min_boundary_index:
         return snippet[: boundary + 1]
     return snippet.rstrip() + "..."
 
 
 def _extract_insights(comments: List[Dict], limit: int = 6) -> List[str]:
-    """Pull substantive insights from top comments, skipping low-value noise."""
     insights: List[str] = []
-    for comment in comments[: limit * 4]:
+    for comment in comments[: limit * 5]:
         body = str(comment.get("body") or "").strip()
-        if len(body) < 28:
+        if len(body) < 32:
             continue
         lowered = body.lower()
-        if any(re.match(pattern, lowered) for pattern in _TRIVIAL_REPLIES):
+        if any(re.match(pattern, lowered) for pattern in _LOW_VALUE_PATTERNS):
             continue
-        insights.append(_excerpt(body, hard_limit=190, min_boundary_index=70))
+        insights.append(_excerpt(body, hard_limit=200, min_boundary_index=80))
         if len(insights) >= limit:
             break
     return insights
 
 
-def enrich(
+def hydrate(
     item: Dict[str, Any],
     mock_json: Optional[Dict] = None,
 ) -> Dict[str, Any]:
     """Augment a Reddit item with thread-derived engagement metadata."""
-    thread_data = _load_thread_json(item.get("link", ""), mock_json)
+    thread_data = _load_thread_json(item.get("url", item.get("link", "")), mock_json)
     if thread_data is None:
         return item
 
     submission, comment_list = _decode_thread_payload(thread_data)
 
     if submission is not None:
-        item["metrics"] = {
+        item["signals"] = {
             "upvotes": submission.get("score"),
             "comments": submission.get("num_comments"),
-            "vote_ratio": submission.get("upvote_ratio"),
+            "ratio": submission.get("upvote_ratio"),
         }
         created_utc = submission.get("created_utc")
         if created_utc is not None:
-            item["posted"] = temporal.to_date_str(created_utc)
+            item["dated"] = timeframe.to_iso_date(created_utc)
 
-    top = _top_comments(comment_list, limit=10)
-    item["comment_cards"] = [
+    top = _top_comments(comment_list, limit=8)
+    item["thread_notes"] = [
         {
             "score": c.get("score", 0),
-            "posted": temporal.to_date_str(c.get("created_utc")),
+            "stamped": timeframe.to_iso_date(c.get("created_utc")),
             "author": c.get("author", ""),
-            "excerpt": str(c.get("body", ""))[:250],
-            "link": f"https://www.reddit.com{c.get('permalink', '')}" if c.get("permalink") else "",
+            "excerpt": str(c.get("body", ""))[:280],
+            "url": f"https://www.reddit.com{c.get('permalink', '')}" if c.get("permalink") else "",
         }
         for c in top
     ]
-    item["comment_highlights"] = _extract_insights(top)
+    item["notables"] = _extract_insights(top)
 
     return item

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Dict, Any
 
-from . import paths
+from . import locations
 
 
 def _log(message: str):
@@ -16,9 +16,9 @@ def _log(message: str):
         sys.stderr.flush()
 
 
-CONFIG_DIR = paths.config_dir()
-CONFIG_FILE = paths.config_file()
-LEGACY_CONFIG_FILE = paths.legacy_config_file()
+CONFIG_DIR = locations.config_dir()
+CONFIG_FILE = locations.config_file()
+LEGACY_CONFIG_FILE = locations.legacy_config_file()
 _TRUTHY = {"1", "true", "yes", "on", "y", "t"}
 
 
@@ -223,7 +223,7 @@ def resolve_sources(
             return SourceResolution("web")
         return SourceResolution(
             "web",
-            "No API keys found. Falling back to WebSearch only. Configure ~/.config/briefbot/.env (or legacy ~/.config/briefbot/.env) to enable Reddit, X, YouTube, and LinkedIn.",
+            "No API keys found. Falling back to WebSearch only. Configure ~/.config/briefbot/briefbot.env (or legacy ~/.config/briefbot/.env) to enable Reddit, X, YouTube, and LinkedIn.",
             severity="warn",
         )
 
@@ -254,7 +254,7 @@ def resolve_sources(
         if available_platforms == "both":
             return SourceResolution("all" if include_web_search else "both")
         missing = "xAI" if available_platforms == "reddit" else "OpenAI"
-        return SourceResolution("none", f"Cannot use both sources: missing {missing} credentials. Try --sources=auto for automatic fallback.", severity="error")
+        return SourceResolution("none", f"Cannot use both sources: missing {missing} credentials. Try --feeds=auto for automatic fallback.", severity="error")
 
     source_requirements = {
         "reddit": "openai",

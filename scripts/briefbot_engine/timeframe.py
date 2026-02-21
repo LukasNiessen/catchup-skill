@@ -1,4 +1,4 @@
-﻿"""Time-window and publication-date utilities."""
+"""Time-window and publication-date utilities."""
 
 import re
 from datetime import date, datetime, timedelta, timezone
@@ -39,14 +39,10 @@ _MONTH_TO_INT = {
     "december": 12,
 }
 
-CONFIDENCE_SOLID = "solid"
-CONFIDENCE_SOFT = "soft"
-CONFIDENCE_WEAK = "weak"
+CONFIDENCE_SOLID = "high"
+CONFIDENCE_SOFT = "medium"
+CONFIDENCE_WEAK = "low"
 
-
-# ---------------------------------------------------------------------------
-# Core date operations
-# ---------------------------------------------------------------------------
 
 def _today_utc() -> date:
     return datetime.now(timezone.utc).date()
@@ -56,15 +52,15 @@ def _as_iso_date(value: date) -> str:
     return value.isoformat()
 
 
-def window(days: int = 30) -> Tuple[str, str]:
-    """Return `from,to` bounds for a rolling UTC calendar window."""
+def span(days: int = 30) -> Tuple[str, str]:
+    """Return start/end bounds for a rolling UTC calendar window."""
     end_day = _today_utc()
     back_days = max(0, int(days or 0))
     start_day = end_day - timedelta(days=back_days)
     return _as_iso_date(start_day), _as_iso_date(end_day)
 
 
-def interpret(date_input: Optional[str]) -> Optional[datetime]:
+def parse_moment(date_input: Optional[str]) -> Optional[datetime]:
     """Parse known date shapes into a UTC datetime."""
     if not date_input:
         return None
@@ -73,7 +69,6 @@ def interpret(date_input: Optional[str]) -> Optional[datetime]:
     if not text:
         return None
 
-    # Fast path: Python ISO parser handles timezone offsets well.
     iso_candidate = text.replace("Z", "+00:00")
     try:
         parsed = datetime.fromisoformat(iso_candidate)
@@ -96,7 +91,7 @@ def interpret(date_input: Optional[str]) -> Optional[datetime]:
         return None
 
 
-def to_date_str(unix_timestamp: Optional[float]) -> Optional[str]:
+def to_iso_date(unix_timestamp: Optional[float]) -> Optional[str]:
     """Convert unix seconds into `YYYY-MM-DD`."""
     if unix_timestamp is None:
         return None
@@ -106,7 +101,7 @@ def to_date_str(unix_timestamp: Optional[float]) -> Optional[str]:
         return None
 
 
-def trust_level(
+def date_confidence(
     date_input: Optional[str],
     range_start: str,
     range_end: str,
@@ -124,7 +119,6 @@ def trust_level(
     if start_day <= parsed <= end_day:
         return CONFIDENCE_SOLID
 
-    # Near-edge dates are still partially trustworthy.
     if parsed < start_day:
         delta = (start_day - parsed).days
     else:
@@ -133,7 +127,7 @@ def trust_level(
     return CONFIDENCE_SOFT if delta <= 7 else CONFIDENCE_WEAK
 
 
-def elapsed_days(date_input: Optional[str]) -> Optional[int]:
+def days_since(date_input: Optional[str]) -> Optional[int]:
     """Return full days elapsed since date_input."""
     if not date_input:
         return None
@@ -144,9 +138,9 @@ def elapsed_days(date_input: Optional[str]) -> Optional[int]:
         return None
 
 
-def freshness_score(date_input: Optional[str], max_days: int = 30) -> int:
-    """Return curved freshness score in [0,100]."""
-    age = elapsed_days(date_input)
+def recency_score(date_input: Optional[str], max_days: int = 30) -> int:
+    """Return curved recency score in [0,100]."""
+    age = days_since(date_input)
     if age is None:
         return 0
     if age < 0:
@@ -155,14 +149,10 @@ def freshness_score(date_input: Optional[str], max_days: int = 30) -> int:
     if age >= cap:
         return 0
     remaining = (cap - age) / cap
-    return int(100 * (remaining ** 1.15))
+    return int(100 * (remaining ** 1.12))
 
 
-# ---------------------------------------------------------------------------
-# Date extraction from URLs and text (merged from websearch.py date logic)
-# ---------------------------------------------------------------------------
-
-def extract_from_url(url: str) -> Optional[str]:
+def scan_url_date(url: str) -> Optional[str]:
     """Extract a plausible publish date from URL patterns."""
     patterns = (
         r"/(\d{4})(\d{2})(\d{2})/",
@@ -174,12 +164,12 @@ def extract_from_url(url: str) -> Optional[str]:
         if not match:
             continue
         year, month, day = match.groups()
-        if 2019 <= int(year) <= 2032 and 1 <= int(month) <= 12 and 1 <= int(day) <= 31:
+        if 2019 <= int(year) <= 2033 and 1 <= int(month) <= 12 and 1 <= int(day) <= 31:
             return f"{year}-{month}-{day}"
     return None
 
 
-def extract_from_text(text: str) -> Optional[str]:
+def scan_text_date(text: str) -> Optional[str]:
     """Extract a date-like value from natural language."""
     if not text:
         return None
@@ -195,7 +185,7 @@ def extract_from_text(text: str) -> Optional[str]:
     if month_first:
         month_str, day_str, year_str = month_first.groups()
         month_num = _MONTH_TO_INT.get(month_str[:3])
-        if month_num and 2019 <= int(year_str) <= 2032 and 1 <= int(day_str) <= 31:
+        if month_num and 2019 <= int(year_str) <= 2033 and 1 <= int(day_str) <= 31:
             return f"{year_str}-{month_num:02d}-{int(day_str):02d}"
 
     day_first = re.search(
@@ -208,13 +198,13 @@ def extract_from_text(text: str) -> Optional[str]:
     if day_first:
         day_str, month_str, year_str = day_first.groups()
         month_num = _MONTH_TO_INT.get(month_str[:3])
-        if month_num and 2019 <= int(year_str) <= 2032 and 1 <= int(day_str) <= 31:
+        if month_num and 2019 <= int(year_str) <= 2033 and 1 <= int(day_str) <= 31:
             return f"{year_str}-{month_num:02d}-{int(day_str):02d}"
 
     iso = re.search(r"\b(\d{4})-(\d{2})-(\d{2})\b", text)
     if iso:
         year, month, day = iso.groups()
-        if 2019 <= int(year) <= 2032 and 1 <= int(month) <= 12 and 1 <= int(day) <= 31:
+        if 2019 <= int(year) <= 2033 and 1 <= int(month) <= 12 and 1 <= int(day) <= 31:
             return f"{year}-{month}-{day}"
 
     now = datetime.now()
@@ -245,21 +235,21 @@ def extract_from_text(text: str) -> Optional[str]:
     return None
 
 
-def detect(
+def detect_date(
     url: str,
     snippet: str,
     title: str,
 ) -> Tuple[Optional[str], str]:
     """Choose best available date signal from URL/title/snippet."""
-    url_date = extract_from_url(url)
+    url_date = scan_url_date(url)
     if url_date:
         return url_date, CONFIDENCE_SOLID
 
-    title_date = extract_from_text(title)
+    title_date = scan_text_date(title)
     if title_date:
         return title_date, CONFIDENCE_SOFT
 
-    snippet_date = extract_from_text(snippet)
+    snippet_date = scan_text_date(snippet)
     if snippet_date:
         return snippet_date, CONFIDENCE_SOFT
 

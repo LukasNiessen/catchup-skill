@@ -1,22 +1,13 @@
 {
-  "response_id": "resp_rs_xai_001",
-  "object": "response",
-  "created": 1708300800,
-  "model": "grok-4-fast",
   "output": [
     {
       "type": "message",
       "content": [
         {
           "type": "output_text",
-          "text": "{\n  \"items\": [\n    {\n      \"text\": \"We just released tokio 2.0 with structured concurrency built in. Cancellation safety is now the default, not the exception. Migration guide dropping tomorrow.\",\n      \"url\": \"https://x.com/tokio_fan/status/9988776655\",\n      \"author_handle\": \"tokio_fan\",\n      \"date\": \"2026-02-16\",\n      \"engagement\": {\n        \"likes\": 3842,\n        \"reposts\": 612,\n        \"replies\": 287,\n        \"quotes\": 95\n      },\n      \"why_relevant\": \"Major Tokio release announcement with breaking changes to the async runtime\",\n      \"relevance\": 0.98\n    },\n    {\n      \"text\": \"Hot take: Rust async is finally ergonomic in 2026. Between AFIT landing in stable, impl Trait in return position everywhere, and the new async closures RFC - the papercut era is over.\",\n      \"url\": \"https://x.com/rustdev_/status/9988776656\",\n      \"author_handle\": \"rustdev_\",\n      \"date\": \"2026-02-12\",\n      \"engagement\": {\n        \"likes\": 1567,\n        \"reposts\": 298,\n        \"replies\": 143,\n        \"quotes\": 67\n      },\n      \"why_relevant\": \"Overview of recent Rust async ergonomics improvements landing in stable\",\n      \"relevance\": 0.94\n    },\n    {\n      \"text\": \"Benchmarked our service after migrating from Go to Rust with tokio. 3.2x throughput improvement, 78% less memory, p99 latency dropped from 12ms to 1.4ms. Thread: how we did it.\",\n      \"url\": \"https://x.com/systems_eng/status/9988776657\",\n      \"author_handle\": \"systems_eng\",\n      \"date\": \"2026-02-09\",\n      \"engagement\": {\n        \"likes\": 2204,\n        \"reposts\": 445,\n        \"replies\": 198,\n        \"quotes\": 83\n      },\n      \"why_relevant\": \"Real-world performance benchmarks of Rust async runtime vs Go for production services\",\n      \"relevance\": 0.91\n    },\n    {\n      \"text\": \"PSA for anyone using async-std: the project just announced maintenance mode. Time to migrate to tokio or smol. Here's a compatibility shim I wrote to make it easier.\",\n      \"url\": \"https://x.com/async_coder/status/9988776658\",\n      \"author_handle\": \"async_coder\",\n      \"date\": \"2026-02-04\",\n      \"engagement\": {\n        \"likes\": 876,\n        \"reposts\": 201,\n        \"replies\": 64,\n        \"quotes\": 29\n      },\n      \"why_relevant\": \"Important ecosystem news about async-std deprecation and migration paths\",\n      \"relevance\": 0.86\n    }\n  ]\n}"
+          "text": "{\"posts\": [{\"snippet\": \"Perovskite tandem cells now certified at 33.8% ? impressive!\", \"url\": \"https://x.com/solarnews/status/123456\", \"handle\": \"solarnews\", \"dated\": \"2026-02-12\", \"signals\": {\"likes\": 540, \"reposts\": 120, \"replies\": 36, \"quotes\": 12}, \"topicality\": 0.9, \"rationale\": \"Strong engagement on a newly certified record\"}]}"
         }
       ]
     }
-  ],
-  "usage": {
-    "prompt_tokens": 217,
-    "completion_tokens": 501,
-    "total_tokens": 718
-  }
+  ]
 }

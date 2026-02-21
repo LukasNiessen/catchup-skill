@@ -38,18 +38,17 @@ Before any tool calls, classify the request into these internal fields:
 7. **COMPLEXITY_CLASS**: `BROAD_EXPLORATORY` vs `COMPLEX_ANALYTICAL`
 8. **EPISTEMIC_STANCE**: `EXPERIENTIAL_OPINION`, `FACTUAL_TEMPORAL`, `TRENDING_BREAKING`, `HOW_TO_TUTORIAL`, or `BALANCED`
 
-- **PROMPTING** - "X prompts", "prompting for X", "X best practices"
-- **RANKED_CHOICES** - "best X", "top X", "what X should I use", "recommended X"
-- **NEWS** - "what's happening with X", "X news", "latest on X"
-- **PAPER** - "papers on X", "research on X", "studies about X", "arxiv X"
-- **CELEBRITY** - "what's up with [celebrity]", "celebrity updates", "public reaction to [person]"
-- **GENERAL** - community research requests not covered above
-- **KNOWLEDGE** - direct explanation requests ("what is", "how does", "X vs Y", etc.)
+- **UPDATES** - "latest", "today", "this week", "release notes", "what changed"
+- **SHORTLIST** - "top picks", "shortlist", "which should I choose", "compare X vs Y"
+- **PROMPTCRAFT** - "write a prompt", "prompt template", "system prompt", "prompt pack"
+- **SCHOLARLY** - "paper", "study", "journal", "preprint", "meta-analysis"
+- **PUBLIC_FIGURE** - "interview", "controversy", "public reaction to [person]"
+- **DISCUSSION** - "what are people saying", "community sentiment", "threads about"
+- **EXPLAINER** - "explain", "what is", "how does", "overview", "break down"
 
 Improved intent heuristics:
 
-- `dont search. [...]` -> TURNED_OFF_SEARCH = true
-- `use only knowledge. [...]` -> TURNED_OFF_SEARCH = true
+- `dont search` / `no web` / `offline only` -> TURNED_OFF_SEARCH = true
 - `for [tool]` / `in [tool]` / `using [tool]` -> extract USAGE_TARGET
 - Mentions of person/company names -> extract TARGET_PERSON_OR_COMPANY
 - Mood cues:
@@ -58,13 +57,16 @@ Improved intent heuristics:
   - "is this real", "I doubt", "skeptical" -> `skeptical`
   - question-driven neutral asks -> `curious`
   - if unclear -> `neutral`
-- "best/top/recommended" patterns -> REQUEST_STYLE = RANKED_CHOICES
-- "paper/study/preprint/arxiv/journal/systematic review/meta-analysis" -> REQUEST_STYLE = PAPER
-- "celebrity/actor/singer/influencer/public figure" with update intent -> REQUEST_STYLE = CELEBRITY
-- "explain/what is/how does/X vs Y" -> REQUEST_STYLE = KNOWLEDGE
+- "latest/recent/today/this week/what changed" -> REQUEST_STYLE = UPDATES
+- "top/shortlist/compare/which should I pick" -> REQUEST_STYLE = SHORTLIST
+- "prompt/template/system prompt" -> REQUEST_STYLE = PROMPTCRAFT
+- "paper/study/journal/preprint/meta-analysis" -> REQUEST_STYLE = SCHOLARLY
+- "public figure/creator/celebrity" with update intent -> REQUEST_STYLE = PUBLIC_FIGURE
+- "what do people think/threads/opinions" -> REQUEST_STYLE = DISCUSSION
+- "explain/what is/how does/overview" -> REQUEST_STYLE = EXPLAINER
 - Complexity rules:
   - Entity/topic or generic request ("NVIDIA", "Tech news") -> `BROAD_EXPLORATORY`
-  - Multi-hop/analytical question ("Why is NVIDIA's stock dropping despite high AI chip sales?") -> `COMPLEX_ANALYTICAL`
+  - Multi-hop/analytical question ("Why is NVIDIA's stock dropping despite high AI chip sales->") -> `COMPLEX_ANALYTICAL`
 - Epistemic stance rules:
   - Opinion/sentiment/community -> `EXPERIENTIAL_OPINION`
   - Factual/technical/timeline -> `FACTUAL_TEMPORAL`
@@ -76,10 +78,10 @@ Improved intent heuristics:
 
 - `TURNED_OFF_SEARCH = [true/false]`
 - `FOCUS_AREA = [determined topic]`
-- `USAGE_TARGET = [determined tool or "unknown"]`
-- `TARGET_PERSON_OR_COMPANY = [name or "none"]`
+- `USAGE_TARGET = [determined tool or "unset"]`
+- `TARGET_PERSON_OR_COMPANY = [name or "unset"]`
 - `MOOD = [hyped | skeptical | urgent | curious | neutral]`
-- `REQUEST_STYLE = [RANKED_CHOICES | PAPER | CELEBRITY | NEWS | PROMPTING | GENERAL | KNOWLEDGE]`
+- `REQUEST_STYLE = [SHORTLIST | SCHOLARLY | PUBLIC_FIGURE | UPDATES | PROMPTCRAFT | DISCUSSION | EXPLAINER]`
 - `COMPLEXITY_CLASS = [BROAD_EXPLORATORY | COMPLEX_ANALYTICAL]`
 - `EPISTEMIC_STANCE = [EXPERIENTIAL_OPINION | FACTUAL_TEMPORAL | TRENDING_BREAKING | HOW_TO_TUTORIAL | BALANCED]`
 
@@ -169,7 +171,7 @@ Here's your current BriefBot config:
 
 After showing the config, say:
 
-> What would you like to change? You can say things like:
+> What would you like to change-> You can say things like:
 >
 > - "set OPENAI_API_KEY to sk-abc123"
 > - "clear SMTP_PASSWORD"
@@ -226,18 +228,18 @@ After applying changes, run `--show` again, present the refreshed config, and as
 End with:
 
 ```
-Want me to go deeper on any part of this, or research what the community is currently saying about {FOCUS_AREA}?
+Want me to go deeper on any part of this, or research what the community is currently saying about {FOCUS_AREA}->
 
 > **Try next:** [a concrete follow-up question about the topic - e.g., "research what people are saying about RAG vs fine-tuning right now"]
 ```
 
 The `> **Try next:**` line MUST be the very last line. It becomes the grey auto-suggestion the user can accept by pressing Enter.
 
-**Rules for KNOWLEDGE responses:**
+**Rules for EXPLAINER responses:**
 
 - No stats blocks, no source counts, no research invitation
 - No Python script execution
-- If the user then asks for community research or "what people are saying", switch to REQUEST_STYLE = GENERAL and run the full research pipeline below
+- If the user then asks for community research or "what people are saying", switch to REQUEST_STYLE = DISCUSSION and run the full research pipeline below
 - Match wording to MOOD; default to neutral and clear when mood is unknown
 
 **After answering, STOP. Do not proceed to Research Execution.**
@@ -285,7 +287,7 @@ If search is allowed, run a LIGHT WebSearch first (2-3 quick queries). Wait for 
 
 ---
 
-**If TURNED_OFF_SEARCH or REQUEST_STYLE = KNOWLEDGE, skip the rest of this entire section.**
+**If TURNED_OFF_SEARCH or REQUEST_STYLE = EXPLAINER, skip the rest of this entire section.**
 
 **Step 4: Run the research script**
 
@@ -298,7 +300,7 @@ ONLY AFTER outputting the text above, invoke your Bash tool in the exact same tu
 This command MUST be in the FOREGROUND. Do NOT use run_in_background. You will need the data it returns.
 
 ```bash
-PY=$(python3 -c "" 2>/dev/null && echo python3 || echo python) && $PY ~/.claude/skills/briefbot/scripts/briefbot.py "$ARGUMENTS" --emit=compact 2>&1
+PY=$(python3 -c "" 2>/dev/null && echo python3 || echo python) && $PY ~/.claude/skills/briefbot/scripts/briefbot.py "$ARGUMENTS" --view=snapshot 2>&1
 ```
 
 Use a timeout of 10 minutes on this bash call. The script does:
@@ -329,7 +331,7 @@ Use the LIGHT WebSearch seed terms from Step 3 to craft targeted, deeper queries
 
 However, tailor your search queries to match the REQUEST_STYLE:
 
-**If NEWS**:
+**If UPDATES**:
 
 - Query: `{FOCUS_AREA} latest news 2026`
 - Query: `{FOCUS_AREA} breaking updates this week`
@@ -337,7 +339,7 @@ However, tailor your search queries to match the REQUEST_STYLE:
 - Query: `{FOCUS_AREA} timeline recent events`
 - Objective: Capture breaking stories and concrete timelines
 
-**If RANKED_CHOICES**:
+**If SHORTLIST**:
 
 - Query: `best {FOCUS_AREA} 2026`
 - Query: `{FOCUS_AREA} comparison top options`
@@ -345,7 +347,7 @@ However, tailor your search queries to match the REQUEST_STYLE:
 - Query: `{FOCUS_AREA} alternatives pros cons`
 - Objective: Surface actual named options and reasons
 
-**If PAPER**:
+**If SCHOLARLY**:
 
 - Query: `{FOCUS_AREA} arxiv`
 - Query: `{FOCUS_AREA} peer reviewed study`
@@ -353,7 +355,7 @@ However, tailor your search queries to match the REQUEST_STYLE:
 - Query: `{FOCUS_AREA} benchmark dataset`
 - Objective: Collect primary research, not summaries
 
-**If CELEBRITY**:
+**If PUBLIC_FIGURE**:
 
 - Query: `{TARGET_PERSON_OR_COMPANY} latest interviews`
 - Query: `{TARGET_PERSON_OR_COMPANY} official announcement`
@@ -361,7 +363,7 @@ However, tailor your search queries to match the REQUEST_STYLE:
 - Query: `{TARGET_PERSON_OR_COMPANY} timeline recent`
 - Objective: Build verified timeline, separate facts from rumor
 
-**If GENERAL**:
+**If DISCUSSION**:
 
 - Query: `{FOCUS_AREA} 2026`
 - Query: `{FOCUS_AREA} community discussion`
@@ -369,7 +371,7 @@ However, tailor your search queries to match the REQUEST_STYLE:
 - Query: `{FOCUS_AREA} practical lessons`
 - Objective: Discover what people are genuinely talking about
 
-**If PROMPTING**:
+**If PROMPTCRAFT**:
 
 - Query: `{FOCUS_AREA} prompt examples 2026`
 - Query: `{FOCUS_AREA} prompt framework`
@@ -381,30 +383,28 @@ However, tailor your search queries to match the REQUEST_STYLE:
 
 Apply these rules regardless of query class:
 
-- **PRESERVE THE USER'S EXACT WORDING** - do not swap in or append technology names from your own knowledge
-  - The user's terminology may reflect newer usage than your training data - defer to it
-- SKIP reddit.com, x.com, twitter.com (the script already covers those)
-- PRIORITIZE: blogs, tutorials, documentation, news sites, GitHub repositories
-- **SUPPRESS any "Sources:" list in output**
-  - If the user typed "Flux LoRA training", search exactly that phrase
-  - Do NOT inject related terms like "Stable Diffusion", "ComfyUI", etc. on your own
+- **Anchor to the user's phrasing** and only add clarifying synonyms if needed.
+  - If the user typed "Flux LoRA training", keep that phrase intact in at least one query.
+- **Prefer primary sources** (docs, repos, official announcements, long-form writeups).
+- **Avoid social domains** in WebSearch unless the script is unavailable or you need an official post.
+- **No separate "Sources" section** -> weave links inline when referencing facts.
 
 **Step 7: Wait for background script to complete**
 Read TaskOutput and wait for script completion before synthesis.
 
-**Depth options** (from the user's command):
+**Sampling options** (from the user's command):
 
-- (default) → Use about 30-40 sources
-- `--deep` → Use about 50-80 sources
-- `--quick` → Use about 6-10 sources
+- `--sampling=standard` -> Balanced (default)
+- `--sampling=dense` -> Heavier coverage
+- `--sampling=lite` -> Faster and smaller
 
 **Time range options:**
 
-- `--days=N` → Search the last N days (default: 30)
-  - `--days=7` → Last week
-  - `--days=1` → Today only
-  - `--days=90` → Last 3 months
-  - `--days=365` → Last year
+- `--span=N` → Search the last N days (default: 30)
+  - `--span=7` → Last week
+  - `--span=1` → Today only
+  - `--span=90` → Last 3 months
+  - `--span=365` → Last year
 
 **Audio output:**
 
@@ -425,7 +425,7 @@ Read TaskOutput and wait for script completion before synthesis.
 - `--schedule "0 6 * * *" --email user@example.com` → Create a scheduled job that runs research and emails results
   - Cron expression format: `minute hour day-of-month month day-of-week`
   - Examples: `"0 6 * * *"` (daily 6am), `"0 8 * * 1-5"` (weekdays 8am), `"0 9 1 * *"` (1st of month)
-  - Captures current `--quick`/`--deep`/`--audio`/`--telegram`/`--days`/`--sources` flags into the job
+  - Captures current `--sampling`/`--audio`/`--telegram`/`--span`/`--feeds` flags into the job
   - Requires SMTP configuration in `~/.config/briefbot/.env` (see below)
 - `--list-jobs` → Display all registered scheduled jobs with status
 - `--delete-job cu_XXXXXX` → Remove a job from the OS scheduler and registry
@@ -550,9 +550,9 @@ The difference: a mental model that generalizes + techniques with mechanisms + s
 
 ---
 
-## RANKED_CHOICES Mode: Give Names, Not Advice
+## SHORTLIST Mode: Give Names, Not Advice
 
-When REQUEST*STYLE = RANKED_CHOICES, the user wants a ranked list of \_specific things* - not life advice.
+When REQUEST*STYLE = SHORTLIST, the user wants a ranked list of \_specific things* - not life advice.
 
 Go through the research and tally mentions. For each named item, note which platforms recommended it. Then rank by frequency.
 
@@ -578,7 +578,7 @@ Output everything in this order:
 
 ### 1. Core findings
 
-**For RANKED_CHOICES requests** - show the ranked list:
+**For SHORTLIST requests** - show the ranked list:
 
 ```
 ### Most mentioned
@@ -592,7 +592,7 @@ Output everything in this order:
 **Also worth noting:** [items with only 1-2 mentions]
 ```
 
-**For PAPER requests** — show this structure:
+**For SCHOLARLY requests** — show this structure:
 
 ```
 ### Research pulse
@@ -603,7 +603,7 @@ Output everything in this order:
 - **Open questions:** [what remains unresolved]
 ```
 
-**For CELEBRITY requests** — show this structure:
+**For PUBLIC_FIGURE requests** — show this structure:
 
 ```
 ### Verified timeline
@@ -617,7 +617,7 @@ Output everything in this order:
 - **Low-confidence claims:** [...]
 ```
 
-**For PROMPTING / NEWS / GENERAL requests** — show your two-layer synthesis:
+**For PROMPTCRAFT / UPDATES / DISCUSSION requests** — show your two-layer synthesis:
 
 ```
 ### What I learned
@@ -671,7 +671,7 @@ Show what was collected so the user can gauge depth.
 
 **Key sources:** {author1} on {site1}, {author2} on {site2}
 
-ðŸ’¡ *Want engagement metrics and community data? Add API keys to ~/.config/briefbot/.env*
+ðŸ’¡ *Want engagement metrics and community data-> Add API keys to ~/.config/briefbot/.env*
 *OPENAI_API_KEY → Reddit, YouTube, LinkedIn | XAI_API_KEY → X/Twitter*
 ```
 
@@ -683,7 +683,7 @@ Include a fitting emoji for the topic somewhere in this section.
 
 ```
 ---
-What would you like to do with this? A few ideas:
+What would you like to do with this-> A few ideas:
 
 - [Concrete suggestion tied to finding #1 - e.g., "Write a product-shot prompt using the camera-gear anchoring technique"]
 - [Concrete suggestion tied to finding #2 - e.g., "Compare Obsidian vs Logseq for your use case"]
@@ -696,7 +696,7 @@ If USAGE_TARGET is still unresolved, infer the most likely tool from the researc
 
 ### 4. Sanity check
 
-Before hitting send: re-read your "What I learned" block. Does it reflect what the sources _actually said_, or did you unconsciously drift toward your own knowledge? If the research was about a niche tool called BarkML, your summary should be about BarkML - not PyTorch just because both involve ML.
+Before hitting send: re-read your "What I learned" block. Does it reflect what the sources _actually said_, or did you unconsciously drift toward your own knowledge-> If the research was about a niche tool called BarkML, your summary should be about BarkML - not PyTorch just because both involve ML.
 
 ### 5. Grey auto-suggestion (last line)
 
@@ -771,24 +771,19 @@ When a prompt is called for, write exactly one.
 Output it like this:
 
 ```
-Here's your prompt for {USAGE_TARGET}:
-
----
-
+Prompt for {USAGE_TARGET} (paste-ready):
 [THE PROMPT - in whatever format the research pointed to]
 
----
-
-Built on: [one sentence naming the specific research insight you applied]
+Notes: [one sentence naming the specific research insight you applied]
 ```
 
 Before sending, verify:
 
-1. The format reflects what the research recommended (JSON, structured, prose, keywords - whichever applies)
-2. It directly addresses what the user said they want
-3. It uses terminology, patterns, and keywords from the actual research - not generic stand-ins
-4. It's paste-ready (or has clearly marked `[PLACEHOLDER]` slots)
-5. Length and tone match USAGE_TARGET conventions
+1. The format matches the medium the research emphasized (JSON, structured, prose, keywords).
+2. It includes 2-3 domain terms or patterns lifted from the findings.
+3. It encodes concrete constraints or guardrails observed in the research.
+4. It is directly usable (or has clearly marked `[PLACEHOLDER]` slots).
+5. Length and formatting fit the target tool's typical conventions.
 
 ### If They Want Variations
 
@@ -809,7 +804,7 @@ Always end with the `> **Try next:**` auto-suggestion line.
 Hold onto these for the duration of the session:
 
 - **FOCUS_AREA** - the topic
-- **USAGE_TARGET** - the tool (or "unknown")
+- **USAGE_TARGET** - the tool (or "unset")
 - **Extracted patterns** - the top findings from your research
 - **Raw research context** - the facts, quotes, and data you collected
 
@@ -870,7 +865,7 @@ After every prompt you deliver, close with:
 
 > **Try next:** [a different angle — short, vivid, concrete]
 
-💡 *Want engagement metrics and community data? Add API keys to ~/.config/briefbot/.env*
+💡 *Want engagement metrics and community data-> Add API keys to ~/.config/briefbot/.env*
 ```
 
 **Auto-suggestion rules:**

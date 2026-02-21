@@ -1,19 +1,13 @@
-﻿"""Tests for the output/formatter module (briefbot_engine.output)."""
+"""Tests for the output/formatter module (briefbot_engine.presenter)."""
 
-import pytest
+from briefbot_engine.records import Brief, Channel, Signal, build_brief
+from briefbot_engine.presenter import compact, context_fragment, full_report, context_path
+from briefbot_engine import timeframe
 
-from briefbot_engine.content import Report, ContentItem, Source, Engagement, build_report
-from briefbot_engine.output import compact, context_fragment, full_report, context_path
-from briefbot_engine import temporal
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 def _make_report(topic="AI agents", mode="both", items=None):
-    """Create a minimal Report for testing."""
-    report = build_report(
+    """Create a minimal Brief for testing."""
+    report = build_brief(
         topic=topic,
         start="2026-01-01",
         end="2026-01-31",
@@ -26,27 +20,22 @@ def _make_report(topic="AI agents", mode="both", items=None):
     return report
 
 
-def _make_reddit_item(uid="R1", title="Big discussion", subreddit="machinelearning"):
-    """Create a minimal Reddit ContentItem."""
-    return ContentItem(
-        uid=uid,
-        source=Source.REDDIT,
-        title=title,
-        link="https://www.reddit.com/r/{}/comments/abc123/test/".format(subreddit),
-        author=subreddit,
-        published="2026-01-15",
-        date_confidence=temporal.CONFIDENCE_SOLID,
-        engagement=Engagement(upvotes=42, comments=10),
-        relevance=0.9,
-        reason="Highly relevant discussion",
-        score=85,
-        meta={"subreddit": subreddit},
+def _make_reddit_item(key="R1", headline="Big discussion", subreddit="machinelearning"):
+    """Create a minimal Reddit Signal."""
+    return Signal(
+        key=key,
+        channel=Channel.REDDIT,
+        headline=headline,
+        url="https://www.reddit.com/r/{}/comments/abc123/test/".format(subreddit),
+        byline=subreddit,
+        dated="2026-01-15",
+        time_confidence=timeframe.CONFIDENCE_SOLID,
+        topicality=0.9,
+        rationale="Highly relevant discussion",
+        rank=85,
+        extras={"subreddit": subreddit},
     )
 
-
-# ---------------------------------------------------------------------------
-# compact()
-# ---------------------------------------------------------------------------
 
 def test_compact_basic_report_contains_topic():
     report = _make_report()
@@ -88,19 +77,11 @@ def test_compact_with_reddit_items_shows_subreddit():
     assert "r/python" in result
 
 
-# ---------------------------------------------------------------------------
-# context_fragment()
-# ---------------------------------------------------------------------------
-
 def test_context_fragment_contains_topic():
     report = _make_report(topic="Rust programming")
     result = context_fragment(report)
     assert "Rust programming" in result
 
-
-# ---------------------------------------------------------------------------
-# full_report()
-# ---------------------------------------------------------------------------
 
 def test_full_report_contains_topic_as_h1():
     report = _make_report(topic="LLM fine-tuning")
@@ -115,10 +96,6 @@ def test_full_report_contains_models_used_section():
     assert "gpt-4o-mini" in result
     assert "grok-2" in result
 
-
-# ---------------------------------------------------------------------------
-# context_path()
-# ---------------------------------------------------------------------------
 
 def test_context_path_contains_briefbot_context_md():
     result = context_path()

@@ -7,22 +7,22 @@ import re
 import sys
 from typing import Any, Dict, List, Optional
 
-from .. import net
+from .. import http_client
 
 FALLBACK_MODELS = ["gpt-4o-mini", "gpt-4o"]
 
 
 def _err(msg: str) -> None:
-    sys.stderr.write(f"[LINKEDIN ERROR] {msg}\n")
+    sys.stderr.write(f"[LinkedIn] {msg}\n")
     sys.stderr.flush()
 
 
 def _info(msg: str) -> None:
-    sys.stderr.write(f"[LINKEDIN] {msg}\n")
+    sys.stderr.write(f"[LinkedIn] {msg}\n")
     sys.stderr.flush()
 
 
-def _is_access_err(err: net.HTTPError) -> bool:
+def _is_access_err(err: http_client.HTTPError) -> bool:
     if err.status_code not in (400, 403) or not err.body:
         return False
     text = err.body.lower()
@@ -38,10 +38,10 @@ def _is_access_err(err: net.HTTPError) -> bool:
 
 API_URL = "https://api.openai.com/v1/responses"
 
-DEPTH_SPECS = {
-    "quick": {"min": 6, "max": 12},
-    "default": {"min": 12, "max": 22},
-    "deep": {"min": 26, "max": 46},
+SAMPLING_SPECS = {
+    "lite": {"min": 6, "max": 12},
+    "standard": {"min": 12, "max": 22},
+    "dense": {"min": 26, "max": 46},
 }
 
 LINKEDIN_DISCOVERY_PROMPT = """Find LinkedIn posts related to: {topic}
@@ -55,17 +55,17 @@ Return JSON only:
 {{
   "posts": [
     {{
-      "excerpt": "Short post text",
-      "link": "https://www.linkedin.com/posts/...",
+      "snippet": "Short post text",
+      "url": "https://www.linkedin.com/posts/...",
       "author": "Name",
       "role": "Title at Company",
-      "posted": "2026-01-15",
-      "metrics": {{
+      "dated": "2026-01-15",
+      "signals": {{
         "reactions": 120,
         "comments": 18
       }},
-      "signal": 0.85,
-      "reason": "Why this is relevant"
+      "topicality": 0.85,
+      "rationale": "Why this is relevant"
     }}
   ]
 }}
@@ -97,14 +97,14 @@ def search(
     topic: str,
     start: str,
     end: str,
-    depth: str = "default",
+    sampling: str = "standard",
     mock_response: Optional[Dict] = None,
     _is_retry: bool = False,
 ) -> Dict[str, Any]:
     if mock_response is not None:
         return mock_response
 
-    depth_spec = DEPTH_SPECS.get(depth, DEPTH_SPECS["default"])
+    depth_spec = SAMPLING_SPECS.get(sampling, SAMPLING_SPECS["standard"])
     min_items = depth_spec["min"]
     max_items = depth_spec["max"]
 
@@ -113,10 +113,13 @@ def search(
         "Content-Type": "application/json",
     }
 
-    timeout_map = {"quick": 90, "default": 120, "deep": 180}
-    timeout = timeout_map.get(depth, 120)
+    timeout_map = {"lite": 90, "standard": 120, "dense": 180}
+    timeout = timeout_map.get(sampling, 120)
 
-    models_chain = [model] + [m for m in FALLBACK_MODELS if m != model]
+    models_chain = [model]
+    for candidate in FALLBACK_MODELS:
+        if candidate not in models_chain:
+            models_chain.append(candidate)
 
     prompt = LINKEDIN_DISCOVERY_PROMPT.format(
         topic=topic,
@@ -142,8 +145,8 @@ def search(
         }
 
         try:
-            return net.post(API_URL, payload, headers=headers, timeout=timeout)
-        except net.HTTPError as api_err:
+            return http_client.post(API_URL, payload, headers=headers, timeout=timeout)
+        except http_client.HTTPError as api_err:
             last_err = api_err
             if _is_access_err(api_err):
                 _info(f"Model {current_model} not accessible, trying fallback...")
@@ -154,7 +157,7 @@ def search(
         _err(f"All models failed. Last error: {last_err}")
         raise last_err
 
-    raise net.HTTPError("No models available")
+    raise http_client.HTTPError("No models available")
 
 
 def parse_linkedin_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -167,9 +170,9 @@ def parse_linkedin_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]
             if isinstance(err_data, dict)
             else str(err_data)
         )
-        _err(f"OpenAI API error: {err_msg}")
-        if net.DEBUG:
-            _err(f"Full error response: {json.dumps(api_response, indent=2)[:700]}")
+        _err(f"OpenAI response error: {err_msg}")
+        if http_client.DEBUG:
+            _err(f"Response snapshot: {json.dumps(api_response, indent=2)[:600]}")
         return extracted
 
     output_text = ""
@@ -181,10 +184,7 @@ def parse_linkedin_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]
             if isinstance(elem, dict):
                 if elem.get("type") == "message":
                     for block in elem.get("content", []):
-                        if (
-                            isinstance(block, dict)
-                            and block.get("type") == "output_text"
-                        ):
+                        if isinstance(block, dict) and block.get("type") == "output_text":
                             output_text = block.get("text", "")
                             break
                 elif "text" in elem:
@@ -202,7 +202,7 @@ def parse_linkedin_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]
 
     if not output_text:
         print(
-            f"[LINKEDIN WARNING] No output text found in response. Keys: {list(api_response.keys())}",
+            f"[LinkedIn] No output text found in response. Keys: {list(api_response.keys())}",
             flush=True,
         )
         return extracted
@@ -214,36 +214,39 @@ def parse_linkedin_response(api_response: Dict[str, Any]) -> List[Dict[str, Any]
         if not isinstance(raw, dict):
             continue
 
-        link = raw.get("link", "")
+        link = raw.get("url", raw.get("link", ""))
         if not link or "linkedin.com" not in link:
             continue
 
         item = {
-            "uid": f"LI{idx + 1}",
-            "excerpt": str(raw.get("excerpt", "")).strip(),
-            "link": link,
+            "key": f"LI-{idx + 1:02d}",
+            "snippet": str(raw.get("snippet", raw.get("excerpt", ""))).strip(),
+            "url": link,
             "author": str(raw.get("author", "")).strip(),
             "role": str(raw.get("role", "")).strip(),
-            "posted": raw.get("posted"),
-            "metrics": {
+            "dated": raw.get("dated", raw.get("posted")),
+            "signals": {
                 "reactions": (
-                    int(raw.get("metrics", {}).get("reactions", 0))
-                    if raw.get("metrics", {}).get("reactions")
+                    int(raw.get("signals", raw.get("metrics", {})).get("reactions", 0))
+                    if raw.get("signals", raw.get("metrics", {})).get("reactions")
                     else None
                 ),
                 "comments": (
-                    int(raw.get("metrics", {}).get("comments", 0))
-                    if raw.get("metrics", {}).get("comments")
+                    int(raw.get("signals", raw.get("metrics", {})).get("comments", 0))
+                    if raw.get("signals", raw.get("metrics", {})).get("comments")
                     else None
                 ),
             },
-            "reason": str(raw.get("reason", "")).strip(),
-            "signal": min(1.0, max(0.0, float(raw.get("signal", 0.5)))),
+            "rationale": str(raw.get("rationale", raw.get("reason", ""))).strip(),
+            "topicality": min(
+                1.0,
+                max(0.0, float(raw.get("topicality", raw.get("signal", 0.5)))),
+            ),
         }
 
-        if item["posted"]:
-            if not re.match(r"^\d{4}-\d{2}-\d{2}$", str(item["posted"])):
-                item["posted"] = None
+        if item["dated"]:
+            if not re.match(r"^\d{4}-\d{2}-\d{2}$", str(item["dated"])):
+                item["dated"] = None
 
         validated.append(item)
 
